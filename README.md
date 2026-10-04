@@ -1,6 +1,6 @@
-# storybook-github-pages
+# storybook-github-swiss-knife
 
-[![CI](https://github.com/Archetipo95/storybook-github-pages/actions/workflows/ci.yml/badge.svg)](https://github.com/Archetipo95/storybook-github-pages/actions/workflows/ci.yml)
+[![CI](https://github.com/Archetipo95/storybook-github-swiss-knife/actions/workflows/ci.yml/badge.svg)](https://github.com/Archetipo95/storybook-github-swiss-knife/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Deploy Storybook to GitHub Pages with secure reusable workflows, PR previews, badges, coverage stats, and growth graphs.
@@ -32,7 +32,7 @@ permissions:
 
 jobs:
   deploy-storybook:
-    uses: Archetipo95/storybook-github-pages/.github/workflows/deploy-storybook.yml@v1.11.0
+    uses: Archetipo95/storybook-github-swiss-knife/.github/workflows/deploy-storybook.yml@v0.1.0
     with:
       path: 'storybook-static'
       package_manager: 'npm'

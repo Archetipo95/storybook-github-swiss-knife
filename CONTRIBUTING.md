@@ -1,6 +1,6 @@
-# Contributing to storybook-github-pages
+# Contributing to storybook-github-swiss-knife
 
-Thank you for your interest in contributing to `storybook-github-pages`! This project provides security-hardened GitHub Actions and reusable workflows for publishing Storybook builds to GitHub Pages.
+Thank you for your interest in contributing to `storybook-github-swiss-knife`! This project provides security-hardened GitHub Actions and reusable workflows for publishing Storybook builds to GitHub Pages.
 
 ---
 
@@ -17,8 +17,8 @@ Thank you for your interest in contributing to `storybook-github-pages`! This pr
 Clone the repository and verify the test environment:
 
 ```bash
-git clone https://github.com/Archetipo95/storybook-github-pages.git
-cd storybook-github-pages
+git clone https://github.com/Archetipo95/storybook-github-swiss-knife.git
+cd storybook-github-swiss-knife
 npm test
 ```
 
@@ -73,4 +73,4 @@ To maintain our security posture:
    - Describe what changed and why.
    - Reference related issue numbers (e.g. `Fixes #12`).
 
-Thank you for helping make `storybook-github-pages` secure, reliable, and developer-friendly!
+Thank you for helping make `storybook-github-swiss-knife` secure, reliable, and developer-friendly!

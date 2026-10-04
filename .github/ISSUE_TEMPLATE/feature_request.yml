@@ -1,12 +1,12 @@
 name: Feature Request
-description: Suggest an idea or enhancement for storybook-github-pages
+description: Suggest an idea or enhancement for storybook-github-swiss-knife
 title: '[Feature]: '
 labels: ['enhancement']
 body:
   - type: markdown
     attributes:
       value: |
-        Have an idea to improve `storybook-github-pages`? We would love to hear it!
+        Have an idea to improve `storybook-github-swiss-knife`? We would love to hear it!
 
   - type: textarea
     id: feature_summary

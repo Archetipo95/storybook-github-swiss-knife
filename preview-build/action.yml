@@ -130,11 +130,11 @@ runs:
         EVENT_NAME: ${{ inputs.event_name }}
       run: |
         if [ "$EVENT_NAME" != "pull_request" ]; then
-          echo "::error::storybook-github-pages/preview-build must run in a job triggered by the pull_request event (got event_name=\"$EVENT_NAME\")." >&2
+          echo "::error::storybook-github-swiss-knife/preview-build must run in a job triggered by the pull_request event (got event_name=\"$EVENT_NAME\")." >&2
           exit 1
         fi
         if [ -z "$PR_NUMBER" ]; then
-          echo '::error::storybook-github-pages/preview-build must run in a job triggered by the pull_request event (github.event.pull_request.number is empty).' >&2
+          echo '::error::storybook-github-swiss-knife/preview-build must run in a job triggered by the pull_request event (github.event.pull_request.number is empty).' >&2
           exit 1
         fi
         if ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]] || [ "$PR_NUMBER" -eq 0 ]; then

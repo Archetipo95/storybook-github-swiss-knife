@@ -56,7 +56,7 @@ export default config;
 
 Vite and Rollup often generate vendor chunks with leading underscores (e.g. `_plugin-vue_export-helper.js` or `_commonjsHelpers.js`). GitHub Pages runs Jekyll by default, which ignores any file or folder starting with an underscore (`_`), causing HTTP 404 errors on dynamic imports.
 
-`storybook-github-pages` **automatically** creates and preserves `.nojekyll` files at both the Pages root and inside artifact packages. You do not need to manually create `.nojekyll` in your source repository.
+`storybook-github-swiss-knife` **automatically** creates and preserves `.nojekyll` files at both the Pages root and inside artifact packages. You do not need to manually create `.nojekyll` in your source repository.
 
 > 💡 **Live Reference Implementation:** See [Archetipo95/storybook-vue-demo](https://github.com/Archetipo95/storybook-vue-demo) for a complete working example with Vue 3.5, Storybook 10, Vite 8, and automated PR previews.
 

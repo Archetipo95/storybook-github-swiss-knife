@@ -111,7 +111,7 @@ test('pr-preview-publish workflow gates on success/event/repository and requires
 
 test('pr-preview-publish pins a preview-publisher action schema that supports the passcode gate', () => {
   const content = read('.github/workflows/pr-preview-publish.yml');
-  const match = content.match(/Archetipo95\/storybook-github-pages\/preview-publisher@([a-f0-9]{40})/);
+  const match = content.match(/Archetipo95\/storybook-github-swiss-knife\/preview-publisher@([a-f0-9]{40})/);
   assert.ok(match, 'publish must pin preview-publisher to a full commit SHA');
 
   const action = execFileSync('git', ['show', `${match[1]}:preview-publisher/action.yml`], {

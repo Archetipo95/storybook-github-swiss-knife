@@ -11,7 +11,7 @@
 
 ## Security Model & Design Principles
 
-`storybook-github-pages` is designed with defense-in-depth principles to safely build and deploy static sites in GitHub Actions environments.
+`storybook-github-swiss-knife` is designed with defense-in-depth principles to safely build and deploy static sites in GitHub Actions environments.
 
 ### 1. Least Privilege Permissions
 
@@ -64,7 +64,7 @@ All user-supplied paths, directory inputs, and built artifacts undergo rigorous 
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in `storybook-github-pages`, please report it responsibly:
+If you discover a security vulnerability in `storybook-github-swiss-knife`, please report it responsibly:
 
 1. **Do NOT open a public GitHub issue** for security vulnerabilities.
 2. Email the maintainer or submit a **Private Security Advisory** via the GitHub repository (`Security > Advisories > Report a vulnerability`).

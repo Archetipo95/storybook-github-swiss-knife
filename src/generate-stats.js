@@ -437,7 +437,7 @@ export function renderHandDrawnChartSvg({
 
   <!-- Footer / Watermark -->
   <g id="watermark">
-    <text x="${width - 20}" y="${height - 14}" class="watermark">storybook-github-pages</text>
+    <text x="${width - 20}" y="${height - 14}" class="watermark">storybook-github-swiss-knife</text>
   </g>
 </svg>`;
 }

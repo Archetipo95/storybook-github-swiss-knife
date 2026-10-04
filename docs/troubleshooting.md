@@ -74,7 +74,7 @@
 - **Symptom**: In browser developer tools console, Storybook fails to render with `404 Not Found` for files like `assets/_plugin-vue_export-helper-*.js` or `TypeError: Failed to fetch dynamically imported module`.
 - **Cause**: GitHub Pages uses Jekyll by default. Jekyll ignores files and folders prefixed with an underscore (`_`), which Vite and Rollup frequently produce for helper chunks.
 - **Solution**:
-  - `storybook-github-pages` automatically injects a `.nojekyll` file at the root of `gh-pages` and within build bundles.
+  - `storybook-github-swiss-knife` automatically injects a `.nojekyll` file at the root of `gh-pages` and within build bundles.
   - If using a custom deployment workflow, ensure `.nojekyll` exists at the root of the `gh-pages` branch.
   - Ensure your `.storybook/main.ts` configures `base: './'` in `viteFinal` as described in the [Modern Bundlers guide](bundlers.md).
 

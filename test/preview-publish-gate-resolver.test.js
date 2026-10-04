@@ -63,7 +63,7 @@ function extractGateResolverStep() {
 function extractCheckoutStep() {
   const content = fs.readFileSync(workflowPath, 'utf8');
   const stepMatch = content.match(
-    /- name: Checkout resolver source \(storybook-github-pages, pinned\)[\s\S]*?\n\n      - name: Extract trusted pull request context/
+    /- name: Checkout resolver source \(storybook-github-swiss-knife, pinned\)[\s\S]*?\n\n      - name: Extract trusted pull request context/
   );
   assert.ok(stepMatch, 'could not locate the resolver checkout step in pr-preview-publish.yml');
   return stepMatch[0];
@@ -74,14 +74,14 @@ test('gate job pins an explicit repository/ref checkout for the resolver instead
 
   assert.match(
     step,
-    /repository:\s*Archetipo95\/storybook-github-pages/,
+    /repository:\s*Archetipo95\/storybook-github-swiss-knife/,
     'checkout must explicitly target this action repo, not the caller'
   );
   const refMatch = step.match(/ref:\s*([a-f0-9]{40})/);
   assert.ok(refMatch, 'checkout must pin an explicit full-length commit SHA ref');
   assert.match(
     step,
-    /path:\s*\.storybook-github-pages-resolver/,
+    /path:\s*\.storybook-github-swiss-knife-resolver/,
     'checkout must land in a dedicated path, not the job workspace root'
   );
   assert.match(step, /persist-credentials:\s*false/, 'resolver checkout must never persist credentials');
@@ -96,7 +96,7 @@ test('gate job pins an explicit repository/ref checkout for the resolver instead
 
 test('extract-context step imports the resolver from the pinned checkout path, not the job workspace root', () => {
   const script = extractGateResolverStep();
-  assert.match(script, /import\("\.\/\.storybook-github-pages-resolver\/src\/resolve-run-context\.js"\)/);
+  assert.match(script, /import\("\.\/\.storybook-github-swiss-knife-resolver\/src\/resolve-run-context\.js"\)/);
   assert.doesNotMatch(script, /import\("\.\/src\/resolve-run-context\.js"\)/);
 });
 
@@ -105,7 +105,7 @@ test('extract-context step resolves the trusted PR context even when the job wor
   // checkout of the *caller*) has no `src/` at all. Only the pinned
   // resolver checkout subdirectory is populated, as the fixed workflow does.
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-resolver-consumer-checkout-'));
-  const resolverDir = path.join(workDir, '.storybook-github-pages-resolver', 'src');
+  const resolverDir = path.join(workDir, '.storybook-github-swiss-knife-resolver', 'src');
   fs.mkdirSync(resolverDir, { recursive: true });
   fs.copyFileSync(path.join(repoRoot, 'src/resolve-run-context.js'), path.join(resolverDir, 'resolve-run-context.js'));
   assert.ok(!fs.existsSync(path.join(workDir, 'src')), 'sanity check: consumer checkout has no top-level src/');

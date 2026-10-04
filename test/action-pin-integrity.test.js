@@ -10,7 +10,7 @@ import { execFileSync } from 'node:child_process';
 // resolve it ("Can't find action.yml") before any provenance gates ran.
 //
 // This test statically resolves every internal self-reference of the form
-// `Archetipo95/storybook-github-pages/<subaction>@<full-sha>` found in the
+// `Archetipo95/storybook-github-swiss-knife/<subaction>@<full-sha>` found in the
 // workflows/docs of this repository and inspects the *actual git object* at
 // that pinned commit (via `git show <sha>:<path>`) to make sure the
 // referenced action definition really exists there. This catches a stale or
@@ -63,9 +63,9 @@ function gitCommitExists(sha) {
 }
 
 function findInternalActionRefs(content) {
-  // Matches `Archetipo95/storybook-github-pages[/<subaction>]@<40-hex-sha>`
-  // e.g. `Archetipo95/storybook-github-pages/preview-publisher@6fdc8e3...`
-  const regex = /Archetipo95\/storybook-github-pages(\/[a-zA-Z0-9_-]+)?@([a-f0-9]{40})/g;
+  // Matches `Archetipo95/storybook-github-swiss-knife[/<subaction>]@<40-hex-sha>`
+  // e.g. `Archetipo95/storybook-github-swiss-knife/preview-publisher@6fdc8e3...`
+  const regex = /Archetipo95\/storybook-github-swiss-knife(\/[a-zA-Z0-9_-]+)?@([a-f0-9]{40})/g;
   const refs = [];
   for (const match of content.matchAll(regex)) {
     refs.push({ subaction: match[1] ? match[1].slice(1) : null, sha: match[2] });
@@ -118,7 +118,7 @@ test('internal action pins reference a commit that actually contains that action
 
 test('preview-publisher pin resolves alongside the src it depends on', () => {
   const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/pr-preview-publish.yml'), 'utf8');
-  const match = workflow.match(/Archetipo95\/storybook-github-pages\/preview-publisher@([a-f0-9]{40})/);
+  const match = workflow.match(/Archetipo95\/storybook-github-swiss-knife\/preview-publisher@([a-f0-9]{40})/);
   assert.ok(match, 'expected a SHA-pinned preview-publisher reference in pr-preview-publish.yml');
 
   const sha = match[1];
@@ -151,7 +151,7 @@ test('preview-publisher pin resolves alongside the src it depends on', () => {
 // *content* - not just its existence - includes the #124 fix.
 test('preview-publisher pin content includes the current-PR snapshot preservation fix (#124)', () => {
   const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/pr-preview-publish.yml'), 'utf8');
-  const match = workflow.match(/Archetipo95\/storybook-github-pages\/preview-publisher@([a-f0-9]{40})/);
+  const match = workflow.match(/Archetipo95\/storybook-github-swiss-knife\/preview-publisher@([a-f0-9]{40})/);
   assert.ok(match, 'expected a SHA-pinned preview-publisher reference in pr-preview-publish.yml');
   const sha = match[1];
 
@@ -177,7 +177,7 @@ test('preview-publisher pin content includes the current-PR snapshot preservatio
 
 test('preview-publisher pin content includes compact stats graph rendering', () => {
   const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/pr-preview-publish.yml'), 'utf8');
-  const match = workflow.match(/Archetipo95\/storybook-github-pages\/preview-publisher@([a-f0-9]{40})/);
+  const match = workflow.match(/Archetipo95\/storybook-github-swiss-knife\/preview-publisher@([a-f0-9]{40})/);
   assert.ok(match, 'expected a SHA-pinned preview-publisher reference in pr-preview-publish.yml');
   const sha = match[1];
 
@@ -208,7 +208,7 @@ test('preview-publisher pin content includes compact stats graph rendering', () 
 
 test('preview-cleanup pin content includes best-effort optional post-cleanup updates', () => {
   const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/pr-preview-cleanup.yml'), 'utf8');
-  const match = workflow.match(/Archetipo95\/storybook-github-pages\/preview-cleanup@([a-f0-9]{40})/);
+  const match = workflow.match(/Archetipo95\/storybook-github-swiss-knife\/preview-cleanup@([a-f0-9]{40})/);
   assert.ok(match, 'expected a SHA-pinned preview-cleanup reference in pr-preview-cleanup.yml');
   const sha = match[1];
 
@@ -234,7 +234,7 @@ function internalActionSteps(content) {
   const lines = content.split('\n');
   const steps = [];
   lines.forEach((line, index) => {
-    const match = line.match(/uses: Archetipo95\/storybook-github-pages\/([a-zA-Z0-9_-]+)@([a-f0-9]{40})/);
+    const match = line.match(/uses: Archetipo95\/storybook-github-swiss-knife\/([a-zA-Z0-9_-]+)@([a-f0-9]{40})/);
     if (!match) return;
     const stepIndent = line.search(/\S/);
     const passed = [];

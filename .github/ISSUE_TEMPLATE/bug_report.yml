@@ -1,5 +1,5 @@
 name: Bug Report
-description: Create a bug report to help us improve storybook-github-pages
+description: Create a bug report to help us improve storybook-github-swiss-knife
 title: '[Bug]: '
 labels: ['bug']
 body:
@@ -38,7 +38,7 @@ body:
       description: Provide the relevant section of your GitHub Actions workflow file.
       render: yaml
       placeholder: |
-        uses: Archetipo95/storybook-github-pages@v1.11.0
+        uses: Archetipo95/storybook-github-swiss-knife@v0.1.0
         with:
           path: 'storybook-static'
           build_command: 'npm run build-storybook'

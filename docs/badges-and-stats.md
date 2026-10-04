@@ -1,6 +1,6 @@
 # Dynamic SVG Badges & Endpoints
 
-When `generate_badges` is enabled (default), `storybook-github-pages` analyzes your Storybook output (`index.json` / `stories.json`) and source tree to generate static SVG badges and Shields.io JSON endpoints into the `<badges_directory>/` subfolder on GitHub Pages:
+When `generate_badges` is enabled (default), `storybook-github-swiss-knife` analyzes your Storybook output (`index.json` / `stories.json`) and source tree to generate static SVG badges and Shields.io JSON endpoints into the `<badges_directory>/` subfolder on GitHub Pages:
 
 - `badges/coverage.svg` / `badges/coverage.json` — Component coverage percentage and ratio (e.g. `coverage | 86% (6/7)` with dynamic green/yellow/red thresholds).
 - `badges/stories.svg` / `badges/stories.json` — Story count badge (e.g. `stories | 26`).
@@ -73,7 +73,7 @@ The selected coverage set is the single source of truth for:
 
 # 📈 Hand-Drawn Growth Chart & Metrics Ledger
 
-When `generate_stats_graph` is enabled (default), `storybook-github-pages` generates a star-history styled hand-drawn SVG chart and keeps an incremental metrics ledger across deployments:
+When `generate_stats_graph` is enabled (default), `storybook-github-swiss-knife` generates a star-history styled hand-drawn SVG chart and keeps an incremental metrics ledger across deployments:
 
 - `stats/history.svg` — Hand-drawn SVG growth chart showing total components in red and covered components in green. Story count stays available as a badge/JSON metric, but is not plotted because it can change much more frequently than component coverage. Supports dark-mode viewing with vintage hand-drawn styling and responsive layout.
 - `stats/history.json` — Historical commit ledger appending metrics (`timestamp`, `commitSha`, `stories`, `components`, `totalComponents`, `coveragePercent`) on every deployment.

@@ -1,7 +1,7 @@
 {
-  "name": "storybook-github-pages",
-  "version": "1.11.0",
-  "description": "Deploy Storybook to GitHub Pages with secure reusable workflows and Bitovi compatibility",
+  "name": "storybook-github-swiss-knife",
+  "version": "0.1.0",
+  "description": "Storybook on GitHub: Pages deploys, PR previews, visual regression and accessibility checks",
   "main": "src/config.js",
   "type": "module",
   "scripts": {
@@ -20,14 +20,18 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Archetipo95/storybook-github-pages.git"
+    "url": "git+https://github.com/Archetipo95/storybook-github-swiss-knife.git"
   },
   "keywords": [
-    "storybook",
-    "github-pages",
-    "github-actions",
+    "accessibility",
+    "axe",
     "deployment",
-    "reusable-workflow"
+    "github-actions",
+    "github-pages",
+    "playwright",
+    "reusable-workflow",
+    "storybook",
+    "visual-regression"
   ],
   "author": "Archetipo95",
   "license": "MIT",
@@ -35,5 +39,6 @@
     "eslint": "^10.11.0",
     "globals": "^17.12.0",
     "prettier": "^3.9.9"
-  }
+  },
+  "private": true
 }

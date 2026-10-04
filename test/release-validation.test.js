@@ -41,7 +41,7 @@ test('release validation - package.json runtime dependency cleanliness', () => {
   assert.match(pkg.version, /^\d+\.\d+\.\d+$/, 'package.json version must be a stable semver release');
   assert.ok(
     !pkg.dependencies || Object.keys(pkg.dependencies).length === 0,
-    'storybook-github-pages must have zero runtime npm dependencies for maximum reproducibility'
+    'storybook-github-swiss-knife must have zero runtime npm dependencies for maximum reproducibility'
   );
   assert.ok(pkg.engines && pkg.engines.node, 'package.json must specify engines.node');
 });
@@ -128,19 +128,19 @@ test('release validation - immutable release tag recommended in docs and issue t
   assert.match(
     docs,
     new RegExp(
-      `uses:\\s*Archetipo95/storybook-github-pages/\\.github/workflows/deploy-storybook\\.yml@${releaseTagPattern().source}`
+      `uses:\\s*Archetipo95/storybook-github-swiss-knife/\\.github/workflows/deploy-storybook\\.yml@${releaseTagPattern().source}`
     ),
     `Docs reusable workflow example must use immutable release tag @v${releaseVersion()}`
   );
   assert.match(
     docs,
-    new RegExp(`uses:\\s*Archetipo95/storybook-github-pages@${releaseTagPattern().source}`),
+    new RegExp(`uses:\\s*Archetipo95/storybook-github-swiss-knife@${releaseTagPattern().source}`),
     `Docs composite action example must use immutable release tag @v${releaseVersion()}`
   );
   assert.match(
     docs,
     new RegExp(
-      `replace \`bitovi/github-actions-storybook-to-github-pages@v1\\.0\\.3\` with \`Archetipo95/storybook-github-pages@${releaseTagPattern().source}\``
+      `replace \`bitovi/github-actions-storybook-to-github-pages@v1\\.0\\.3\` with \`Archetipo95/storybook-github-swiss-knife@${releaseTagPattern().source}\``
     ),
     `Docs migration guide must specify immutable release tag @v${releaseVersion()}`
   );
@@ -151,7 +151,7 @@ test('release validation - immutable release tag recommended in docs and issue t
   );
   assert.match(
     bugReport,
-    new RegExp(`uses:\\s*Archetipo95/storybook-github-pages@${releaseTagPattern().source}`),
+    new RegExp(`uses:\\s*Archetipo95/storybook-github-swiss-knife@${releaseTagPattern().source}`),
     `Bug report template must use immutable release tag @v${releaseVersion()}`
   );
 });
@@ -160,12 +160,12 @@ test('release validation - all documented own-action release refs use current ve
   const currentTag = `v${releaseVersion()}`;
   const staleRefs = releaseRefFiles().flatMap(file => {
     const content = fs.readFileSync(path.join(process.cwd(), file), 'utf8');
-    return [...content.matchAll(/Archetipo95\/storybook-github-pages(?:\/[A-Za-z0-9_.\/-]+)?@(v\d+\.\d+\.\d+)/g)]
+    return [...content.matchAll(/Archetipo95\/storybook-github-swiss-knife(?:\/[A-Za-z0-9_.\/-]+)?@(v\d+\.\d+\.\d+)/g)]
       .filter(match => match[1] !== currentTag)
       .map(match => `${file}: ${match[0]}`);
   });
 
-  assert.deepEqual(staleRefs, [], `Found stale documented storybook-github-pages refs:\n${staleRefs.join('\n')}`);
+  assert.deepEqual(staleRefs, [], `Found stale documented storybook-github-swiss-knife refs:\n${staleRefs.join('\n')}`);
 });
 
 test('release validation - package manager validation documents Bun workflow-only support', () => {
@@ -193,7 +193,7 @@ test('release validation - directory mode integration documents dedicated publis
   // Directory mode requires publisher action
   assert.match(
     docs,
-    new RegExp(`uses:\\s*Archetipo95/storybook-github-pages/publisher@${releaseTagPattern().source}`),
+    new RegExp(`uses:\\s*Archetipo95/storybook-github-swiss-knife/publisher@${releaseTagPattern().source}`),
     `Docs Option 3 directory mode pipeline must use publisher@v${releaseVersion()}`
   );
   assert.match(

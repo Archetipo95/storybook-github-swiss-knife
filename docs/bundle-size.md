@@ -15,7 +15,7 @@ The inputs are accepted by the reusable workflow, the composite action, the
 ```yaml
 jobs:
   storybook:
-    uses: Archetipo95/storybook-github-pages/.github/workflows/deploy-storybook.yml@v1
+    uses: Archetipo95/storybook-github-swiss-knife/.github/workflows/deploy-storybook.yml@v1
     with:
       audit_bundle_size: true
       bundle_size_max_mb: '25'

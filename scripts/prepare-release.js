@@ -30,7 +30,7 @@ function replaceProjectTags(file) {
   write(
     file,
     read(file)
-      .replace(/(Archetipo95\/storybook-github-pages(?:\/[A-Za-z0-9_.\/-]+)?@)v\d+\.\d+\.\d+/g, `$1${tag}`)
+      .replace(/(Archetipo95\/storybook-github-swiss-knife(?:\/[A-Za-z0-9_.\/-]+)?@)v\d+\.\d+\.\d+/g, `$1${tag}`)
       .replace(/(for example, `@)v\d+\.\d+\.\d+(`\))/g, `$1${tag}$2`)
   );
 }
@@ -77,7 +77,10 @@ if (uncommitted) {
   process.exit(1);
 }
 for (const file of walkFiles('.github/workflows').filter(file => /\.ya?ml$/.test(file))) {
-  write(file, read(file).replace(/(Archetipo95\/storybook-github-pages\/[A-Za-z0-9_-]+@)[0-9a-f]{40}/g, `$1${pinSha}`));
+  write(
+    file,
+    read(file).replace(/(Archetipo95\/storybook-github-swiss-knife\/[A-Za-z0-9_-]+@)[0-9a-f]{40}/g, `$1${pinSha}`)
+  );
 }
 
 updateJson('package.json', pkg => {
@@ -95,13 +98,13 @@ for (const file of releaseRefFiles()) {
 
 const staleRefs = releaseRefFiles().flatMap(file => {
   const matches = [
-    ...read(file).matchAll(/Archetipo95\/storybook-github-pages(?:\/[A-Za-z0-9_.\/-]+)?@v\d+\.\d+\.\d+/g)
+    ...read(file).matchAll(/Archetipo95\/storybook-github-swiss-knife(?:\/[A-Za-z0-9_.\/-]+)?@v\d+\.\d+\.\d+/g)
   ];
   return matches.map(match => ({ file, ref: match[0] })).filter(({ ref }) => !ref.endsWith(`@${tag}`));
 });
 
 if (staleRefs.length > 0) {
-  console.error(`Found stale storybook-github-pages release refs after preparing ${tag}:`);
+  console.error(`Found stale storybook-github-swiss-knife release refs after preparing ${tag}:`);
   for (const { file, ref } of staleRefs) {
     console.error(`- ${file}: ${ref}`);
   }
