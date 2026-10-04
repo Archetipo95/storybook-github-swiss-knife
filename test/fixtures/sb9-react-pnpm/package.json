@@ -1,0 +1,17 @@
+{
+  "name": "swiss-knife-fixture-sb9-react-pnpm",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.18.3",
+  "scripts": {
+    "build-storybook": "storybook build --quiet --output-dir storybook-static"
+  },
+  "devDependencies": {
+    "@storybook/react-vite": "9.1.20",
+    "@vitejs/plugin-react": "5.2.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "storybook": "9.1.20",
+    "vite": "7.3.6"
+  }
+}

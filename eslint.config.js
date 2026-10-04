@@ -15,6 +15,11 @@ export default [
     }
   },
   {
-    ignores: ['node_modules/', 'test/fixtures/', '.copilot/']
+    // Serialized by Playwright and run inside the Storybook preview.
+    files: ['runner/lib/browser.js'],
+    languageOptions: { globals: { ...globals.browser } }
+  },
+  {
+    ignores: ['node_modules/', '**/node_modules/', 'test/fixtures/', '.copilot/']
   }
 ];

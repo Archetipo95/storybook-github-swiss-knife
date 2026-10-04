@@ -7,13 +7,14 @@
   "scripts": {
     "test": "node --test test/*.test.js",
     "test:coverage": "node --test --experimental-test-coverage test/*.test.js",
-    "lint": "eslint src/ test/*.test.js",
+    "lint": "eslint src/ test/*.test.js runner/ scripts/",
     "format": "prettier --check \"**/*.{js,json,yml,yaml,md}\"",
     "format:fix": "prettier --write \"**/*.{js,json,yml,yaml,md}\"",
     "prepare-release": "node scripts/prepare-release.js",
     "validate-artifact": "node src/validate-artifact.js",
     "validate-config": "node src/config.js",
-    "generate-badges": "node src/generate-badges.js"
+    "generate-badges": "node src/generate-badges.js",
+    "test:fixture": "node scripts/fixture-e2e.mjs"
   },
   "engines": {
     "node": ">=24.0.0"
