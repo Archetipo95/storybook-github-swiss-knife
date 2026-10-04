@@ -42,6 +42,17 @@ export const storyFailureOf = test =>
 
 export const storyIdOf = test => annotationsOf(test).find(({ type }) => type === 'story')?.description;
 
+/** Story ids a shard's "removed stories" check reported: baselines without a story. */
+export const removedIdsOf = test => [
+  // Playwright repeats annotations on the test and on each result.
+  ...new Set(
+    annotationsOf(test)
+      .filter(({ type }) => type === 'removed')
+      .flatMap(({ description }) => String(description ?? '').split(','))
+      .filter(Boolean)
+  )
+];
+
 export function firstErrorLine(test) {
   const failure = storyFailureOf(test);
   return (failure ?? stripVTControlCharacters(errorOf(test)))
@@ -55,7 +66,10 @@ export function firstErrorLine(test) {
  * @param {{ suites?: unknown[] }} report Parsed Playwright JSON report.
  */
 export function classifyVisualResults(report) {
-  const tests = (report?.suites ?? []).flatMap(collectTests);
+  const all = (report?.suites ?? []).flatMap(collectTests);
+  // The per-shard "removed stories" check is not a story.
+  const removedChecks = all.filter(test => removedIdsOf(test).length > 0);
+  const tests = all.filter(test => !removedChecks.includes(test));
   // An interaction that failed on any attempt blocks, even when the retry passed.
   const interactions = tests.filter(storyFailureOf);
   const failed = tests.filter(test => test.status === 'unexpected');
@@ -63,9 +77,13 @@ export function classifyVisualResults(report) {
   const broken = failed.filter(test => !isScreenshotDiff(test) && !storyFailureOf(test));
   const added = tests.filter(test => test.status === 'expected' && isNew(test));
   const flaky = tests.filter(test => test.status === 'flaky' && !storyFailureOf(test));
-  const notUnchanged = new Set([...failed, ...interactions, ...added, ...flaky]);
+  const skipped = tests.filter(test => test.status === 'skipped');
+  const notUnchanged = new Set([...failed, ...interactions, ...added, ...flaky, ...skipped]);
   const unchanged = tests.filter(test => !notUnchanged.has(test));
-  return { tests, interactions, failed, changed, broken, added, flaky, unchanged };
+  const removed = [...new Set(removedChecks.flatMap(removedIdsOf))].sort();
+  // Errors outside any test, e.g. the spec failing to load: nothing was compared.
+  const runErrors = (report?.errors ?? []).map(error => stripVTControlCharacters(error?.message ?? String(error)));
+  return { tests, interactions, failed, changed, broken, added, flaky, skipped, unchanged, removed, runErrors };
 }
 
 export const readVisualResults = resultsPath => classifyVisualResults(JSON.parse(fs.readFileSync(resultsPath, 'utf8')));

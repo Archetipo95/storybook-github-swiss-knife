@@ -51,7 +51,10 @@ export function evaluateGate({ bundle, config, baseline, approved, headSha, prNu
       incomplete: 'Incomplete run',
       interaction: 'Interaction tests failed',
       error: 'Stories failed to render',
-      changed: `${gate.counts.changed} visual change${gate.counts.changed === 1 ? '' : 's'} to review`,
+      changed: (() => {
+        const count = gate.counts.changed + gate.counts.removed;
+        return `${count} visual change${count === 1 ? '' : 's'} to review`;
+      })(),
       approved: 'Visual changes approved',
       clean: 'No visual changes'
     }[gate.reason],
@@ -94,5 +97,5 @@ export function evaluateGate({ bundle, config, baseline, approved, headSha, prNu
       )
     };
   }
-  return { visual, a11y, approvedForManifest: approved, changed: gate.counts.changed };
+  return { visual, a11y, approvedForManifest: approved, changed: gate.counts.changed + gate.counts.removed };
 }

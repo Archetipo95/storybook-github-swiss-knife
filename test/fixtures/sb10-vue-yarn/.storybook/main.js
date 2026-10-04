@@ -2,5 +2,6 @@
 export default {
   framework: '@storybook/vue3-vite',
   stories: ['../src/**/*.stories.js'],
+  addons: ['@storybook/addon-a11y'],
   core: { disableTelemetry: true }
 };

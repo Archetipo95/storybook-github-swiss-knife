@@ -13,18 +13,43 @@ export function isA11yDisabled(parameters = {}) {
 }
 
 /**
+ * Rules a story turns on or off: `a11y.config.rules` ([{ id, enabled }]) and the axe run-options
+ * form `a11y.options.rules` ({ id: { enabled } }).
+ * @param {any} parameters
+ */
+export function storyRuleSettings(parameters = {}) {
+  const enabled = new Set();
+  const disabled = new Set();
+  const apply = (id, on) => {
+    if (typeof id !== 'string') return;
+    (on === false ? disabled : enabled).add(id);
+    (on === false ? enabled : disabled).delete(id);
+  };
+  for (const rule of parameters?.a11y?.config?.rules ?? []) {
+    if (rule && 'enabled' in rule) apply(rule.id, rule.enabled);
+  }
+  for (const [id, rule] of Object.entries(parameters?.a11y?.options?.rules ?? {})) {
+    if (rule && typeof rule === 'object' && 'enabled' in rule) apply(id, rule.enabled);
+  }
+  return { enabled, disabled };
+}
+
+/**
  * Runs axe on the rendered story and writes `<reportDir>/<storyId>.json` when it finds
  * violations. Blocking is decided later, by the trusted gate (src/a11y/report.js).
  * @param {import('@playwright/test').Page} page
  * @param {{ storyId: string, parameters: any, reportDir: string, scope: string, disabledRules: string[] }} options
  */
 export async function scanStory(page, { storyId, parameters, reportDir, scope, disabledRules }) {
-  const storyRules = (parameters?.a11y?.config?.rules ?? []).filter(rule => rule && typeof rule.id === 'string');
-  const disabled = [
-    ...new Set([...disabledRules, ...storyRules.filter(rule => rule.enabled === false).map(rule => rule.id)])
-  ];
-  let builder = new AxeBuilder({ page }).include(scope);
-  if (disabled.length > 0) builder = builder.disableRules(disabled);
+  const { enabled, disabled } = storyRuleSettings(parameters);
+  const off = [...new Set([...disabledRules.filter(rule => !enabled.has(rule)), ...disabled])];
+  // Storybook 8 `a11y.element`, Storybook 9+ `a11y.context` (selector form only).
+  const storyScope = [parameters?.a11y?.context, parameters?.a11y?.element].find(value => typeof value === 'string');
+  let builder = new AxeBuilder({ page }).include(storyScope || scope);
+  if (off.length > 0) builder = builder.disableRules(off);
+  if (enabled.size > 0) {
+    builder = builder.options({ rules: Object.fromEntries([...enabled].map(rule => [rule, { enabled: true }])) });
+  }
   const { violations } = await builder.analyze();
   if (violations.length === 0) return [];
   const report = {

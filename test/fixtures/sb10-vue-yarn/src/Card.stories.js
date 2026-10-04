@@ -9,3 +9,8 @@ export const Mobile = {
     </article>`
   })
 };
+
+export const OptedOut = {
+  parameters: { swissKnife: { visual: { skip: true } } },
+  render: () => ({ template: '<p>Not compared</p>' })
+};

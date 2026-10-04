@@ -6,6 +6,7 @@
     "build-storybook": "storybook build --quiet --output-dir storybook-static"
   },
   "devDependencies": {
+    "@storybook/addon-viewport": "8.6.18",
     "@storybook/test": "8.6.18",
     "@storybook/vue3-vite": "8.6.18",
     "@vitejs/plugin-vue": "5.2.4",

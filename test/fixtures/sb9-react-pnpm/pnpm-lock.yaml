@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@storybook/addon-a11y':
+        specifier: 9.1.20
+        version: 9.1.20(storybook@9.1.20(@testing-library/dom@10.4.2)(vite@7.3.6))
       '@storybook/react-vite':
         specifier: 9.1.20
         version: 9.1.20(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rollup@4.64.0)(storybook@9.1.20(@testing-library/dom@10.4.2)(vite@7.3.6))(typescript@7.0.2)(vite@7.3.6)
@@ -607,6 +610,11 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@storybook/addon-a11y@9.1.20':
+    resolution: {integrity: sha512-VFZ34y4ApmFwIzPRs2OJrG6jtYhM5y91eCZLTlR/HMGQciKF4TdOJHjj+5vf91SOER5UDcLizXetpiUowiZSgw==}
+    peerDependencies:
+      storybook: ^9.1.20
+
   '@storybook/builder-vite@9.1.20':
     resolution: {integrity: sha512-cdU3Q2/wEaT8h+mApFToRiF/0hYKH1eAkD0scQn67aODgp7xnkr0YHcdA+8w0Uxd2V7U8crV/cmT/HD0ELVOGw==}
     peerDependencies:
@@ -880,6 +888,10 @@ packages:
 
   ast-types@0.16.3:
     resolution: {integrity: sha512-FvWoWYfSCM6kRxCSH+MGLHIKKGRL6A6AW7Zek2O32REPQRdg131428uRTKMBYAeRd3XXAaHDS60Wpri7CdKDrA==}
+    engines: {node: '>=4'}
+
+  axe-core@4.13.0:
+    resolution: {integrity: sha512-UzGt8zg7Ny8djbYMhxl2zuEevVa7r2gJjYY5Lwr1xM7+XU2nd6CkIWFTVcCIbAP63vSz71NaVyyuSk9lHKcy0A==}
     engines: {node: '>=4'}
 
   balanced-match@1.0.2:
@@ -1823,6 +1835,12 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.64.0':
     optional: true
 
+  '@storybook/addon-a11y@9.1.20(storybook@9.1.20(@testing-library/dom@10.4.2)(vite@7.3.6))':
+    dependencies:
+      '@storybook/global': 5.0.0
+      axe-core: 4.13.0
+      storybook: 9.1.20(@testing-library/dom@10.4.2)(vite@7.3.6)
+
   '@storybook/builder-vite@9.1.20(storybook@9.1.20(@testing-library/dom@10.4.2)(vite@7.3.6))(vite@7.3.6)':
     dependencies:
       '@storybook/csf-plugin': 9.1.20(storybook@9.1.20(@testing-library/dom@10.4.2)(vite@7.3.6))
@@ -2060,6 +2078,8 @@ snapshots:
   ast-types@0.16.3:
     dependencies:
       tslib: 2.8.1
+
+  axe-core@4.13.0: {}
 
   balanced-match@1.0.2: {}
 
