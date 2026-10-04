@@ -3,7 +3,8 @@
 // baseline from the pull request head (as data, through the API), the run's results bundle,
 // and posts the two required check runs on the head commit. It never runs pull request code.
 //
-// Environment: GITHUB_TOKEN, REPOSITORY, RUN_ID, PROJECT_DIR (trusted checkout), BUNDLE_DIR
+// Environment: GITHUB_TOKEN, REPOSITORY, RUN_ID, PROJECT_DIR (trusted checkout of the project
+// directory), WORKING_DIRECTORY (that directory, relative to the repository root), BUNDLE_DIR
 // (downloaded results bundle, may be missing), PAGES_REPO (optional checkout of the Pages
 // branch), PASSCODE_HASH (optional), GITHUB_STEP_SUMMARY.
 
@@ -103,6 +104,10 @@ export async function runVisualGate({ env, request, publish = publishDirectory, 
   const repository = env.REPOSITORY;
   const runId = Number(env.RUN_ID);
   const projectDir = path.resolve(env.PROJECT_DIR || process.cwd());
+  const workingDirectory = path.posix.normalize(env.WORKING_DIRECTORY || '.');
+  if (workingDirectory.startsWith('..') || path.posix.isAbsolute(workingDirectory)) {
+    throw new Error(`WORKING_DIRECTORY must stay inside the repository, got "${env.WORKING_DIRECTORY}"`);
+  }
   const run = await request(`/repos/${repository}/actions/runs/${runId}`);
   if (!run) throw new Error(`Workflow run ${runId} not found`);
   const headSha = run.head_sha;
@@ -121,8 +126,9 @@ export async function runVisualGate({ env, request, publish = publishDirectory, 
 
   let baseline = {};
   if (pr) {
+    const baselinePath = path.posix.join(workingDirectory, config.a11y.baseline);
     const content = await request(
-      `/repos/${repository}/contents/${config.a11y.baseline.split('/').map(encodeURIComponent).join('/')}?ref=${headSha}`,
+      `/repos/${repository}/contents/${baselinePath.split('/').map(encodeURIComponent).join('/')}?ref=${headSha}`,
       { raw: true }
     );
     if (content) {

@@ -196,3 +196,32 @@ test('a successful run that uploaded no results (unrelated label) posts nothing'
   assert.deepEqual(output, { skipped: true });
   assert.equal(checkRuns(github.calls).length, 0);
 });
+
+test('the a11y baseline is read from the project directory at the PR head', async () => {
+  const github = fakeGitHub();
+  await runVisualGate({
+    env: {
+      REPOSITORY: REPO,
+      RUN_ID: String(RUN_ID),
+      PROJECT_DIR: project(),
+      WORKING_DIRECTORY: 'packages/ui',
+      BUNDLE_DIR: bundle(),
+      GITHUB_TOKEN: 't'
+    },
+    request: github.request,
+    log: () => {}
+  });
+  assert.ok(
+    github.calls.some(
+      call => call.apiPath === `/repos/${REPO}/contents/packages/ui/.storybook/a11y-baseline.json?ref=${HEAD}`
+    )
+  );
+  await assert.rejects(
+    runVisualGate({
+      env: { REPOSITORY: REPO, RUN_ID: String(RUN_ID), PROJECT_DIR: project(), WORKING_DIRECTORY: '../x' },
+      request: github.request,
+      log: () => {}
+    }),
+    /WORKING_DIRECTORY must stay inside the repository/
+  );
+});
