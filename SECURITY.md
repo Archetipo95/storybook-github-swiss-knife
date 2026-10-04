@@ -2,10 +2,12 @@
 
 ## Supported Versions
 
-| Version | Supported          |
-| ------- | ------------------ |
-| v1.x    | :white_check_mark: |
-| < 1.0   | :x:                |
+| Version    | Supported          |
+| ---------- | ------------------ |
+| latest 0.x | :white_check_mark: |
+| older 0.x  | :x:                |
+
+Until 1.0, only the latest release gets fixes.
 
 ---
 
@@ -54,10 +56,19 @@ All user-supplied paths, directory inputs, and built artifacts undergo rigorous 
 - Rejects target directories containing nested `.git` or `.github` folders.
 - Requires static content (`index.html` or valid HTML/JS/CSS assets) to prevent publishing empty or invalid builds.
 
-### 5. Dependency Pinning & No Telemetry
+### 5. Visual Regression & Accessibility Checks
 
-- All third-party GitHub Actions are pinned to full **40-character commit SHAs**.
-- Zero runtime npm dependencies (uses Node.js standard modules only).
+- The capture (`visual.yml`) runs pull request code with `contents: read`, no secrets, and saves baseline caches only on pushes to the baseline branches.
+- The gate (`visual-gate.yml`) runs from the default branch on `workflow_run`, never checks out pull request code, reads its configuration from the default branch, and decides blocking itself from raw results (for example axe node counts against the baseline).
+- Results bundles containing symlinks, `.git` or `.github` are rejected, and summaries written from them are escaped.
+- With `caller_workflow` and `protected_paths`, a pull request that changes the capture workflow or its configuration gets failing checks.
+- The results are produced by pull request code, so they protect against mistakes, not against a malicious author who can change what their Storybook renders. Collaborators with write access can also post check runs. See the threat model in [docs/visual-regression.md](docs/visual-regression.md).
+- The Storybook addon only reads the published manifest and screenshots; it sends nothing anywhere.
+
+### 6. Dependency Pinning & No Telemetry
+
+- All third-party GitHub Actions are pinned to full **40-character commit SHAs**, and internal actions to commits of this repository.
+- The workflow scripts use Node.js standard modules only. The runner's Playwright and axe versions are pinned by its lockfile, which is part of the baseline cache key; the addon has no runtime dependencies.
 - No external tracking, telemetry, or third-party analytics. Only authenticated GitHub API HTTP requests required for the deployment lifecycle (such as Pages deployments, PR head SHA verification, and bot comment updates) are executed.
 
 ---

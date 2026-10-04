@@ -128,6 +128,7 @@ test('runInit writes the files, registers the addon and keeps existing files', (
   const output = lines.join('\n');
   assert.match(output, /kept {5}\.github\/workflows\/visual\.yml/);
   assert.match(output, /gh label create visual-approved/);
+  assert.match(output, /pnpm add --save-dev storybook-swiss-knife/);
   assert.match(output, /required status checks/);
 });
 

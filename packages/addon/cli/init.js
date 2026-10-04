@@ -10,10 +10,14 @@ export const REPOSITORY = 'Archetipo95/storybook-github-swiss-knife';
 export const ADDON = 'storybook-swiss-knife';
 
 const COMMANDS = {
-  npm: { install: 'npm ci', build: 'npx storybook build' },
-  pnpm: { install: 'corepack pnpm install --frozen-lockfile', build: 'corepack pnpm exec storybook build' },
-  yarn: { install: 'corepack yarn install --immutable', build: 'corepack yarn storybook build' },
-  bun: { install: 'bun install --frozen-lockfile', build: 'bunx storybook build' }
+  npm: { install: 'npm ci', build: 'npx storybook build', add: 'npm install --save-dev' },
+  pnpm: {
+    install: 'corepack pnpm install --frozen-lockfile',
+    build: 'corepack pnpm exec storybook build',
+    add: 'pnpm add --save-dev'
+  },
+  yarn: { install: 'corepack yarn install --immutable', build: 'corepack yarn storybook build', add: 'yarn add --dev' },
+  bun: { install: 'bun install --frozen-lockfile', build: 'bunx storybook build', add: 'bun add --dev' }
 };
 
 /** The package manager from the project's lockfile (the repository root is checked too). */
@@ -301,11 +305,12 @@ export function runInit({ argv, cwd = process.cwd(), version, log = console.log 
     ? fs.readdirSync(path.join(projectDir, '.storybook')).find(file => /^main\.(c|m)?(j|t)s$/.test(file))
     : undefined;
   const mainPath = mainFile ? path.posix.join(workingDirectory, '.storybook', mainFile) : undefined;
+  const packageManager = detectPackageManager(projectDir, root);
   const plan = planInit({
     ref: options.ref ?? `v${version}`,
     branch,
     workingDirectory,
-    packageManager: detectPackageManager(projectDir, root),
+    packageManager,
     previews: options.previews,
     approvalLabel,
     main: mainPath ? { path: mainPath, source: fs.readFileSync(path.join(root, mainPath), 'utf8') } : undefined
@@ -356,7 +361,7 @@ export function runInit({ argv, cwd = process.cwd(), version, log = console.log 
   }
 
   const steps = [
-    `Install the addon in ${workingDirectory}: npm install --save-dev ${ADDON}`,
+    `Install the addon in ${workingDirectory}: ${COMMANDS[packageManager].add} ${ADDON}`,
     plan.addonRegistered
       ? null
       : `Add '${ADDON}' to the addons of ${mainPath ?? '.storybook/main.js'} (no addons array was found).`,

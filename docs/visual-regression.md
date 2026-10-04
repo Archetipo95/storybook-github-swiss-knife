@@ -6,6 +6,9 @@ branch, scans it with axe, and posts two required checks: `swiss-knife / visual`
 
 ## Setup
 
+`npx storybook-swiss-knife init` writes all of this (and the PR preview workflows) and creates
+the label; see `--help`. By hand:
+
 Two small workflow files. A `workflow_run` trigger cannot live in a reusable workflow, so the
 trusted half needs its own caller.
 
@@ -75,6 +78,31 @@ Settings live in `.storybook/swiss-knife.json` (`visual`, `a11y`); see
 `maxDiffPixels`, `delay`), Storybook's own viewport parameters/globals, and the a11y
 parameters (`a11y.disable` / `a11y.test: 'off'`, `a11y.config.rules`, `a11y.options.rules`,
 `a11y.context` / `a11y.element`). Tag a story `skip-visual` to leave it out entirely.
+
+## Storybook addon
+
+```bash
+npm install --save-dev storybook-swiss-knife
+```
+
+```js
+// .storybook/main.js
+export default {
+  addons: ['storybook-swiss-knife']
+};
+```
+
+In the PR preview, the addon reads the report published next to it (`visual/gallery/` under
+the preview; `STORYBOOK_SWISS_KNIFE_VISUAL_URL` at build time overrides it):
+
+- a **Visual** panel with the base and PR screenshots of the selected story, a toggle, and the
+  changed pixels highlighted;
+- sidebar statuses: a warning on changed stories, an error on failed ones (the sidebar's status
+  filter lists them);
+- `visual:changed`, `visual:new` and `visual:failed` tags in the tag filter (Storybook 8.6 and
+  10; Storybook 9 does not expose the story index to addons).
+
+It stays off in automated browsers and shows "No visual report" until the gate publishes one.
 
 ## How a pull request is checked
 

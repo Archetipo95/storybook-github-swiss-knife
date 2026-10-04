@@ -3,20 +3,30 @@
 [![CI](https://github.com/Archetipo95/storybook-github-swiss-knife/actions/workflows/ci.yml/badge.svg)](https://github.com/Archetipo95/storybook-github-swiss-knife/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Deploy Storybook to GitHub Pages with secure reusable workflows, PR previews, badges, coverage stats, and growth graphs.
+Storybook on GitHub, in one place: Pages deploys, PR previews, and visual regression plus accessibility checks on every pull request. Storybook 8.6, 9 and 10, any framework, npm/pnpm/yarn/bun.
 
-> See [Archetipo95/storybook-vue-demo](https://github.com/Archetipo95/storybook-vue-demo) for a live Vue 3 + Storybook 10 example.
+The successor of [storybook-github-pages](https://github.com/Archetipo95/storybook-github-pages): every one of its inputs still works, see [Migration](docs/migration.md).
 
 ## Why use it?
 
-- **One workflow for Storybook Pages**: build, validate, upload, and deploy static Storybook output.
-- **Secure by default**: least-privilege jobs, SHA-pinned actions, artifact validation, fork-safe PR preview publishing.
-- **Preview every PR**: untrusted build job + trusted publisher, stale-run protection, bot comments, cleanup, and janitor.
-- **Visible project health**: generated SVG badges for Storybook version, stories, components, component coverage, tests, build, and publish status.
-- **Trend graph**: `stats/history.svg` and `stats/history.json` track Storybook growth over time.
-- **Migration-friendly**: compatible with common `bitovi/github-actions-storybook-to-github-pages` inputs.
+- **Visual regression for every story**: screenshots compared with the base branch, interaction (play) tests in the same pass, changes accepted with a label. A trusted gate posts the required `swiss-knife / visual` check.
+- **Accessibility**: axe on every story, with a baseline of known violations, so only new ones block (`swiss-knife / accessibility`).
+- **Results where reviewers look**: one PR comment with the preview link and both results, a published report, and a Storybook addon with a Visual panel (base/PR screenshots, changed pixels) and sidebar statuses.
+- **PR previews and Pages deploys**: an untrusted build, a trusted publisher, stale-run protection, cleanup and a janitor.
+- **Secure by default**: pull request code runs read-only and without secrets; trusted steps never check it out; every action is SHA-pinned. See [Security](SECURITY.md).
+- **Project health**: SVG badges, component coverage and a growth chart.
 
 ## Quickstart
+
+From the repository root:
+
+```bash
+npx storybook-swiss-knife init
+```
+
+It writes the caller workflows, `.storybook/swiss-knife.json` and the addon registration, creates the `visual-approved` label, and lists what is left: install the addon, make the two checks required, push once to the base branch for baselines. The manual setup is in [Visual regression and accessibility](docs/visual-regression.md).
+
+Only Pages deploys:
 
 ```yaml
 name: Deploy Storybook
@@ -40,6 +50,8 @@ jobs:
 ```
 
 Need a custom pipeline or branch-backed directory deploy? See [Usage](docs/usage.md).
+
+> While this repository is private, only repositories owned by Archetipo95 can use it, after allowing them in its Settings → Actions → Access, and the addon is installed from an `npm pack` tarball.
 
 ## What you get on your Pages site
 
@@ -73,27 +85,33 @@ flowchart LR
   D --> E[gh-pages preview directory]
   D --> F[PR comment with badges + deltas]
   G[PR closed] --> H[Cleanup preview]
+  A --> V[Untrusted visual + a11y run]
+  V --> W[Trusted gate]
+  W --> X[Required checks]
+  W --> F
+  W --> Y[Report + Visual panel data]
 ```
 
 See [PR previews](docs/pr-previews.md).
 
 ## Documentation
 
-| Need                                                     | Read                                         |
-| -------------------------------------------------------- | -------------------------------------------- |
-| Turnkey deploy, composite action, directory mode, inputs | [Usage](docs/usage.md)                       |
-| Badges, component coverage, growth chart                 | [Badges and stats](docs/badges-and-stats.md) |
-| Bundle size audit and budget                             | [Bundle size](docs/bundle-size.md)           |
-| PR preview build/publish/cleanup/janitor                 | [PR previews](docs/pr-previews.md)           |
-| Permissions and security model                           | [Security](docs/security.md)                 |
-| Bitovi migration                                         | [Migration](docs/migration.md)               |
-| Vite/Rollup/Webpack subdirectory previews                | [Modern bundlers](docs/bundlers.md)          |
-| Common failures                                          | [Troubleshooting](docs/troubleshooting.md)   |
-| Tests, coverage, release checklist                       | [Development](docs/development.md)           |
+| Need                                                     | Read                                           |
+| -------------------------------------------------------- | ---------------------------------------------- |
+| Turnkey deploy, composite action, directory mode, inputs | [Usage](docs/usage.md)                         |
+| Badges, component coverage, growth chart                 | [Badges and stats](docs/badges-and-stats.md)   |
+| Bundle size audit and budget                             | [Bundle size](docs/bundle-size.md)             |
+| PR preview build/publish/cleanup/janitor                 | [PR previews](docs/pr-previews.md)             |
+| Visual regression, accessibility, the Storybook addon    | [Visual regression](docs/visual-regression.md) |
+| Permissions and security model                           | [Security](docs/security.md)                   |
+| From storybook-github-pages or Bitovi                    | [Migration](docs/migration.md)                 |
+| Vite/Rollup/Webpack subdirectory previews                | [Modern bundlers](docs/bundlers.md)            |
+| Common failures                                          | [Troubleshooting](docs/troubleshooting.md)     |
+| Tests, coverage, release checklist                       | [Development](docs/development.md)             |
 
 ## Security note
 
-The optional passcode gate is only casual client-side privacy. Static assets remain public on GitHub Pages. Use an authenticated hosting layer for confidential Storybooks.
+The optional passcode gate is only casual client-side privacy. Static assets, including the visual report's screenshots, remain public on GitHub Pages. Use an authenticated hosting layer for confidential Storybooks.
 
 ## License
 

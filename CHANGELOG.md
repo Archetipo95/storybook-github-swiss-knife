@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `storybook-swiss-knife` Storybook addon (`packages/addon`, Storybook 8.6, 9 and 10): a Visual panel with base/PR screenshots and a changed-pixels overlay, sidebar statuses for changed and failed stories, and `visual:*` tags, from the report published next to the PR preview. The fixture end-to-end test builds it into the head Storybook and checks it in a browser.
+- `npx storybook-swiss-knife init`: writes the caller workflows pinned to a ref, the configuration and the addon registration, creates the approval label, and prints the remaining steps.
+- The visual gate adds both results to the PR preview comment (a block the preview publisher keeps), creating the comment when there is none yet. `visual.prComment: false` turns it off.
+
 - Visual regression and accessibility pipeline for pull requests:
   - `runner/`: Playwright + axe runner for a built Storybook (8, 9 and 10), configured by `.storybook/swiss-knife.json`; viewports come from each story's own parameters.
   - `.github/workflows/visual.yml` (untrusted, read-only): builds the head Storybook once, builds the base only when cached baselines are missing, screenshots in shards, and uploads a results bundle. Pushes to `visual.baselineBranches` capture baselines; the approval label reuses the commit's results.
