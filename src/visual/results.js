@@ -68,7 +68,9 @@ export function firstErrorLine(test) {
 export function classifyVisualResults(report) {
   const all = (report?.suites ?? []).flatMap(collectTests);
   // The per-shard "removed stories" check is not a story.
-  const removedChecks = all.filter(test => removedIdsOf(test).length > 0);
+  const removedChecks = all.filter(test =>
+    annotationsOf(test).some(({ type }) => type === 'removed-check' || type === 'removed')
+  );
   const tests = all.filter(test => !removedChecks.includes(test));
   // An interaction that failed on any attempt blocks, even when the retry passed.
   const interactions = tests.filter(storyFailureOf);

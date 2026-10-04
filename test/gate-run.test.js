@@ -90,7 +90,8 @@ function fakeGitHub({
     }
     if (route === `/repos/${REPO}`) return { default_branch: 'main' };
     if (route.startsWith(`/repos/${REPO}/contents/.github/`)) {
-      return apiPath.includes(`ref=${HEAD}`) ? callerAtHead : 'caller workflow';
+      if (apiPath.includes(`ref=${HEAD}`)) return callerAtHead;
+      return apiPath.includes(`ref=${BASE}`) ? 'caller workflow' : 'default branch version';
     }
     if (route.startsWith(`/repos/${REPO}/contents/`)) {
       return JSON.stringify(apiPath.includes(`ref=${BASE}`) ? baseBaseline : baseline);
@@ -289,7 +290,7 @@ test('caller verification: the run must come from the visual workflow, unchanged
     github: fakeGitHub({ conclusion: 'success', callerAtHead: 'uploads fake results' }),
     env
   });
-  assert.match(checkRuns(edited.calls)[0].output.summary, /differs from the default branch/);
+  assert.match(checkRuns(edited.calls)[0].output.summary, /differs from the base branch/);
   assert.equal(edited.published.length, 0);
 });
 

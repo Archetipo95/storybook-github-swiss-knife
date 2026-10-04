@@ -25,11 +25,13 @@ export async function scanStory(page, { storyId, parameters, reportDir, scope, d
   const off = [...new Set([...disabledRules.filter(rule => !enabled.has(rule)), ...disabled])];
   // Storybook 8 `a11y.element`, Storybook 9+ `a11y.context` (selector form only).
   const storyScope = [parameters?.a11y?.context, parameters?.a11y?.element].find(value => typeof value === 'string');
+  // One options() call: AxeBuilder.options() replaces what disableRules() set.
+  const rules = Object.fromEntries([
+    ...off.map(rule => [rule, { enabled: false }]),
+    ...[...enabled].map(rule => [rule, { enabled: true }])
+  ]);
   let builder = new AxeBuilder({ page }).include(storyScope || scope);
-  if (off.length > 0) builder = builder.disableRules(off);
-  if (enabled.size > 0) {
-    builder = builder.options({ rules: Object.fromEntries([...enabled].map(rule => [rule, { enabled: true }])) });
-  }
+  if (Object.keys(rules).length > 0) builder = builder.options({ rules });
   const { violations } = await builder.analyze();
   if (violations.length === 0) return [];
   const report = {

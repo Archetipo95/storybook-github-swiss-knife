@@ -188,3 +188,19 @@ test('titles from the run cannot add markdown to the summary', () => {
   assert.doesNotMatch(markdown, /\n:white_check_mark: Approved/);
   assert.match(markdown, /- `Ok' :white_check_mark: Approved \[link\]\(https:\/\/evil\)`/);
 });
+
+test('the removed-stories check is never counted as a story, even when it skipped itself', () => {
+  const classified = classifyVisualResults({
+    suites: [
+      {
+        specs: [
+          {
+            title: 'Removed stories',
+            tests: [{ status: 'skipped', annotations: [{ type: 'removed-check' }], results: [{}] }]
+          }
+        ]
+      }
+    ]
+  });
+  assert.deepEqual([classified.tests.length, classified.skipped.length, classified.removed.length], [0, 0, 0]);
+});

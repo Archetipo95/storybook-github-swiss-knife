@@ -166,7 +166,8 @@ for (const story of stories) {
 // Baselines of this shard whose story no longer exists in the head Storybook: a deleted story, or
 // a broken stories glob that leaves Storybook empty. Reported as a change that needs approval.
 test('Removed stories', async ({}, testInfo) => {
-  test.skip(testInfo.config.updateSnapshots === 'all', 'capturing baselines');
+  // Marks this test as the removed-stories check (not a story) in the results, even when skipped.
+  testInfo.annotations.push({ type: 'removed-check' });
   const baselines = fs.existsSync(settings.snapshotDir)
     ? fs
         .readdirSync(settings.snapshotDir)
@@ -176,6 +177,11 @@ test('Removed stories', async ({}, testInfo) => {
   const removed = baselines
     .filter(id => shardOf(id, settings.shard.total) === settings.shard.index && !indexedIds.has(id))
     .sort();
+  if (testInfo.config.updateSnapshots === 'all') {
+    // Capturing baselines: drop those of deleted stories, so a local baseline folder stays in sync.
+    for (const id of removed) fs.rmSync(path.join(settings.snapshotDir, `${id}.png`), { force: true });
+    test.skip(true, 'capturing baselines');
+  }
   test.skip(removed.length === 0, 'no removed stories');
   testInfo.annotations.push({ type: 'removed', description: removed.join(',') });
   throw new Error(`Removed stories (baseline without a story): ${removed.join(', ')}`);

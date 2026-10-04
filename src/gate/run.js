@@ -130,7 +130,7 @@ async function resolvePullRequest(request, repository, run) {
  * unchanged from the default branch: a pull request cannot then replace the capture with one
  * that uploads made-up results.
  */
-async function verifyCaller(request, { repository, run, env }) {
+async function verifyCaller(request, { repository, run, env, baseSha }) {
   const caller = String(env.CALLER_WORKFLOW || '').trim();
   if (caller && run.path !== caller) return `The run came from ${run.path}, not the visual workflow ${caller}.`;
   const protectedPaths = String(env.PROTECTED_PATHS || '')
@@ -138,15 +138,18 @@ async function verifyCaller(request, { repository, run, env }) {
     .map(file => file.trim())
     .filter(Boolean);
   if (caller) protectedPaths.push(caller);
-  const repo = protectedPaths.length > 0 ? await request(`/repos/${repository}`) : null;
+  // Compared with the pull request's base (the branch it merges into); the default branch when
+  // the pull request is unknown.
+  const reference =
+    baseSha || (protectedPaths.length > 0 ? (await request(`/repos/${repository}`)).default_branch : '');
   for (const file of new Set(protectedPaths)) {
     const encoded = file.split('/').map(encodeURIComponent).join('/');
     const [atHead, atDefault] = await Promise.all([
       request(`/repos/${repository}/contents/${encoded}?ref=${run.head_sha}`, { raw: true }),
-      request(`/repos/${repository}/contents/${encoded}?ref=${encodeURIComponent(repo.default_branch)}`, { raw: true })
+      request(`/repos/${repository}/contents/${encoded}?ref=${encodeURIComponent(reference)}`, { raw: true })
     ]);
     if (atHead !== atDefault) {
-      return `${file} differs from the default branch in this pull request, so its visual results cannot be trusted. Merge the workflow change separately first.`;
+      return `${file} differs from the base branch in this pull request, so its visual results cannot be trusted. Merge the workflow change separately first.`;
     }
   }
   return null;
@@ -185,7 +188,7 @@ export async function runVisualGate({ env, request, publish = publishDirectory, 
   const prNumber = pr?.number ?? 0;
   const isFork = Boolean(pr && pr.head.repo.full_name !== repository);
   const isCurrentHead = Boolean(pr && pr.state === 'open' && pr.head.sha === headSha);
-  const callerProblem = await verifyCaller(request, { repository, run, env });
+  const callerProblem = await verifyCaller(request, { repository, run, env, baseSha: pr?.base?.sha });
 
   const baselinePath = path.posix.join(workingDirectory, config.a11y.baseline);
   const readBaseline = async ref => {

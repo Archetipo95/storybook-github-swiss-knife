@@ -1,6 +1,6 @@
 # Visual regression and accessibility
 
-Every pull request screenshots every story of your Storybook, compares it with the base
+Every pull request (Storybook 8.6, 9 or 10; any framework) screenshots every story of your Storybook, compares it with the base
 branch, scans it with axe, and posts two required checks: `swiss-knife / visual` and
 `swiss-knife / accessibility`. Intended visual changes are accepted with a label.
 
@@ -56,6 +56,8 @@ jobs:
       pull-requests: write
     with:
       caller_workflow: .github/workflows/visual.yml
+      # The capture settings are read from the pull request: keep them as reviewed on the base.
+      protected_paths: .storybook/swiss-knife.json
     secrets:
       passcode_hash: ${{ secrets.STORYBOOK_PREVIEW_PASSCODE_HASH }} # optional
 ```
@@ -109,7 +111,8 @@ when comparing with CI.
 - Results come from a run of pull request code, so they are only as honest as that code. The
   checks protect against mistakes and unnoticed changes, **not against a malicious author**:
   - With `caller_workflow` (and `protected_paths`), a pull request that changes the visual
-    workflow, or runs another workflow under the same name, fails the checks.
+    workflow or the protected files compared with its base branch, or runs another workflow
+    under the same name, fails the checks. Land such changes in their own pull request.
   - A pull request can still change what its own Storybook renders, or its build scripts.
     Review those changes as usual.
   - Collaborators with write access can post check runs from their own workflows; required
