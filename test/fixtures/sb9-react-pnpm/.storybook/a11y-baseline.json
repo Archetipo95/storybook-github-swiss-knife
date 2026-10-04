@@ -1,0 +1,6 @@
+{
+  "enforcedRules": [],
+  "stories": {
+    "fixture-badge--low-contrast": { "color-contrast": 1 }
+  }
+}

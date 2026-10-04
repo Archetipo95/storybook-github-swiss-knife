@@ -91,7 +91,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ steps.pages.outputs.branch }}
-          path: ${{ runner.temp }}/swiss-knife-pages
+          # actions/checkout only writes inside the workspace (the trusted default-branch checkout).
+          path: .swiss-knife-pages
           fetch-depth: 0
 
       - name: Gate and post checks
@@ -101,7 +102,7 @@ jobs:
           PROJECT_DIR: ${{ github.workspace }}/${{ inputs.working_directory }}
           WORKING_DIRECTORY: ${{ inputs.working_directory }}
           BUNDLE_DIR: ${{ runner.temp }}/swiss-knife-bundle
-          PAGES_REPO: ${{ steps.pages.outputs.branch != '' && format('{0}/swiss-knife-pages', runner.temp) || '' }}
+          PAGES_REPO: ${{ steps.pages.outputs.branch != '' && format('{0}/.swiss-knife-pages', github.workspace) || '' }}
           SITE_URL: ${{ inputs.site_url }}
           PASSCODE_HASH: ${{ secrets.passcode_hash }}
         run: node "$SWISS_KNIFE_ROOT/src/gate/run.js"

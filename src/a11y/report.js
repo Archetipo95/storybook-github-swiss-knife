@@ -106,7 +106,9 @@ export function renderA11ySummary(
       ? [
           '### New violations',
           '',
-          ...blocking.map(({ story, id, nodes }) => `- \`${story}\`: ${id} (${nodes} nodes)`),
+          ...blocking.map(
+            ({ story, id, nodes }) => `- \`${story}\`: ${id} (${nodes} node${Number(nodes) === 1 ? '' : 's'})`
+          ),
           ''
         ]
       : [])
