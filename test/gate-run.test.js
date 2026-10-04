@@ -185,3 +185,14 @@ test('a cancelled run fails both checks even with a partial bundle', async () =>
     ['failure', 'failure']
   );
 });
+
+test('a successful run that uploaded no results (unrelated label) posts nothing', async () => {
+  const github = fakeGitHub({ conclusion: 'success', artifactRunId: 1 });
+  const output = await runVisualGate({
+    env: { REPOSITORY: REPO, RUN_ID: String(RUN_ID), PROJECT_DIR: project(), GITHUB_TOKEN: 't' },
+    request: github.request,
+    log: () => {}
+  });
+  assert.deepEqual(output, { skipped: true });
+  assert.equal(checkRuns(github.calls).length, 0);
+});

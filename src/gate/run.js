@@ -84,13 +84,15 @@ async function resolvePullRequest(request, repository, run) {
       .filter(match => match && Number(match[2]) === run.id)
       .map(match => Number(match[1]))
   );
-  if (numbers.size !== 1) return { pr: null, problem: 'The visual run uploaded no results for a single pull request.' };
+  if (numbers.size !== 1) {
+    return { pr: null, found: numbers.size, problem: 'The visual run uploaded no results for a single pull request.' };
+  }
   const [number] = numbers;
   const pr = await request(`/repos/${repository}/pulls/${number}`);
   if (!pr || pr.head?.repo?.full_name !== run.head_repository?.full_name) {
-    return { pr: null, problem: `Pull request #${number} does not match the run's head repository.` };
+    return { pr: null, found: 1, problem: `Pull request #${number} does not match the run's head repository.` };
   }
-  return { pr, problem: null };
+  return { pr, found: 1, problem: null };
 }
 
 /**
@@ -106,7 +108,13 @@ export async function runVisualGate({ env, request, publish = publishDirectory, 
   const headSha = run.head_sha;
 
   const config = loadSwissKnifeConfig({ cwd: projectDir });
-  const { pr, problem: prProblem } = await resolvePullRequest(request, repository, run);
+  const { pr, found, problem: prProblem } = await resolvePullRequest(request, repository, run);
+  // A successful run without results did nothing on purpose (an unrelated label event, visual
+  // checks disabled): keep the checks already posted for this commit.
+  if (found === 0 && run.conclusion === 'success') {
+    log('The visual run produced no results to gate; leaving the existing checks unchanged.');
+    return { skipped: true };
+  }
   const prNumber = pr?.number ?? 0;
   const isFork = Boolean(pr && pr.head.repo.full_name !== repository);
   const isCurrentHead = Boolean(pr && pr.state === 'open' && pr.head.sha === headSha);
