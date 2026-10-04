@@ -1,0 +1,130 @@
+name: Trusted Storybook Pages publisher
+description: Publish validated Storybook output to a Pages branch
+inputs:
+  pages_repo:
+    required: true
+  source_directory:
+    required: true
+  pages_branch:
+    required: true
+  target_directory:
+    required: false
+    default: ''
+  managed_directories:
+    required: false
+    default: ''
+  site_url:
+    required: false
+    default: ''
+  base_path:
+    required: false
+    default: ''
+  cname:
+    description: 'Custom domain written to a CNAME file at the root of the Pages branch'
+    required: false
+    default: ''
+  preserve_cname:
+    description: 'Whether to keep an existing root CNAME when a root publish does not provide one'
+    required: false
+    default: 'true'
+  trigger_pages_rebuild:
+    description: 'Whether to explicitly request a Pages rebuild after pushing (normally unnecessary for branch-based Pages)'
+    required: false
+    default: 'false'
+  generate_badges:
+    description: 'Whether to auto-generate dynamic SVG badges for components and stories'
+    required: false
+    default: 'true'
+  badges_directory:
+    description: 'Directory within the static build output to store generated badges'
+    required: false
+    default: 'badges'
+  test_results_path:
+    description: 'Path to JSON test results used to generate tests.svg/tests.json badges'
+    required: false
+    default: ''
+  coverage_include_paths:
+    description: 'Repository-root-relative glob patterns that narrow the component coverage denominator'
+    required: false
+    default: ''
+  coverage_ignore_paths:
+    description: 'Repository-root-relative glob patterns removed from the final coverage set even when they match include rules'
+    required: false
+    default: ''
+  generate_stats_graph:
+    description: 'Whether to auto-generate hand-drawn growth chart (history.svg) and update metrics ledger (history.json)'
+    required: false
+    default: 'true'
+  stats_directory:
+    description: 'Directory within the static build output to store stats graph and ledger'
+    required: false
+    default: 'stats'
+  enable_passcode_gate:
+    description: 'Whether to inject a client-side passcode gate into the published Storybook'
+    required: false
+    default: 'false'
+  passcode_hash:
+    description: 'SHA-256 hash of the passcode; keep this value in a workflow secret'
+    required: false
+    default: ''
+  passcode_session_hours:
+    description: 'Hours before the browser session expires'
+    required: false
+    default: '24'
+runs:
+  using: composite
+  steps:
+    - name: Generate Storybook badges
+      if: ${{ inputs.generate_badges != 'false' }}
+      shell: bash
+      env:
+        SOURCE_PATH: ${{ inputs.source_directory }}
+        SB_BADGES_DIRECTORY: ${{ inputs.badges_directory || 'badges' }}
+        SB_TEST_RESULTS_PATH: ${{ inputs.test_results_path || '' }}
+        SB_COVERAGE_INCLUDE_PATHS: ${{ inputs.coverage_include_paths || '' }}
+        SB_COVERAGE_IGNORE_PATHS: ${{ inputs.coverage_ignore_paths || '' }}
+        SB_SITE_URL: ${{ inputs.site_url || '' }}
+        SB_BASE_PATH: ${{ inputs.base_path || '' }}
+        WORKSPACE_ROOT: ${{ github.workspace }}
+        GITHUB_SHA: ${{ github.sha }}
+      run: node "$GITHUB_ACTION_PATH/../../src/generate-badges.js" "$SOURCE_PATH" "$WORKSPACE_ROOT"
+
+    - name: Generate Storybook growth graph
+      if: ${{ inputs.generate_stats_graph != 'false' }}
+      shell: bash
+      env:
+        SOURCE_PATH: ${{ inputs.source_directory }}
+        PAGES_REPO: ${{ inputs.pages_repo }}
+        SB_STATS_DIRECTORY: ${{ inputs.stats_directory || 'stats' }}
+        SB_COVERAGE_INCLUDE_PATHS: ${{ inputs.coverage_include_paths || '' }}
+        SB_COVERAGE_IGNORE_PATHS: ${{ inputs.coverage_ignore_paths || '' }}
+        SB_SITE_URL: ${{ inputs.site_url || '' }}
+        SB_BASE_PATH: ${{ inputs.base_path || '' }}
+        WORKSPACE_ROOT: ${{ github.workspace }}
+        GITHUB_SHA: ${{ github.sha }}
+      run: node "$GITHUB_ACTION_PATH/../../src/generate-stats.js" "$SOURCE_PATH" "$WORKSPACE_ROOT" "$PAGES_REPO"
+
+    - name: Inject Storybook passcode gate
+      if: ${{ inputs.enable_passcode_gate == 'true' }}
+      shell: bash
+      env:
+        SB_PATH: ${{ inputs.source_directory }}
+        PASSCODE_HASH: ${{ inputs.passcode_hash }}
+        PASSCODE_SESSION_HOURS: ${{ inputs.passcode_session_hours }}
+      run: node "$GITHUB_ACTION_PATH/../../src/inject-auth-gate.js" "$SB_PATH"
+
+    - shell: bash
+      env:
+        PAGES_REPO: ${{ inputs.pages_repo }}
+        SOURCE_DIRECTORY: ${{ inputs.source_directory }}
+        PAGES_BRANCH: ${{ inputs.pages_branch }}
+        TARGET_DIRECTORY: ${{ inputs.target_directory }}
+        MANAGED_DIRECTORIES: ${{ inputs.managed_directories }}
+        SITE_URL: ${{ inputs.site_url }}
+        BASE_PATH: ${{ inputs.base_path }}
+        CNAME: ${{ inputs.cname }}
+        PRESERVE_CNAME: ${{ inputs.preserve_cname }}
+        TRIGGER_PAGES_REBUILD: ${{ inputs.trigger_pages_rebuild }}
+        GITHUB_TOKEN: ${{ github.token }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+      run: node "$GITHUB_ACTION_PATH/../../src/publish-directory.js"

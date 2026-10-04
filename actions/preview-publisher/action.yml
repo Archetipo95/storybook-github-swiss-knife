@@ -1,0 +1,142 @@
+name: 'Trusted Storybook preview publisher'
+description: 'Validate build artifact provenance and publish Storybook preview to Pages branch'
+inputs:
+  bundle_dir:
+    description: 'Path to downloaded preview bundle directory'
+    required: true
+  pages_repo:
+    description: 'Path to checked-out Pages branch repository'
+    required: true
+  pages_branch:
+    description: 'Pages branch name'
+    required: false
+    default: 'gh-pages'
+  preview_root:
+    description: 'Root directory for previews on the Pages branch'
+    required: false
+    default: 'pr-preview'
+  site_url:
+    description: 'Canonical Pages site URL'
+    required: false
+    default: ''
+  base_path:
+    description: 'Optional URL base path'
+    required: false
+    default: ''
+  trigger_pages_rebuild:
+    description: 'Whether to explicitly request a Pages rebuild after pushing (normally unnecessary for branch-based Pages)'
+    required: false
+    default: 'false'
+  generate_stats_graph:
+    description: 'Whether to regenerate the preview growth chart from trusted Pages history before publishing'
+    required: false
+    default: 'true'
+  stats_directory:
+    description: 'Directory within the static build output to store stats graph and ledger'
+    required: false
+    default: 'stats'
+  badges_directory:
+    description: 'Badges directory used by the build; excluded from the recomputed bundle size'
+    required: false
+    default: 'badges'
+  managed_directories:
+    description: 'Comma-separated managed directories preserved during root publication'
+    required: false
+    default: ''
+  trusted_repository:
+    description: 'Expected base repository'
+    required: false
+    default: ${{ github.repository }}
+  trusted_run_id:
+    description: 'Trusted build workflow run ID'
+    required: false
+    default: ''
+  trusted_pr_number:
+    description: 'Trusted pull request number'
+    required: false
+    default: ''
+  trusted_head_sha:
+    description: 'Trusted build head commit SHA'
+    required: false
+    default: ''
+  trusted_head_repository:
+    description: 'Trusted head repository'
+    required: false
+    default: ${{ github.repository }}
+  trusted_base_ref:
+    description: 'Trusted base branch ref'
+    required: false
+    default: ''
+  expected_artifact_name:
+    description: 'Expected artifact name'
+    required: false
+    default: ''
+  current_head_sha:
+    description: 'Current live pull request head commit SHA'
+    required: false
+    default: ''
+  create_deployment:
+    description: 'Whether to create a native GitHub deployment record for the preview'
+    required: false
+    default: 'true'
+  environment_name:
+    description: 'GitHub deployment environment name for the preview (defaults to pr-preview-<PR_NUMBER> when empty)'
+    required: false
+    default: ''
+  environment_url:
+    description: 'Explicit preview URL to attach to the deployment status'
+    required: false
+    default: ''
+  enable_passcode_gate:
+    description: 'Whether to inject a client-side passcode gate into the published Storybook'
+    required: false
+    default: 'false'
+  passcode_hash:
+    description: 'SHA-256 hash of the passcode; keep this value in a trusted workflow secret'
+    required: false
+    default: ''
+  passcode_session_hours:
+    description: 'Hours before the browser session expires'
+    required: false
+    default: '24'
+outputs:
+  page_url:
+    description: 'The URL of the published GitHub Pages site'
+    value: ${{ steps.publish.outputs.page_url }}
+  action:
+    description: 'Publication action taken (published, skip-fork, skip-stale)'
+    value: ${{ steps.publish.outputs.action }}
+runs:
+  using: 'composite'
+  steps:
+    - id: publish
+      shell: bash
+      env:
+        BUNDLE_DIR: ${{ inputs.bundle_dir }}
+        PAGES_REPO: ${{ inputs.pages_repo }}
+        PAGES_BRANCH: ${{ inputs.pages_branch }}
+        PREVIEW_ROOT: ${{ inputs.preview_root }}
+        SITE_URL: ${{ inputs.site_url }}
+        BASE_PATH: ${{ inputs.base_path }}
+        TRIGGER_PAGES_REBUILD: ${{ inputs.trigger_pages_rebuild }}
+        GENERATE_STATS_GRAPH: ${{ inputs.generate_stats_graph }}
+        SB_STATS_DIRECTORY: ${{ inputs.stats_directory }}
+        SB_BADGES_DIRECTORY: ${{ inputs.badges_directory }}
+        MANAGED_DIRECTORIES: ${{ inputs.managed_directories }}
+        TRUSTED_REPOSITORY: ${{ inputs.trusted_repository }}
+        TRUSTED_RUN_ID: ${{ inputs.trusted_run_id }}
+        TRUSTED_PR_NUMBER: ${{ inputs.trusted_pr_number }}
+        TRUSTED_HEAD_SHA: ${{ inputs.trusted_head_sha }}
+        TRUSTED_HEAD_REPOSITORY: ${{ inputs.trusted_head_repository }}
+        TRUSTED_BASE_REF: ${{ inputs.trusted_base_ref }}
+        EXPECTED_ARTIFACT_NAME: ${{ inputs.expected_artifact_name }}
+        CURRENT_HEAD_SHA: ${{ inputs.current_head_sha }}
+        CREATE_DEPLOYMENT: ${{ inputs.create_deployment }}
+        DEPLOYMENT_ENVIRONMENT: ${{ inputs.environment_name }}
+        ENVIRONMENT_URL: ${{ inputs.environment_url }}
+        ENABLE_PASSCODE_GATE: ${{ inputs.enable_passcode_gate }}
+        PASSCODE_HASH: ${{ inputs.passcode_hash }}
+        PASSCODE_SESSION_HOURS: ${{ inputs.passcode_session_hours }}
+        GITHUB_TOKEN: ${{ github.token }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+      run: node "$GITHUB_ACTION_PATH/../../src/preview-publish.js"

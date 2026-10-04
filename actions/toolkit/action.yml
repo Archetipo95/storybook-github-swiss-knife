@@ -1,0 +1,21 @@
+name: 'storybook-github-swiss-knife toolkit'
+description: >-
+  Exposes this repository's trusted source on the runner, so later steps of the same job
+  can run its scripts (output `root`, and `SWISS_KNIFE_ROOT` in the job environment). Use it instead of checking out this repository: a private
+  repository cannot be checked out with the caller's token, but its actions can be used.
+author: 'Archetipo95'
+outputs:
+  root:
+    description: 'Absolute path of the swiss-knife source (contains src/ and package.json)'
+    value: ${{ steps.root.outputs.root }}
+runs:
+  using: 'composite'
+  steps:
+    - name: Locate swiss-knife source
+      id: root
+      shell: bash
+      run: |
+        root="$(cd "$GITHUB_ACTION_PATH/../.." && pwd)"
+        test -f "$root/src/config.js" || { echo "::error::swiss-knife source not found at $root" >&2; exit 1; }
+        echo "root=$root" >> "$GITHUB_OUTPUT"
+        echo "SWISS_KNIFE_ROOT=$root" >> "$GITHUB_ENV"

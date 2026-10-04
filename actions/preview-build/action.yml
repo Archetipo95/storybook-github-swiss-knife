@@ -1,0 +1,246 @@
+name: 'Storybook PR preview bundle'
+description: >-
+  Untrusted pull_request build-job action. Packages an already-built static
+  Storybook directory into the storybook-preview-pr-<PR>-run-<run> artifact
+  contract (storybook/ + preview-metadata.json + SHA-256 digest binding)
+  consumed by the trusted preview publisher. Read-only: never checks out or
+  publishes to the Pages branch, never touches secrets, and requires no
+  write, Pages, Actions-read, or pull-request write permissions.
+
+inputs:
+  source_path:
+    description: 'Path (relative to the workspace) to the already-built static Storybook output directory'
+    required: true
+  preview_root:
+    description: 'Root directory used to compute the preview target path; must match the trusted publisher configuration'
+    required: false
+    default: 'pr-preview'
+  upload:
+    description: 'Whether to upload the staged bundle as a workflow artifact'
+    required: false
+    default: 'true'
+  retention_days:
+    description: 'Artifact retention in days, used only when upload is true'
+    required: false
+    default: '7'
+  repository:
+    description: 'Base repository in owner/name form'
+    required: false
+    default: ${{ github.repository }}
+  run_id:
+    description: 'Workflow run id'
+    required: false
+    default: ${{ github.run_id }}
+  run_attempt:
+    description: 'Workflow run attempt'
+    required: false
+    default: ${{ github.run_attempt }}
+  pr_number:
+    description: 'Pull request number'
+    required: false
+    default: ${{ github.event.pull_request.number }}
+  base_ref:
+    description: 'Pull request base ref'
+    required: false
+    default: ${{ github.event.pull_request.base.ref }}
+  head_repository:
+    description: 'Pull request head repository in owner/name form'
+    required: false
+    default: ${{ github.event.pull_request.head.repo.full_name }}
+  head_sha:
+    description: 'Pull request head commit SHA'
+    required: false
+    default: ${{ github.event.pull_request.head.sha }}
+  event_name:
+    description: 'Triggering event name (must be pull_request; do not override)'
+    required: false
+    default: ${{ github.event_name }}
+  generate_badges:
+    description: 'Whether to auto-generate dynamic SVG badges for components and stories'
+    required: false
+    default: 'true'
+  badges_directory:
+    description: 'Directory within the static build output to store generated badges'
+    required: false
+    default: 'badges'
+  test_results_path:
+    description: 'Path to JSON test results used to generate tests.svg/tests.json badges'
+    required: false
+    default: ''
+  coverage_include_paths:
+    description: 'Repository-root-relative glob patterns that narrow the component coverage denominator'
+    required: false
+    default: ''
+  coverage_ignore_paths:
+    description: 'Repository-root-relative glob patterns removed from the final coverage set even when they match include rules'
+    required: false
+    default: ''
+  generate_stats_graph:
+    description: 'Whether to auto-generate hand-drawn growth chart (history.svg) and update metrics ledger (history.json)'
+    required: false
+    default: 'true'
+  stats_directory:
+    description: 'Directory within the static build output to store stats graph and ledger'
+    required: false
+    default: 'stats'
+  smoke_test:
+    description: 'Whether to run an opt-in Playwright smoke test before packaging'
+    required: false
+    default: 'false'
+  smoke_test_stories:
+    description: 'Comma-separated story id globs to smoke test, or all'
+    required: false
+    default: 'all'
+  smoke_test_timeout_ms:
+    description: 'Per-page Playwright navigation timeout in milliseconds'
+    required: false
+    default: '30000'
+  audit_bundle_size:
+    description: 'Whether to audit static asset sizes; the trusted publisher then adds a bundle size table to the PR comment'
+    required: false
+    default: 'false'
+  bundle_size_max_mb:
+    description: 'Optional total static output budget in megabytes; the build fails when the audit exceeds it'
+    required: false
+    default: ''
+
+outputs:
+  artifact_name:
+    description: 'The deterministic storybook-preview-pr-<PR>-run-<run> artifact name used for upload; never overridable'
+    value: ${{ steps.bundle.outputs.artifact_name }}
+  bundle_dir:
+    description: 'Path to the staged bundle directory (storybook/ + preview-metadata.json)'
+    value: ${{ steps.bundle.outputs.bundle_dir }}
+  content_digest:
+    description: 'SHA-256 digest binding the staged storybook/ content to preview-metadata.json'
+    value: ${{ steps.bundle.outputs.content_digest }}
+  is_fork:
+    description: 'Whether the pull request head repository differs from the base repository'
+    value: ${{ steps.bundle.outputs.is_fork }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Resolve bundle configuration
+      id: config
+      shell: bash
+      env:
+        PR_NUMBER: ${{ inputs.pr_number }}
+        RUN_ID: ${{ inputs.run_id }}
+        EVENT_NAME: ${{ inputs.event_name }}
+      run: |
+        if [ "$EVENT_NAME" != "pull_request" ]; then
+          echo "::error::storybook-github-swiss-knife/preview-build must run in a job triggered by the pull_request event (got event_name=\"$EVENT_NAME\")." >&2
+          exit 1
+        fi
+        if [ -z "$PR_NUMBER" ]; then
+          echo '::error::storybook-github-swiss-knife/preview-build must run in a job triggered by the pull_request event (github.event.pull_request.number is empty).' >&2
+          exit 1
+        fi
+        if ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]] || [ "$PR_NUMBER" -eq 0 ]; then
+          echo "::error::pr_number \"$PR_NUMBER\" is not a positive integer." >&2
+          exit 1
+        fi
+        if ! [[ "$RUN_ID" =~ ^[0-9]+$ ]] || [ "$RUN_ID" -eq 0 ]; then
+          echo "::error::run_id \"$RUN_ID\" is not a positive integer." >&2
+          exit 1
+        fi
+        # The artifact name is always deterministically derived from the
+        # validated PR number and run id - it is never accepted as a
+        # caller-supplied override - so the trusted publisher's expected
+        # storybook-preview-pr-<PR>-run-<run> namespace can never be spoofed
+        # or redirected by this untrusted build-job action.
+        echo "artifact_name=storybook-preview-pr-${PR_NUMBER}-run-${RUN_ID}" >> "$GITHUB_OUTPUT"
+        echo "bundle_dir=${RUNNER_TEMP}/storybook-preview-bundle" >> "$GITHUB_OUTPUT"
+
+    - name: Run Storybook smoke test
+      if: ${{ inputs.smoke_test == 'true' }}
+      shell: bash
+      env:
+        SOURCE_PATH: ${{ inputs.source_path }}
+        WORKSPACE_ROOT: ${{ github.workspace }}
+        SMOKE_TEST_STORIES: ${{ inputs.smoke_test_stories }}
+        SMOKE_TEST_TIMEOUT_MS: ${{ inputs.smoke_test_timeout_ms }}
+      run: node "$GITHUB_ACTION_PATH/../../src/smoke-test.js" "$SOURCE_PATH" "$WORKSPACE_ROOT" "$SMOKE_TEST_STORIES" "$SMOKE_TEST_TIMEOUT_MS"
+
+    - name: Validate static Storybook output
+      shell: bash
+      env:
+        SOURCE_PATH: ${{ inputs.source_path }}
+        WORKSPACE_ROOT: ${{ github.workspace }}
+      run: node "$GITHUB_ACTION_PATH/../../src/validate-artifact.js" "$SOURCE_PATH" "$WORKSPACE_ROOT"
+
+    # The audit runs before badges/stats are written so it measures the
+    # Storybook build output only.
+    - name: Audit Storybook bundle size
+      if: ${{ inputs.audit_bundle_size == 'true' }}
+      shell: bash
+      env:
+        SOURCE_PATH: ${{ inputs.source_path }}
+        SB_BUNDLE_SIZE_MAX_MB: ${{ inputs.bundle_size_max_mb }}
+        WORKSPACE_ROOT: ${{ github.workspace }}
+      run: node "$GITHUB_ACTION_PATH/../../src/audit-static.js" "$SOURCE_PATH" "$WORKSPACE_ROOT"
+
+    - name: Generate Storybook badges
+      if: ${{ inputs.generate_badges != 'false' }}
+      shell: bash
+      env:
+        SOURCE_PATH: ${{ inputs.source_path }}
+        SB_BADGES_DIRECTORY: ${{ inputs.badges_directory || 'badges' }}
+        SB_TEST_RESULTS_PATH: ${{ inputs.test_results_path || '' }}
+        SB_COVERAGE_INCLUDE_PATHS: ${{ inputs.coverage_include_paths || '' }}
+        SB_COVERAGE_IGNORE_PATHS: ${{ inputs.coverage_ignore_paths || '' }}
+        WORKSPACE_ROOT: ${{ github.workspace }}
+        GITHUB_SHA: ${{ inputs.head_sha || github.sha }}
+      run: node "$GITHUB_ACTION_PATH/../../src/generate-badges.js" "$SOURCE_PATH" "$WORKSPACE_ROOT"
+
+    - name: Generate Storybook growth graph
+      if: ${{ inputs.generate_stats_graph != 'false' }}
+      shell: bash
+      env:
+        SOURCE_PATH: ${{ inputs.source_path }}
+        SB_STATS_DIRECTORY: ${{ inputs.stats_directory || 'stats' }}
+        SB_COVERAGE_INCLUDE_PATHS: ${{ inputs.coverage_include_paths || '' }}
+        SB_COVERAGE_IGNORE_PATHS: ${{ inputs.coverage_ignore_paths || '' }}
+        WORKSPACE_ROOT: ${{ github.workspace }}
+        GITHUB_SHA: ${{ inputs.head_sha }}
+      run: node "$GITHUB_ACTION_PATH/../../src/generate-stats.js" "$SOURCE_PATH" "$WORKSPACE_ROOT"
+
+    - name: Ensure .nojekyll exists
+      shell: bash
+      env:
+        SOURCE_PATH: ${{ inputs.source_path }}
+      run: |
+        if [ -d "$SOURCE_PATH" ]; then
+          touch "$SOURCE_PATH/.nojekyll"
+        fi
+
+    - name: Stage preview bundle (metadata + content digest)
+      id: bundle
+      shell: bash
+      env:
+        REPOSITORY: ${{ inputs.repository }}
+        RUN_ID: ${{ inputs.run_id }}
+        RUN_ATTEMPT: ${{ inputs.run_attempt }}
+        PR_NUMBER: ${{ inputs.pr_number }}
+        BASE_REF: ${{ inputs.base_ref }}
+        HEAD_REPOSITORY: ${{ inputs.head_repository }}
+        HEAD_SHA: ${{ inputs.head_sha }}
+        ARTIFACT_NAME: ${{ steps.config.outputs.artifact_name }}
+        PREVIEW_ROOT: ${{ inputs.preview_root }}
+        SOURCE_PATH: ${{ inputs.source_path }}
+        EVENT_NAME: ${{ inputs.event_name }}
+        BUNDLE_DIR: ${{ steps.config.outputs.bundle_dir }}
+      run: |
+        node "$GITHUB_ACTION_PATH/../../src/preview-metadata.js" "$BUNDLE_DIR"
+        echo "bundle_dir=$BUNDLE_DIR" >> "$GITHUB_OUTPUT"
+
+    - name: Upload preview bundle artifact
+      if: ${{ inputs.upload == 'true' }}
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ${{ steps.bundle.outputs.artifact_name }}
+        path: ${{ steps.bundle.outputs.bundle_dir }}
+        if-no-files-found: error
+        retention-days: ${{ inputs.retention_days }}
+        include-hidden-files: true
