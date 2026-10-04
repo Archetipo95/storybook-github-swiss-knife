@@ -53,7 +53,8 @@ function fakeGitHub({
   firstRunAt = '2026-10-04T10:00:00Z',
   artifactRunId = RUN_ID,
   conclusion = 'failure',
-  baseline = { stories: { 'card--default': { 'color-contrast': 2 } } }
+  baseline = { stories: { 'card--default': { 'color-contrast': 2 } } },
+  existingChecks = 0
 } = {}) {
   const calls = [];
   const request = async (apiPath, { method = 'GET', body } = {}) => {
@@ -85,6 +86,7 @@ function fakeGitHub({
       return [{ event: 'labeled', created_at: labeledAt, label: { name: 'visual-approved' } }];
     }
     if (route === `/repos/${REPO}/actions/workflows/99/runs`) return { workflow_runs: [{ created_at: firstRunAt }] };
+    if (route === `/repos/${REPO}/commits/${HEAD}/check-runs`) return { total_count: existingChecks };
     if (method === 'POST' || method === 'DELETE') return {};
     throw new Error(`unexpected ${method} ${apiPath}`);
   };
@@ -186,8 +188,8 @@ test('a cancelled run fails both checks even with a partial bundle', async () =>
   );
 });
 
-test('a successful run that uploaded no results (unrelated label) posts nothing', async () => {
-  const github = fakeGitHub({ conclusion: 'success', artifactRunId: 1 });
+test('a successful run that uploaded no results posts nothing when the commit is already gated', async () => {
+  const github = fakeGitHub({ conclusion: 'success', artifactRunId: 1, existingChecks: 2 });
   const output = await runVisualGate({
     env: { REPOSITORY: REPO, RUN_ID: String(RUN_ID), PROJECT_DIR: project(), GITHUB_TOKEN: 't' },
     request: github.request,
@@ -223,5 +225,18 @@ test('the a11y baseline is read from the project directory at the PR head', asyn
       log: () => {}
     }),
     /WORKING_DIRECTORY must stay inside the repository/
+  );
+});
+
+test('a successful run without results on an ungated commit fails both checks (caller tampering)', async () => {
+  const github = fakeGitHub({ conclusion: 'success', artifactRunId: 1, existingChecks: 0 });
+  await runVisualGate({
+    env: { REPOSITORY: REPO, RUN_ID: String(RUN_ID), PROJECT_DIR: project(), GITHUB_TOKEN: 't' },
+    request: github.request,
+    log: () => {}
+  });
+  assert.deepEqual(
+    checkRuns(github.calls).map(check => check.conclusion),
+    ['failure', 'failure']
   );
 });

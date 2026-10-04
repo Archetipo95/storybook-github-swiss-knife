@@ -114,11 +114,17 @@ export async function runVisualGate({ env, request, publish = publishDirectory, 
 
   const config = loadSwissKnifeConfig({ cwd: projectDir });
   const { pr, found, problem: prProblem } = await resolvePullRequest(request, repository, run);
-  // A successful run without results did nothing on purpose (an unrelated label event, visual
-  // checks disabled): keep the checks already posted for this commit.
+  // A successful run without results did nothing on purpose (an unrelated label event): keep
+  // the checks already posted for this commit. A commit without swiss-knife checks yet gets
+  // failing ones, so editing the caller to skip the capture cannot produce a green PR.
   if (found === 0 && run.conclusion === 'success') {
-    log('The visual run produced no results to gate; leaving the existing checks unchanged.');
-    return { skipped: true };
+    const existing = await request(
+      `/repos/${repository}/commits/${headSha}/check-runs?check_name=${encodeURIComponent('swiss-knife / visual')}`
+    );
+    if ((existing?.total_count ?? 0) > 0) {
+      log('The visual run produced no results to gate; this commit is already gated, so the checks stay.');
+      return { skipped: true };
+    }
   }
   const prNumber = pr?.number ?? 0;
   const isFork = Boolean(pr && pr.head.repo.full_name !== repository);
