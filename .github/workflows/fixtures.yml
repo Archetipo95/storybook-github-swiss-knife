@@ -3,7 +3,7 @@ name: Fixtures
 # End-to-end check of the runner and the trusted gate modules on real Storybooks: each fixture
 # is built twice (base, and head with mutate/ applied), captured like CI does, and its
 # classification compared with expected.json. Storybook 8 + Vue (npm), 9 + React (pnpm) and
-# 10 + Vue (yarn).
+# 10 + Vue (yarn). The head build includes the addon, checked in a browser against the gallery.
 
 on:
   pull_request:
@@ -13,6 +13,7 @@ on:
       - 'src/a11y/**'
       - 'src/swiss-knife-config.js'
       - 'scripts/fixture-e2e.mjs'
+      - 'packages/addon/**'
       - 'test/fixtures/sb*/**'
       - '.github/workflows/fixtures.yml'
   push:
@@ -52,6 +53,7 @@ jobs:
         run: |
           npm ci --no-audit --no-fund
           npm ci --prefix runner --no-audit --no-fund
+          npm ci --prefix packages/addon --no-audit --no-fund
           echo "PLAYWRIGHT_VERSION=$(node -p "require('./runner/node_modules/@playwright/test/package.json').version")" >> "$GITHUB_ENV"
 
       - name: Cache Chromium

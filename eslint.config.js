@@ -20,6 +20,21 @@ export default [
     languageOptions: { globals: { ...globals.browser } }
   },
   {
-    ignores: ['node_modules/', '**/node_modules/', 'test/fixtures/', '.copilot/']
+    // The Storybook addon: runs in the manager, JSX compiled to React.createElement.
+    files: ['packages/addon/src/**/*.{js,jsx}'],
+    languageOptions: {
+      parserOptions: { ecmaFeatures: { jsx: true } },
+      globals: { ...globals.browser, process: 'readonly' }
+    },
+    rules: {
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^(_|React$)' }]
+    }
+  },
+  {
+    files: ['**/*.cjs'],
+    languageOptions: { sourceType: 'commonjs' }
+  },
+  {
+    ignores: ['packages/addon/dist/', 'node_modules/', '**/node_modules/', 'test/fixtures/', '.copilot/']
   }
 ];

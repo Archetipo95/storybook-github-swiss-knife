@@ -1,0 +1,28 @@
+{
+  "name": "storybook-swiss-knife",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Storybook addon: visual regression results (Visual panel, sidebar statuses) from storybook-github-swiss-knife",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./preset.cjs",
+    "./preset": "./preset.cjs",
+    "./manager-sb8": "./dist/manager-sb8.js",
+    "./manager-modern": "./dist/manager-modern.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "preset.cjs",
+    "dist/"
+  ],
+  "scripts": {
+    "build": "node build.js"
+  },
+  "peerDependencies": {
+    "storybook": ">=8.6.0 <11"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

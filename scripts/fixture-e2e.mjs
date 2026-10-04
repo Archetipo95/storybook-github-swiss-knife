@@ -6,6 +6,8 @@
 //      the accessibility baseline
 //   4. run the runner on the head build (gallery + axe)
 //   5. classify with the trusted modules and compare with the fixture's expected.json
+//   6. publish the gallery next to the head build, which includes the addon, and check its panel
+//      and sidebar statuses in a browser
 //
 // Usage: node scripts/fixture-e2e.mjs test/fixtures/<name> [--skip-install]
 
@@ -19,9 +21,11 @@ import { buildBaseline, evaluateA11yReports } from '../src/a11y/report.js';
 import { evaluateVisualGate } from '../src/visual/gate.js';
 import { buildGalleryManifest } from '../src/visual/manifest.js';
 import { readVisualResults, storyIdOf } from '../src/visual/results.js';
+import { createStaticServer } from '../runner/lib/serve.js';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const runnerDir = path.join(repoRoot, 'runner');
+const addonPreset = path.join(repoRoot, 'packages/addon/preset.cjs');
 const [fixtureArg, ...flags] = process.argv.slice(2);
 if (!fixtureArg) {
   console.error('Usage: node scripts/fixture-e2e.mjs test/fixtures/<name> [--skip-install]');
@@ -61,7 +65,37 @@ function mutatedCopy() {
   }
   fs.cpSync(path.join(fixtureDir, 'mutate'), path.join(copy, 'src'), { recursive: true });
   fs.symlinkSync(path.join(fixtureDir, 'node_modules'), path.join(copy, 'node_modules'), 'dir');
+  // The head build is the pull request preview, so it registers the addon.
+  const main = path.join(
+    copy,
+    '.storybook',
+    fs.readdirSync(path.join(copy, '.storybook')).find(file => file.startsWith('main.'))
+  );
+  const source = fs.readFileSync(main, 'utf8');
+  const withAddon = source.replace('addons: [', `addons: [${JSON.stringify(addonPreset)}, `);
+  assert.notEqual(withAddon, source, `${main} has no addons array`);
+  fs.writeFileSync(main, withAddon);
   return copy;
+}
+
+/** Opens the head build like a reviewer would and checks the addon's panel and sidebar status. */
+async function checkAddon(storybookDir, storyId) {
+  const { chromium } = await import(path.join(runnerDir, 'node_modules/@playwright/test/index.mjs'));
+  const server = createStaticServer(storybookDir);
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  // The addon stays off in automated browsers; this one must look like a person's.
+  const browser = await chromium.launch({ args: ['--disable-blink-features=AutomationControlled'] });
+  try {
+    const page = await browser.newPage();
+    const { port } = server.address();
+    await page.goto(`http://127.0.0.1:${port}/?path=/story/${storyId}&addonPanel=storybook-swiss-knife/visual`);
+    await page.getByText('Visual change', { exact: true }).waitFor({ timeout: 30_000 });
+    await page.getByRole('img', { name: 'PR screenshot' }).waitFor();
+    await page.locator(`[data-item-id="${storyId}"] [aria-label^="Test status"]`).waitFor({ timeout: 10_000 });
+  } finally {
+    await browser.close();
+    server.close();
+  }
 }
 
 function runRunner({ storybookDir, update, jsonOutput, galleryDir, a11yDir }) {
@@ -104,6 +138,7 @@ if (!flags.includes('--skip-install')) install();
 fs.rmSync(work, { recursive: true, force: true });
 fs.mkdirSync(work, { recursive: true });
 
+run('node', [path.join(repoRoot, 'packages/addon/build.js')]);
 const baseBuild = path.join(work, 'storybook-base');
 const headBuild = path.join(work, 'storybook-head');
 buildStorybook(fixtureDir, baseBuild);
@@ -129,7 +164,8 @@ const results = readVisualResults(headJson);
 const ids = tests => tests.map(storyIdOf).sort();
 const evaluation = evaluateA11yReports(readReports(headA11y), { baseline, enforcedRules });
 const manifest = buildGalleryManifest(results, {
-  hasImage: (id, image) => fs.existsSync(path.join(gallery, id, `${image}.png`))
+  hasImage: (id, image) => fs.existsSync(path.join(gallery, id, `${image}.png`)),
+  headSha: 'e2e0000'
 });
 const viewports = Object.fromEntries(
   Object.keys(expected.viewports ?? {}).map(id => [id, pngSize(path.join(gallery, id, 'pr.png'))])
@@ -156,4 +192,9 @@ for (const [id, size] of Object.entries(expectedViewports)) {
   // Desktop Chrome renders at device scale factor 1, so the PNG width is the viewport width.
   assert.equal(viewports[id].width, size.width, `${name}: ${id} captured at width ${viewports[id].width}`);
 }
+
+const published = path.join(headBuild, 'visual', 'gallery');
+fs.cpSync(gallery, published, { recursive: true });
+fs.writeFileSync(path.join(published, 'manifest.json'), JSON.stringify(manifest));
+await checkAddon(headBuild, expected.changed[0]);
 console.log(`\n${name}: OK`);
