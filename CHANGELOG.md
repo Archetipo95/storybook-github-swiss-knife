@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The PR preview comment marker is now `<!-- swiss-knife:pr-<N> -->`. An existing storybook-github-pages comment (`<!-- storybook-pages-preview:pr-<N> -->`, including its expiry block) is found and rewritten in place, so upgrading never posts a second comment.
 - Composite actions moved under `actions/` (`actions/preview-build`, `actions/preview-publisher`, `actions/publisher`, `actions/preview-cleanup`, `actions/preview-janitor`). The root action stays at the repository root.
 
 ### Fixed

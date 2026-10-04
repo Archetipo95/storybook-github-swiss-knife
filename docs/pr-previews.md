@@ -25,7 +25,7 @@ Because multiple build runs can complete out of order (retries, re-runs, or a fa
 
 ### The preview comment
 
-The comment is idempotent: it is identified by a stable hidden marker (`<!-- storybook-pages-preview:pr-<number> -->`), created once, and updated in place on every subsequent successful publish - never duplicated. Updates are restricted to an existing comment authored by `github-actions[bot]` with GitHub's `Bot` user type; if a user comment claims the marker, the publisher fails closed without editing or creating a comment. Comment failures are reported independently of the publish step: if the directory push already succeeded but the comment API call fails (for example, a transient GitHub outage), the job fails visibly on the comment step without rolling back or hiding the successful publish.
+The comment is idempotent: it is identified by a stable hidden marker (`<!-- swiss-knife:pr-<number> -->`), created once, and updated in place on every subsequent successful publish - never duplicated. A comment left by storybook-github-pages (`<!-- storybook-pages-preview:pr-<number> -->`) is taken over and rewritten with the new marker. Updates are restricted to an existing comment authored by `github-actions[bot]` with GitHub's `Bot` user type; if a user comment claims the marker, the publisher fails closed without editing or creating a comment. Comment failures are reported independently of the publish step: if the directory push already succeeded but the comment API call fails (for example, a transient GitHub outage), the job fails visibly on the comment step without rolling back or hiding the successful publish.
 
 The PR preview comment provides a rich overview for reviewers:
 

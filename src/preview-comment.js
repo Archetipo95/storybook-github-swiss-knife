@@ -4,10 +4,15 @@
 
 import { formatBundleReport } from './audit-static.js';
 
-const MARKER_PREFIX = '<!-- storybook-pages-preview:pr-';
+const MARKER_PREFIX = '<!-- swiss-knife:pr-';
 const MARKER_SUFFIX = ' -->';
-const STATUS_MARKER = '<!-- storybook-pages-preview-status -->';
-const STATUS_END_MARKER = '<!-- /storybook-pages-preview-status -->';
+const STATUS_MARKER = '<!-- swiss-knife-preview-status -->';
+const STATUS_END_MARKER = '<!-- /swiss-knife-preview-status -->';
+// Comments written by storybook-github-pages are found and taken over (rewritten with the
+// new markers) instead of a second comment being posted.
+const LEGACY_MARKER_PREFIX = '<!-- storybook-pages-preview:pr-';
+const LEGACY_STATUS_MARKER = '<!-- storybook-pages-preview-status -->';
+const LEGACY_STATUS_END_MARKER = '<!-- /storybook-pages-preview-status -->';
 export const PREVIEW_COMMENT_AUTHOR = 'github-actions[bot]';
 
 export function buildMarker(prNumber) {
@@ -16,6 +21,12 @@ export function buildMarker(prNumber) {
     throw new Error(`Invalid PR number for preview comment marker: "${prNumber}"`);
   }
   return `${MARKER_PREFIX}${number}${MARKER_SUFFIX}`;
+}
+
+/** Markers that identify this PR's preview comment, current first, then the legacy one. */
+export function previewCommentMarkers(prNumber) {
+  const marker = buildMarker(prNumber);
+  return [marker, marker.replace(MARKER_PREFIX, LEGACY_MARKER_PREFIX)];
 }
 
 export function buildExpirationStatus({ expired = false, warningDays = 3 } = {}) {
@@ -30,8 +41,13 @@ ${STATUS_END_MARKER}`;
 }
 
 function replaceExpirationStatus(body, status) {
-  const block = `${STATUS_MARKER}[\\s\\S]*?${STATUS_END_MARKER}`;
-  if (new RegExp(block).test(body)) return body.replace(new RegExp(block), status);
+  for (const [start, end] of [
+    [STATUS_MARKER, STATUS_END_MARKER],
+    [LEGACY_STATUS_MARKER, LEGACY_STATUS_END_MARKER]
+  ]) {
+    const block = new RegExp(`${start}[\\s\\S]*?${end}`);
+    if (block.test(body)) return body.replace(block, status);
+  }
   const insertionPoint = body.indexOf('\n<sub>');
   return insertionPoint === -1
     ? `${body}\n\n${status}`
@@ -225,7 +241,10 @@ export async function findExistingComment({ token, repository, prNumber, marker 
       `https://api.github.com/repos/${repository}/issues/${number}/comments?per_page=100&page=${page}`,
       { token }
     );
-    const marked = comments.filter(comment => typeof comment.body === 'string' && comment.body.includes(marker));
+    const markers = [].concat(marker);
+    const marked = comments.filter(
+      comment => typeof comment.body === 'string' && markers.some(value => comment.body.includes(value))
+    );
     const conflicting = marked.find(
       comment => comment.user?.login !== PREVIEW_COMMENT_AUTHOR || comment.user?.type !== 'Bot'
     );
@@ -234,7 +253,9 @@ export async function findExistingComment({ token, repository, prNumber, marker 
         `Refusing to update comment ${conflicting.id}: preview marker is owned by a non-${PREVIEW_COMMENT_AUTHOR} account`
       );
     }
-    if (marked.length > 0) return marked[0];
+    if (marked.length > 0) {
+      return marked.find(comment => comment.body.includes(markers[0])) ?? marked[0];
+    }
     if (comments.length < 100) return null;
     page += 1;
   }
@@ -259,7 +280,12 @@ export async function upsertPreviewComment({ token, repository, prNumber, body }
     throw new Error('Comment body must include the stable preview marker');
   }
 
-  const existing = await findExistingComment({ token, repository, prNumber: number, marker });
+  const existing = await findExistingComment({
+    token,
+    repository,
+    prNumber: number,
+    marker: previewCommentMarkers(number)
+  });
   if (existing) {
     await githubRequest(`https://api.github.com/repos/${repository}/issues/comments/${existing.id}`, {
       token,
@@ -279,8 +305,12 @@ export async function upsertPreviewComment({ token, repository, prNumber, body }
 
 export async function updatePreviewCommentStatus({ token, repository, prNumber, expired = false, warningDays = 3 }) {
   const number = Number(prNumber);
-  const marker = buildMarker(number);
-  const existing = await findExistingComment({ token, repository, prNumber: number, marker });
+  const existing = await findExistingComment({
+    token,
+    repository,
+    prNumber: number,
+    marker: previewCommentMarkers(number)
+  });
   if (!existing) return { action: 'missing' };
   const body = replaceExpirationStatus(existing.body, buildExpirationStatus({ expired, warningDays }));
   if (body !== existing.body) {

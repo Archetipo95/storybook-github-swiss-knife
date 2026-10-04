@@ -1,6 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildMarker, buildCommentBody, buildExpirationStatus, upsertPreviewComment } from '../src/preview-comment.js';
+import {
+  buildMarker,
+  buildCommentBody,
+  buildExpirationStatus,
+  previewCommentMarkers,
+  updatePreviewCommentStatus,
+  upsertPreviewComment
+} from '../src/preview-comment.js';
 
 const SHA = 'c'.repeat(40);
 
@@ -31,7 +38,7 @@ function jsonResponse(status, body) {
 }
 
 test('buildMarker embeds the PR number in a stable hidden marker', () => {
-  assert.equal(buildMarker(42), '<!-- storybook-pages-preview:pr-42 -->');
+  assert.equal(buildMarker(42), '<!-- swiss-knife:pr-42 -->');
   assert.throws(() => buildMarker('not-a-number'), /Invalid PR number/);
 });
 
@@ -262,4 +269,104 @@ test('buildCommentBody omits the bundle size section by default', () => {
     repository: 'octo/widgets'
   });
   assert.doesNotMatch(body, /Bundle Size/);
+});
+
+const BOT = { login: 'github-actions[bot]', type: 'Bot' };
+const LEGACY_MARKER = '<!-- storybook-pages-preview:pr-7 -->';
+
+test('previewCommentMarkers lists the current marker first, then the storybook-github-pages one', () => {
+  assert.deepEqual(previewCommentMarkers(7), ['<!-- swiss-knife:pr-7 -->', LEGACY_MARKER]);
+});
+
+test('upsertPreviewComment takes over a storybook-github-pages comment instead of posting a second one', async () => {
+  const marker = buildMarker(7);
+  const mock = mockFetchSequence([
+    () => jsonResponse(200, [{ id: 55, body: `${LEGACY_MARKER}\nold sgp body`, user: BOT }]),
+    (url, options) => {
+      assert.match(url, /\/issues\/comments\/55$/);
+      assert.equal(options.method, 'PATCH');
+      const sent = JSON.parse(options.body).body;
+      assert.ok(sent.includes(marker) && !sent.includes(LEGACY_MARKER), 'rewritten with the new marker');
+      return jsonResponse(200, { id: 55 });
+    }
+  ]);
+  try {
+    const result = await upsertPreviewComment({
+      token: 't',
+      repository: 'octo/widgets',
+      prNumber: 7,
+      body: `${marker}\nnew`
+    });
+    assert.deepEqual(result, { action: 'updated', commentId: 55 });
+    assert.equal(mock.calls.length, 2);
+  } finally {
+    mock.restore();
+  }
+});
+
+test('upsertPreviewComment prefers the swiss-knife comment when both markers are present', async () => {
+  const marker = buildMarker(7);
+  const mock = mockFetchSequence([
+    () =>
+      jsonResponse(200, [
+        { id: 55, body: `${LEGACY_MARKER}\nold`, user: BOT },
+        { id: 56, body: `${marker}\ncurrent`, user: BOT }
+      ]),
+    url => {
+      assert.match(url, /\/issues\/comments\/56$/);
+      return jsonResponse(200, { id: 56 });
+    }
+  ]);
+  try {
+    const result = await upsertPreviewComment({
+      token: 't',
+      repository: 'octo/widgets',
+      prNumber: 7,
+      body: `${marker}\nnew`
+    });
+    assert.equal(result.commentId, 56);
+  } finally {
+    mock.restore();
+  }
+});
+
+test('a legacy marker claimed by a user still fails closed', async () => {
+  const marker = buildMarker(7);
+  const mock = mockFetchSequence([
+    () => jsonResponse(200, [{ id: 902, body: `${LEGACY_MARKER}\nspoof`, user: { login: 'octocat', type: 'User' } }])
+  ]);
+  try {
+    await assert.rejects(
+      upsertPreviewComment({ token: 't', repository: 'octo/widgets', prNumber: 7, body: `${marker}\nnew` }),
+      /Refusing to update comment 902/
+    );
+    assert.equal(mock.calls.length, 1);
+  } finally {
+    mock.restore();
+  }
+});
+
+test('updatePreviewCommentStatus replaces the expiry block of a storybook-github-pages comment', async () => {
+  const legacyBody = `${LEGACY_MARKER}\npreview\n\n<!-- storybook-pages-preview-status -->\nold warning\n<!-- /storybook-pages-preview-status -->\n<sub>footer</sub>`;
+  const mock = mockFetchSequence([
+    () => jsonResponse(200, [{ id: 57, body: legacyBody, user: BOT }]),
+    (url, options) => {
+      const sent = JSON.parse(options.body).body;
+      assert.doesNotMatch(sent, /old warning/);
+      assert.match(sent, /<!-- swiss-knife-preview-status -->/);
+      assert.equal((sent.match(/<!-- [a-z-]+-preview-status -->/g) || []).length, 1, 'one status block, not two');
+      return jsonResponse(200, { id: 57 });
+    }
+  ]);
+  try {
+    const result = await updatePreviewCommentStatus({
+      token: 't',
+      repository: 'octo/widgets',
+      prNumber: 7,
+      expired: true
+    });
+    assert.deepEqual(result, { action: 'updated', commentId: 57 });
+  } finally {
+    mock.restore();
+  }
 });
