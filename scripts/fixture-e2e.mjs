@@ -134,12 +134,15 @@ const manifest = buildGalleryManifest(results, {
 const viewports = Object.fromEntries(
   Object.keys(expected.viewports ?? {}).map(id => [id, pngSize(path.join(gallery, id, 'pr.png'))])
 );
+assert.deepEqual(results.runErrors, [], `${name}: the runner reported errors`);
 const actual = {
   changed: ids(results.changed),
+  removed: results.removed,
   new: ids(results.added),
   interaction: ids(results.interactions),
   error: ids(results.broken),
   flaky: ids(results.flaky),
+  skipped: ids(results.skipped),
   unchanged: ids(results.unchanged),
   a11yBlocking: evaluation.blocking.map(({ story, id, nodes }) => `${story}:${id}:${nodes}`).sort(),
   gate: evaluateVisualGate(results).reason,

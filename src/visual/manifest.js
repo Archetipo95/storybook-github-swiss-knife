@@ -7,6 +7,7 @@ const STATUS_ORDER = [
   ['changed', 'changed'],
   ['flaky', 'flaky'],
   ['new', 'added'],
+  ['skipped', 'skipped'],
   ['unchanged', 'unchanged']
 ];
 
@@ -19,7 +20,7 @@ const STATUS_ORDER = [
 export function buildGalleryManifest(results, { hasImage, headSha, runId, runUrl, approved = false }) {
   const stories = {};
   for (const [status, key] of STATUS_ORDER) {
-    for (const test of results[key]) {
+    for (const test of results[key] ?? []) {
       const id = storyIdOf(test);
       if (!id || stories[id]) continue;
       const images = ['base', 'pr', 'diff'].filter(name => hasImage(id, name));
