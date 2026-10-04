@@ -36,3 +36,19 @@ test('dockerArgs runs the same command in the Playwright image of the runner ver
   assert.deepEqual(args.slice(args.indexOf('/swiss-knife/runner/cli.js') + 1), ['visual', '--update']);
   assert.equal(args[args.indexOf('--user') + 1], '501:20');
 });
+
+test('dockerArgs passes SWISS_KNIFE_* settings, not host paths, and rejects absolute --storybook', () => {
+  const args = dockerArgs({
+    projectDir: '/work/app',
+    args: ['visual', '--docker'],
+    version: '1.63.0',
+    env: { SWISS_KNIFE_SHARD: '1/2', SWISS_KNIFE_SNAPSHOT_DIR: '/host/path', PATH: '/usr/bin' }
+  });
+  assert.ok(args.includes('SWISS_KNIFE_SHARD=1/2'));
+  assert.ok(!args.some(arg => arg.startsWith('SWISS_KNIFE_SNAPSHOT_DIR')));
+  assert.ok(!args.some(arg => arg.startsWith('PATH=')));
+  assert.throws(
+    () => dockerArgs({ projectDir: '/w', args: ['visual', '--docker', '--storybook', '/abs/sb'], version: '1.63.0' }),
+    /relative to the project directory/
+  );
+});

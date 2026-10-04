@@ -55,7 +55,11 @@ export function parseArgs(argv) {
 
 function playwrightVersion() {
   const require = createRequire(path.join(runnerDir, 'package.json'));
-  return require('@playwright/test/package.json').version;
+  try {
+    return require('@playwright/test/package.json').version;
+  } catch {
+    throw new Error(`The runner's dependencies are not installed: run \`npm ci\` in ${runnerDir}.`);
+  }
 }
 
 /**
@@ -63,7 +67,14 @@ function playwrightVersion() {
  * mounted at /project and swiss-knife at /swiss-knife.
  * @param {{ projectDir: string, args: string[], version: string, uid?: number, gid?: number }} options
  */
-export function dockerArgs({ projectDir, args, version, uid, gid }) {
+export function dockerArgs({ projectDir, args, version, uid, gid, env = {} }) {
+  const storybook = args[args.indexOf('--storybook') + 1];
+  if (args.includes('--storybook') && path.isAbsolute(storybook)) {
+    throw new Error('--docker needs --storybook relative to the project directory (it is mounted at /project).');
+  }
+  const passthrough = Object.entries(env)
+    .filter(([key]) => /^SWISS_KNIFE_/.test(key) && !/_DIR$/.test(key))
+    .flatMap(([key, value]) => ['-e', `${key}=${value}`]);
   return [
     'run',
     '--rm',
@@ -72,6 +83,7 @@ export function dockerArgs({ projectDir, args, version, uid, gid }) {
     ...(uid !== undefined ? ['--user', `${uid}:${gid}`] : []),
     '-e',
     'HOME=/tmp',
+    ...passthrough,
     '-v',
     `${projectDir}:/project`,
     '-v',
@@ -95,7 +107,10 @@ function runVisual(options, projectDir) {
     SWISS_KNIFE_REPORT_DIR: LOCAL.report,
     PLAYWRIGHT_JSON_OUTPUT_NAME: path.join(projectDir, LOCAL.results)
   };
-  if (!options.update) fs.rmSync(path.join(projectDir, LOCAL.a11y), { recursive: true, force: true });
+  if (!options.update) {
+    fs.rmSync(path.join(projectDir, LOCAL.a11y), { recursive: true, force: true });
+    fs.rmSync(path.join(projectDir, LOCAL.results), { force: true });
+  }
   const args = ['playwright', 'test', '-c', 'playwright.config.js', '--reporter=list,json'];
   if (options.update) args.push('--update-snapshots=all');
   const result = spawnSync('npx', args, { cwd: runnerDir, env, stdio: 'inherit' });
@@ -104,8 +119,10 @@ function runVisual(options, projectDir) {
     return result.status ?? 1;
   }
 
+  const resultsPath = path.join(projectDir, LOCAL.results);
+  if (result.status !== 0 && !fs.existsSync(resultsPath)) return result.status ?? 1;
   const config = loadSwissKnifeConfig({ cwd: projectDir });
-  const results = readVisualResults(path.join(projectDir, LOCAL.results));
+  const results = readVisualResults(resultsPath);
   console.log(`\n${renderVisualSummary(results, { approvalLabel: config.visual.approvalLabel })}`);
   const evaluation = evaluateA11yReports(readReports(path.join(projectDir, LOCAL.a11y)), {
     baseline: readJson(path.join(projectDir, config.a11y.baseline)) ?? {},
@@ -116,6 +133,10 @@ function runVisual(options, projectDir) {
     renderA11ySummary(evaluation, { baselinePath: config.a11y.baseline, blockingImpacts: config.a11y.blockingImpacts })
   );
   console.log(`\nHTML report: ${path.join(projectDir, LOCAL.report, 'index.html')}`);
+  if (results.tests.length === 0 && results.runErrors.length === 0) {
+    console.error('No stories were compared. Is the Storybook build path right?');
+    return 1;
+  }
   const blocking = evaluateVisualGate(results).blocking || evaluation.blocking.length > 0;
   return blocking ? 1 : 0;
 }
@@ -156,7 +177,8 @@ function main(argv) {
       args: argv,
       version: playwrightVersion(),
       uid: process.getuid?.(),
-      gid: process.getgid?.()
+      gid: process.getgid?.(),
+      env: process.env
     });
     return spawnSync('docker', args, { stdio: 'inherit' }).status ?? 1;
   }
