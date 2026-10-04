@@ -37,7 +37,9 @@ export function selectedViewport({ parameters = {}, globals = {} } = {}) {
   if (global && typeof global === 'object' && typeof global.value === 'string') {
     return { name: global.value, isRotated: Boolean(global.isRotated) };
   }
-  if (typeof global === 'string') return { name: global, isRotated: false };
+  // Storybook 8's viewport addon sets the global to 'reset' unless a story picks one; the
+  // story's own defaultViewport parameter applies then.
+  if (typeof global === 'string' && !RESPONSIVE.has(global)) return { name: global, isRotated: false };
   const name = parameters?.viewport?.defaultViewport;
   return {
     name: typeof name === 'string' ? name : '',

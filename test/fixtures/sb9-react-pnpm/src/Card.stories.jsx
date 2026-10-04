@@ -8,3 +8,5 @@ const Card = ({ title }) => (
 export default { title: 'Fixture/Card', component: Card };
 
 export const Mobile = { args: { title: 'Mobile card' }, globals: { viewport: { value: 'mobile1', isRotated: false } } };
+
+export const OptedOut = { args: { title: 'Not compared' }, parameters: { swissKnife: { visual: { skip: true } } } };

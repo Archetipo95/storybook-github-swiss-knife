@@ -84,6 +84,8 @@ runs:
             # A story that fails to render has no baseline; its head screenshot is reported as new.
             npx playwright test -c playwright.config.js --update-snapshots=all --retries=0 || true ;;
           compare)
+            # A blob left by the baseline capture must never be uploaded as compare results.
+            rm -rf "$PLAYWRIGHT_BLOB_OUTPUT_DIR"
             # Differences are gated by the trusted gate, which honours the approval label.
             npx playwright test -c playwright.config.js || true ;;
           *)

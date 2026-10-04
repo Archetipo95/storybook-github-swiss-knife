@@ -8,14 +8,19 @@ import { firstErrorLine } from './results.js';
  */
 export function evaluateVisualGate(results, { approved = false, incomplete = false } = {}) {
   const { interactions, changed, broken, added, flaky, unchanged } = results;
-  const blocking = incomplete || interactions.length > 0 || broken.length > 0 || (changed.length > 0 && !approved);
+  const skipped = results.skipped ?? [];
+  const removed = results.removed ?? [];
+  const runErrors = results.runErrors ?? [];
+  const reviewable = changed.length + removed.length;
+  const errors = broken.length + runErrors.length;
+  const blocking = incomplete || interactions.length > 0 || errors > 0 || (reviewable > 0 && !approved);
   const reason = incomplete
     ? 'incomplete'
     : interactions.length > 0
       ? 'interaction'
-      : broken.length > 0
+      : errors > 0
         ? 'error'
-        : changed.length > 0
+        : reviewable > 0
           ? approved
             ? 'approved'
             : 'changed'
@@ -25,10 +30,12 @@ export function evaluateVisualGate(results, { approved = false, incomplete = fal
     reason,
     counts: {
       changed: changed.length,
+      removed: removed.length,
       new: added.length,
       interactions: interactions.length,
-      errors: broken.length,
+      errors,
       flaky: flaky.length,
+      skipped: skipped.length,
       unchanged: unchanged.length
     }
   };
@@ -37,14 +44,16 @@ export function evaluateVisualGate(results, { approved = false, incomplete = fal
 const STATUS = {
   incomplete: () => ':x: Some screenshot shards did not finish, so this report is incomplete.',
   interaction: () => ':x: Some interaction tests (play functions) failed.',
-  error: () => ':x: Some stories failed to render.',
+  error: () => ':x: Some stories failed to render, or the runner failed.',
   changed: label =>
     `:warning: Visual changes detected. Review them, then add the \`${label}\` label to accept (again after every push that changes them).`,
   approved: label => `:white_check_mark: Visual changes approved with the \`${label}\` label.`,
   clean: () => ':white_check_mark: No visual changes.'
 };
 
-const escapeCode = text => String(text).replaceAll('`', "'");
+// Titles and errors come from the pull request's run: keep them on one line inside inline code,
+// so they cannot add markdown (links, headings, fake status lines) to the check summary.
+const escapeCode = text => String(text).replace(/\s+/g, ' ').replaceAll('`', "'").slice(0, 300);
 
 function list(title, items, detailOf = () => '') {
   if (items.length === 0) return '';
@@ -70,10 +79,16 @@ export function renderVisualSummary(
 
 ${STATUS[reason](approvalLabel)}
 
-| Changed | New | Interaction failures | Render errors | Flaky | Unchanged |
-| --- | --- | --- | --- | --- | --- |
-| ${counts.changed} | ${counts.new} | ${counts.interactions} | ${counts.errors} | ${counts.flaky} | ${counts.unchanged} |
+| Changed | Removed | New | Interaction failures | Errors | Flaky | Skipped | Unchanged |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| ${counts.changed} | ${counts.removed} | ${counts.new} | ${counts.interactions} | ${counts.errors} | ${counts.flaky} | ${counts.skipped} | ${counts.unchanged} |
 
-${list('Interaction failures', results.interactions, interactionError)}${list('Changed stories', results.changed)}${list('New stories', results.added)}${list('Render errors', results.broken)}${list('Flaky stories', results.flaky)}
+${list(
+  'Runner errors',
+  (results.runErrors ?? []).map(message => ({ title: message.split('\n')[0] }))
+)}${list('Interaction failures', results.interactions, interactionError)}${list('Changed stories', results.changed)}${list(
+    'Removed stories (baseline without a story)',
+    (results.removed ?? []).map(id => ({ title: id }))
+  )}${list('New stories', results.added)}${list('Render errors', results.broken)}${list('Flaky stories', results.flaky)}${list('Skipped stories', results.skipped ?? [])}
 ${reportUrl ? `Full report: [open the report](${reportUrl}).\n` : ''}`;
 }

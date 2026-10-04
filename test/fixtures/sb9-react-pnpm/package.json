@@ -7,6 +7,7 @@
     "build-storybook": "storybook build --quiet --output-dir storybook-static"
   },
   "devDependencies": {
+    "@storybook/addon-a11y": "9.1.20",
     "@storybook/react-vite": "9.1.20",
     "@vitejs/plugin-react": "5.2.0",
     "react": "19.3.0",

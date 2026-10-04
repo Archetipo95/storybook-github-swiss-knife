@@ -22,5 +22,7 @@ jobs:
       pull-requests: write
     with:
       working_directory: test/fixtures/sb9-react-pnpm
+      caller_workflow: .github/workflows/dogfood-visual.yml
+      protected_paths: .github/workflows/visual.yml
     secrets:
       passcode_hash: ${{ secrets.STORYBOOK_PREVIEW_PASSCODE_HASH }}

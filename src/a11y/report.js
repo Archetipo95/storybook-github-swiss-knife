@@ -9,6 +9,19 @@
 
 export const A11Y_COMMENT_MARKER = '<!-- swiss-knife:a11y -->';
 
+// Report fields come from the pull request's run: one line, no markdown or HTML of their own.
+const text = value =>
+  String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .replace(/[\\`*_[\]()<>|#!]/g, character => `\\${character}`)
+    .slice(0, 200);
+const code = value =>
+  `\`${String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .replaceAll('`', "'")
+    .slice(0, 200)}\``;
+const safeUrl = value => (/^https:\/\/[^\s()<>]+$/.test(String(value ?? '')) ? String(value) : '');
+
 /**
  * Marks each violation `isNew` (blocking) and returns the blocking ones.
  * A violation blocks when its rule is enforced (any impact), or when its impact is blocking and
@@ -80,7 +93,7 @@ export function renderA11ySummary(
     .sort(([leftId, left], [rightId, right]) => right.stories - left.stories || leftId.localeCompare(rightId))
     .map(
       ([id, { impact, help, helpUrl, stories, nodes, newStories }]) =>
-        `| ${impact ?? ''} | ${helpUrl ? `[${id}](${helpUrl})` : id} | ${help ?? ''} | ${stories} | ${nodes} | ${newStories} |`
+        `| ${text(impact)} | ${safeUrl(helpUrl) ? `[${text(id)}](${safeUrl(helpUrl)})` : text(id)} | ${text(help)} | ${stories} | ${nodes} | ${newStories} |`
     );
   const enforced = enforcedRules.length > 0 ? enforcedRules.map(rule => `\`${rule}\``).join(', ') : 'none yet';
   const storiesWithViolations = reports.filter(report => report.violations.length > 0).length;
@@ -107,7 +120,7 @@ export function renderA11ySummary(
           '### New violations',
           '',
           ...blocking.map(
-            ({ story, id, nodes }) => `- \`${story}\`: ${id} (${nodes} node${Number(nodes) === 1 ? '' : 's'})`
+            ({ story, id, nodes }) => `- ${code(story)}: ${text(id)} (${nodes} node${Number(nodes) === 1 ? '' : 's'})`
           ),
           ''
         ]

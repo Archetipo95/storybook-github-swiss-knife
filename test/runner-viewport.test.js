@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import { storyRuleSettings } from '../runner/lib/a11y-rules.js';
 import { resolveStaticPath } from '../runner/lib/serve.js';
 import { hostResolverRules } from '../runner/lib/settings.js';
 import { resolveViewport, selectedViewport } from '../runner/lib/viewport.js';
@@ -73,5 +74,31 @@ test('host resolver rules always keep localhost and add the allowed hosts', () =
   assert.equal(
     hostResolverRules(['fonts.gstatic.com']),
     '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost, EXCLUDE fonts.gstatic.com'
+  );
+});
+
+test("Storybook 8 with the viewport addon: the 'reset' global falls back to the story's defaultViewport", () => {
+  const story = { parameters: { viewport: { defaultViewport: 'mobile1' } }, globals: { viewport: 'reset' } };
+  assert.deepEqual(resolveViewport(story, config), { width: 320, height: 568, name: 'mobile1' });
+  assert.deepEqual(resolveViewport({ globals: { viewport: 'reset' } }, config).name, 'default');
+});
+
+test('story a11y rules: config.rules list and options.rules map, later settings win', () => {
+  const { enabled, disabled } = storyRuleSettings({
+    a11y: {
+      config: {
+        rules: [
+          { id: 'region', enabled: true },
+          { id: 'color-contrast', enabled: false }
+        ]
+      },
+      options: { rules: { 'heading-order': { enabled: false }, region: { enabled: false } } }
+    }
+  });
+  assert.deepEqual([...enabled], []);
+  assert.deepEqual([...disabled].sort(), ['color-contrast', 'heading-order', 'region']);
+  assert.deepEqual(
+    [...storyRuleSettings({ a11y: { config: { rules: [{ id: 'region', enabled: true }] } } }).enabled],
+    ['region']
   );
 });
