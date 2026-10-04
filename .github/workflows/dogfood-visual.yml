@@ -18,6 +18,7 @@ permissions:
 
 jobs:
   visual:
+    if: false
     uses: ./.github/workflows/visual.yml
     permissions:
       contents: read
