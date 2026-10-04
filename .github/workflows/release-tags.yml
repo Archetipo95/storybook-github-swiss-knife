@@ -26,6 +26,9 @@ concurrency:
 jobs:
   tag:
     name: Create release tag and update major tag
+    # Off until the repository variable SWISS_KNIFE_RELEASES is 'true', so pushes during
+    # the private phase never tag or publish a release.
+    if: vars.SWISS_KNIFE_RELEASES == 'true'
     runs-on: ubuntu-24.04
     permissions:
       # Required to push the release and major tags and publish the release.

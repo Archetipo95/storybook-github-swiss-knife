@@ -48,6 +48,9 @@ on:
 jobs:
   janitor:
     name: Prune stale preview directories (trusted)
+    # This repository's own nightly run only makes sense once it is public; callers
+    # (workflow_call) and manual runs are unaffected.
+    if: github.event_name != 'schedule' || !github.event.repository.private
     concurrency:
       group: storybook-pages-${{ github.repository }}
       cancel-in-progress: false
