@@ -1,0 +1,9 @@
+# Dependencies and build outputs
+node_modules/
+package-lock.json
+
+# Test fixtures
+test/fixtures/
+
+# Session state
+.copilot/

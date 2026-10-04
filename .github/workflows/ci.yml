@@ -1,0 +1,56 @@
+name: CI & Action Validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-validate:
+    name: Run Tests & Action Validation
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history is required so tests can `git show`/`git cat-file`
+          # historical commits referenced by internal SHA-pinned action refs
+          # (see test/action-pin-integrity.test.js).
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit test suite
+        run: npm test
+
+      - name: Report code coverage
+        run: npm run test:coverage
+
+      - name: Check code formatting and linting
+        run: |
+          npm run format
+          npm run lint
+
+      - name: Validate fixture artifact directory
+        run: node src/validate-artifact.js "test/fixtures/sample-storybook" "${{ github.workspace }}"
+
+      - name: Validate configuration parsing
+        run: npm run validate-config
+
+      - name: Test composite action artifact validation step
+        uses: ./
+        with:
+          checkout: 'false'
+          path: 'test/fixtures/sample-storybook'
+          publish: 'false'

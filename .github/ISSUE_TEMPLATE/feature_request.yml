@@ -1,0 +1,38 @@
+name: Feature Request
+description: Suggest an idea or enhancement for storybook-github-pages
+title: '[Feature]: '
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea to improve `storybook-github-pages`? We would love to hear it!
+
+  - type: textarea
+    id: feature_summary
+    attributes:
+      label: Feature Summary
+      description: A clear and concise description of the feature or enhancement you are proposing.
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem_statement
+    attributes:
+      label: Is your feature request related to a problem?
+      description: Describe the problem or limitation you are encountering.
+      placeholder: I'm frustrated when...
+
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution or workflow improvement you would like to see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternative Solutions
+      description: Describe any alternative solutions or workarounds you've considered.

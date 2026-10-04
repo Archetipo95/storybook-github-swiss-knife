@@ -1,0 +1,74 @@
+name: PR Preview Build
+
+# Unprivileged build entrypoint. Runs on `pull_request` for both
+# same-repository and forked contributions. `contents: read` is the only
+# permission granted anywhere in this workflow: no secrets are referenced,
+# nothing is deployed, and no PR comment is ever written from here. All
+# publish-capable logic lives in the separate, trusted `pr-preview-publish`
+# workflow, which only runs after this one completes and independently
+# re-validates everything produced here.
+#
+# There is intentionally no dependency/build cache in this workflow: sharing
+# a cache between untrusted PR builds (and especially between fork and
+# same-repo builds) can be used to smuggle content across isolation
+# boundaries, so every run starts from a clean, isolated state.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: storybook-pr-preview-build-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build & validate Storybook (untrusted)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout pull request head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Resolve preview configuration
+        id: config
+        run: |
+          node -e 'import("./src/config.js").then(({resolveConfiguration}) => {
+            const c = resolveConfiguration({inputs: {}});
+            console.log(`preview_root=${c.preview_root}`);
+          })' >> "$GITHUB_OUTPUT"
+
+      # This repository has no Storybook of its own to build, so the
+      # reference pipeline validates the bundled fixture as a stand-in for a
+      # real `npm run build-storybook` output. Consuming repositories should
+      # replace this step with the composite action (or their own build
+      # steps) pointed at their actual build output directory.
+      - name: 'Build and validate Storybook output (reference: bundled fixture)'
+        uses: ./
+        with:
+          checkout: 'false'
+          path: 'test/fixtures/sample-storybook'
+          package_manager: 'npm'
+          publish: 'false'
+          smoke_test: 'true'
+
+      # Reuses the public, supported preview-build action - the same one
+      # documented for external consumers - so this reference pipeline never
+      # drifts from what ships. It stages `preview-metadata.json` + the
+      # digest-bound `storybook/` directory and uploads the deterministic
+      # `storybook-preview-pr-<PR>-run-<run>` artifact the trusted publisher
+      # expects.
+      - name: Package and upload preview bundle
+        uses: ./preview-build
+        with:
+          source_path: 'test/fixtures/sample-storybook'
+          preview_root: ${{ steps.config.outputs.preview_root }}
+          smoke_test: 'true'
+          audit_bundle_size: 'true'

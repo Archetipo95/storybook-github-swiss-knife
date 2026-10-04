@@ -1,0 +1,143 @@
+name: PR Preview Cleanup
+
+# Trusted, metadata-only close cleanup. Uses `pull_request_target` so a
+# write-capable token is available even for closing a forked pull request,
+# but this workflow NEVER checks out the pull request's head ref or runs
+# any code from it - it only reads structured event metadata (PR number,
+# head/base refs, head repository) to compute the preview directory name,
+# then checks out the trusted Pages branch to remove it. This is the
+# documented-safe usage of `pull_request_target`: no PR-controlled code is
+# ever executed in this privileged context.
+#
+# Removal is idempotent: if the directory does not exist (e.g. the PR's
+# preview was never published, such as for a fork PR), this is a no-op and
+# no rebuild is requested.
+
+on:
+  pull_request_target:
+    types: [closed]
+  workflow_call:
+    inputs:
+      preview_root:
+        description: 'Root directory for previews on the Pages branch'
+        required: false
+        type: string
+        default: ''
+      pages_branch:
+        description: 'Pages branch used for previews'
+        required: false
+        type: string
+        default: ''
+      pr_number:
+        description: 'Pull request number to clean up'
+        required: false
+        type: number
+
+jobs:
+  cleanup:
+    name: Remove closed PR preview (trusted, metadata-only)
+    concurrency:
+      group: storybook-pages-${{ github.repository }}
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pages: write
+      deployments: write
+    steps:
+      # Checks out the default branch only (no `ref:` on a pull_request_target
+      # checkout resolves to the base repository's default branch) so the
+      # trusted cleanup script itself is available. This is never the pull
+      # request's head - no PR-controlled code is checked out in this job.
+      - name: Checkout repository (default branch, trusted)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Credentials must persist here because the Pages-branch-existence
+          # check below runs `git ls-remote` against `origin`; without a
+          # stored token that call fails with an auth error on private
+          # repositories (indistinguishable from a real "missing branch"
+          # result), silently skipping the rest of the cleanup while the job
+          # still reports success.
+          persist-credentials: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve trusted base configuration
+        id: config
+        env:
+          INPUT_PREVIEW_ROOT: ${{ inputs.preview_root }}
+          INPUT_PAGES_BRANCH: ${{ inputs.pages_branch }}
+        run: |
+          node -e '
+            import("node:fs").then(async ({existsSync}) => {
+              if (existsSync("./src/config.js")) {
+                const {resolveConfiguration} = await import("./src/config.js");
+                const c = resolveConfiguration({inputs: { preview_root: process.env.INPUT_PREVIEW_ROOT, pages_branch: process.env.INPUT_PAGES_BRANCH }});
+                console.log(`preview_root=${c.preview_root}`);
+                console.log(`pages_branch=${c.pages_branch}`);
+              } else {
+                let file_preview_root = undefined;
+                let file_pages_branch = undefined;
+                if (existsSync(".storybook-pages.yml")) {
+                  const {readFileSync} = await import("node:fs");
+                  const content = readFileSync(".storybook-pages.yml", "utf8");
+                  for (const line of content.split("\n")) {
+                    const trimmed = line.trim();
+                    if (file_preview_root === undefined && trimmed.startsWith("preview_root:")) {
+                      file_preview_root = trimmed.slice("preview_root:".length).trim().replace(/^["'\''"]|["'\''"]$/g, "");
+                    }
+                    if (file_pages_branch === undefined && trimmed.startsWith("pages_branch:")) {
+                      file_pages_branch = trimmed.slice("pages_branch:".length).trim().replace(/^["'\''"]|["'\''"]$/g, "");
+                    }
+                  }
+                }
+                const rawPreviewRoot = process.env.INPUT_PREVIEW_ROOT;
+                let preview_root;
+                if (rawPreviewRoot !== undefined && rawPreviewRoot !== "") {
+                  preview_root = (rawPreviewRoot === "." || rawPreviewRoot === "./") ? "" : rawPreviewRoot;
+                } else if (file_preview_root !== undefined) {
+                  preview_root = (file_preview_root === "." || file_preview_root === "./") ? "" : file_preview_root;
+                } else {
+                  preview_root = "pr-preview";
+                }
+                const rawPagesBranch = process.env.INPUT_PAGES_BRANCH;
+                const pages_branch = (rawPagesBranch !== undefined && rawPagesBranch !== "")
+                  ? rawPagesBranch
+                  : (file_pages_branch !== undefined ? file_pages_branch : "gh-pages");
+                console.log(`preview_root=${preview_root}`);
+                console.log(`pages_branch=${pages_branch}`);
+              }
+            });
+          ' >> "$GITHUB_OUTPUT"
+
+      - name: Check Pages branch existence
+        id: branch_check
+        env:
+          PAGES_BRANCH: ${{ steps.config.outputs.pages_branch || inputs.pages_branch || 'gh-pages' }}
+        run: |
+          if git ls-remote --exit-code --heads origin "$PAGES_BRANCH" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Pages branch '$PAGES_BRANCH' does not exist; skipping preview cleanup."
+            if [ -n "$GITHUB_STEP_SUMMARY" ]; then
+              echo -e "### Storybook preview cleanup\n\nPages branch \`$PAGES_BRANCH\` does not exist; no preview directory to remove.\n" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+
+      - name: Checkout Pages branch
+        if: steps.branch_check.outputs.exists == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.config.outputs.pages_branch || inputs.pages_branch || 'gh-pages' }}
+          path: pages-repo
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Remove preview directory for closed pull request
+        if: steps.branch_check.outputs.exists == 'true'
+        uses: Archetipo95/storybook-github-pages/preview-cleanup@227fd45a195eb7110996f3843277a97b5820b489
+        with:
+          pages_repo: ${{ github.workspace }}/pages-repo
+          pages_branch: ${{ steps.config.outputs.pages_branch || inputs.pages_branch || 'gh-pages' }}
+          preview_root: ${{ steps.config.outputs.preview_root }}
+          pr_number: ${{ inputs.pr_number > 0 && inputs.pr_number || github.event.pull_request.number }}

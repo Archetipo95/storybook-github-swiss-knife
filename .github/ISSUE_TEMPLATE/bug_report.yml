@@ -1,0 +1,71 @@
+name: Bug Report
+description: Create a bug report to help us improve storybook-github-pages
+title: '[Bug]: '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug! Please fill out the sections below to help us investigate and fix the issue.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: Describe what happened...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: execution_mode
+    attributes:
+      label: Deployment Mode
+      description: Which deployment mode or workflow were you using?
+      options:
+        - 'Reusable Workflow (mode: artifact)'
+        - 'Reusable Workflow (mode: directory)'
+        - 'Composite Action (action.yml)'
+        - 'PR Preview Workflows (pr-preview-*.yml)'
+        - 'Other / Not sure'
+    validations:
+      required: true
+
+  - type: textarea
+    id: workflow_snippet
+    attributes:
+      label: Workflow Configuration
+      description: Provide the relevant section of your GitHub Actions workflow file.
+      render: yaml
+      placeholder: |
+        uses: Archetipo95/storybook-github-pages@v1.11.0
+        with:
+          path: 'storybook-static'
+          build_command: 'npm run build-storybook'
+
+  - type: textarea
+    id: steps_to_reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Detailed steps to reproduce the behavior.
+      placeholder: |
+        1. Set up workflow with...
+        2. Run GitHub Actions job...
+        3. Observe error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs or Screenshots
+      description: Paste relevant GitHub Actions log output or error messages.
+      render: shell

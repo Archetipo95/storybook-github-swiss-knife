@@ -1,0 +1,383 @@
+name: 'Security-Hardened Storybook to GitHub Pages'
+description: 'Security-hardened GitHub Action to build, validate, and deploy Storybook to GitHub Pages with Bitovi compatibility'
+author: 'Archetipo95'
+
+branding:
+  icon: 'book-open'
+  color: 'blue'
+
+inputs:
+  checkout:
+    description: 'Whether to check out the repository automatically'
+    required: false
+    default: 'true'
+  path:
+    description: 'Path to the directory containing built static Storybook files'
+    required: false
+    default: ''
+  package_manager:
+    description: 'Package manager to use: npm, yarn, or pnpm (Bun requires the reusable workflow)'
+    required: false
+    default: ''
+  install_command:
+    description: 'Bitovi-compatible custom install command escape hatch'
+    required: false
+    default: ''
+  build_command:
+    description: 'Bitovi-compatible custom build command escape hatch'
+    required: false
+    default: ''
+  custom_install_command:
+    description: 'Alias for install_command'
+    required: false
+    default: ''
+  custom_build_command:
+    description: 'Alias for build_command'
+    required: false
+    default: ''
+  publish:
+    description: 'Whether to upload and deploy the Pages artifact'
+    required: false
+    default: ''
+  create_deployment:
+    description: 'Whether to create a native GitHub deployment record and status lifecycle for the deployment'
+    required: false
+    default: 'false'
+  environment_name:
+    description: 'GitHub deployment environment name for the Pages deployment'
+    required: false
+    default: 'github-pages'
+  environment_url:
+    description: 'Explicit URL to expose on the GitHub deployment environment'
+    required: false
+    default: ''
+  artifact_name:
+    description: 'Name of the GitHub Pages artifact'
+    required: false
+    default: ''
+  mode:
+    description: 'Deployment mode: artifact or trusted branch-backed directory'
+    required: false
+    default: ''
+  pages_branch:
+    description: 'Branch used by directory mode'
+    required: false
+    default: ''
+  target_directory:
+    description: 'Directory replaced by directory mode; empty publishes the root'
+    required: false
+    default: ''
+  site_url:
+    description: 'Canonical Pages site URL'
+    required: false
+    default: ''
+  base_path:
+    description: 'Optional URL base path'
+    required: false
+    default: ''
+  managed_directories:
+    description: 'Comma-separated managed directories preserved during root publication'
+    required: false
+    default: ''
+  generate_badges:
+    description: 'Whether to auto-generate dynamic SVG badges for components and stories'
+    required: false
+    default: 'true'
+  badges_directory:
+    description: 'Directory within the static build output to store generated badges'
+    required: false
+    default: 'badges'
+  test_results_path:
+    description: 'Optional repository-relative path to a JSON Storybook interaction test results file'
+    required: false
+    default: ''
+  coverage_include_paths:
+    description: 'Repository-root-relative glob patterns that narrow the component coverage denominator; leave blank for repository-wide scan'
+    required: false
+    default: ''
+  coverage_ignore_paths:
+    description: 'Repository-root-relative glob patterns removed from the final coverage set even when they match include rules'
+    required: false
+    default: ''
+  generate_stats_graph:
+    description: 'Whether to auto-generate hand-drawn growth chart (history.svg) and update metrics ledger (history.json)'
+    required: false
+    default: 'true'
+  stats_directory:
+    description: 'Directory within the static build output to store stats graph and ledger'
+    required: false
+    default: 'stats'
+  enable_passcode_gate:
+    description: 'Whether to inject a client-side passcode gate into the published Storybook'
+    required: false
+    default: 'false'
+  passcode_hash:
+    description: 'SHA-256 hash of the passcode; keep this value in a workflow secret'
+    required: false
+    default: ''
+  passcode_session_hours:
+    description: 'Hours before the browser session expires'
+    required: false
+    default: '24'
+  smoke_test:
+    description: 'Whether to run an opt-in Playwright smoke test before publishing'
+    required: false
+    default: 'false'
+  smoke_test_stories:
+    description: 'Comma-separated story id globs to smoke test, or all'
+    required: false
+    default: 'all'
+  smoke_test_timeout_ms:
+    description: 'Per-page Playwright navigation timeout in milliseconds'
+    required: false
+    default: '30000'
+  auto_base_url:
+    description: 'Whether to compute and inject the Storybook base URL for the deployment target'
+    required: false
+    default: 'true'
+  audit_bundle_size:
+    description: 'Whether to audit static asset sizes and append a bundle size scorecard to the job summary'
+    required: false
+    default: 'false'
+  bundle_size_max_mb:
+    description: 'Optional total static output budget in megabytes; the job fails when the audit exceeds it'
+    required: false
+    default: ''
+
+outputs:
+  page_url:
+    description: 'The URL of the deployed GitHub Pages site'
+    value: ${{ steps.deploy.outputs.page_url }}
+  deployment_id:
+    description: 'The GitHub Pages deployment ID or GitHub deployment record ID'
+    value: ${{ steps.create-deployment.outputs.deployment_id || steps.deploy.outputs.deployment_id }}
+  status:
+    description: 'Status of the deployment operation (success, skipped, failed)'
+    value: ${{ steps.set-status.outputs.status }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout repository
+      if: ${{ inputs.checkout == 'true' }}
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Resolve and validate configuration
+      shell: bash
+      env:
+        CONFIG_INPUTS: ${{ toJSON(inputs) }}
+        PUBLISH_INPUT: ${{ inputs.publish }}
+        ARTIFACT_NAME_INPUT: ${{ inputs.artifact_name }}
+      run: |
+        node -e 'import(process.env.GITHUB_ACTION_PATH + "/src/config.js").then(async ({resolveConfiguration, COMPOSITE_PACKAGE_MANAGERS}) => {
+          const c = resolveConfiguration({inputs: JSON.parse(process.env.CONFIG_INPUTS), allowedPackageManagers: COMPOSITE_PACKAGE_MANAGERS});
+          const lines = [
+            `SB_MODE=${c.mode}`, `SB_PATH=${c.path}`, `SB_PACKAGE_MANAGER=${c.package_manager}`,
+            `SB_INSTALL_COMMAND=${c.build.install_command || ""}`, `SB_BUILD_COMMAND=${c.build.build_command || ""}`,
+            `SB_PUBLISH=${process.env.PUBLISH_INPUT || "true"}`, `SB_ARTIFACT_NAME=${process.env.ARTIFACT_NAME_INPUT || "github-pages"}`,
+            `SB_CREATE_DEPLOYMENT=${String(c.create_deployment ?? false)}`,
+            `SB_ENVIRONMENT_NAME=${c.environment_name || c.environment || ""}`,
+            `SB_ENVIRONMENT_URL=${c.environment_url || ""}`,
+            `SB_GENERATE_BADGES=${c.generate_badges}`, `SB_BADGES_DIRECTORY=${c.badges_directory || "badges"}`,
+            `SB_TEST_RESULTS_PATH=${c.test_results_path || ""}`,
+            `SB_COVERAGE_INCLUDE_PATHS=${c.coverage_include_paths || ""}`,
+            `SB_COVERAGE_IGNORE_PATHS=${c.coverage_ignore_paths || ""}`,
+            `SB_GENERATE_STATS_GRAPH=${c.generate_stats_graph}`, `SB_STATS_DIRECTORY=${c.stats_directory || "stats"}`,
+            `SB_ENABLE_PASSCODE_GATE=${c.enable_passcode_gate}`, `SB_PASSCODE_SESSION_HOURS=${c.passcode_session_hours}`,
+            `SB_SMOKE_TEST=${c.smoke_test}`, `SB_SMOKE_TEST_STORIES=${c.smoke_test_stories}`, `SB_SMOKE_TEST_TIMEOUT_MS=${c.smoke_test_timeout_ms}`,
+            `SB_SITE_URL=${c.site_url || ""}`, `SB_BASE_PATH=${c.base_path || ""}`, `SB_AUTO_BASE_URL=${c.auto_base_url}`,
+            `SB_AUDIT_BUNDLE_SIZE=${c.audit_bundle_size}`, `SB_BUNDLE_SIZE_MAX_MB=${c.bundle_size_max_mb}`,
+            `SB_CNAME=${c.cname || ""}`
+          ];
+          const {appendFileSync} = await import("node:fs");
+          appendFileSync(process.env.GITHUB_ENV, `${lines.join("\n")}\n`);
+        })'
+
+    - name: Set up Node.js
+      if: ${{ env.SB_PACKAGE_MANAGER == 'npm' || env.SB_PACKAGE_MANAGER == 'yarn' || env.SB_PACKAGE_MANAGER == 'pnpm' }}
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: '24'
+
+    - name: Install dependencies
+      if: ${{ env.SB_INSTALL_COMMAND != '' }}
+      shell: bash
+      env:
+        SB_INSTALL_COMMAND: ${{ env.SB_INSTALL_COMMAND }}
+      run: |
+        CMD="$SB_INSTALL_COMMAND"
+        echo "Running custom install command: $CMD"
+        eval "$CMD"
+
+    - name: Build Storybook
+      if: ${{ env.SB_BUILD_COMMAND != '' }}
+      shell: bash
+      env:
+        SB_AUTO_BASE_URL: ${{ env.SB_AUTO_BASE_URL }}
+        SB_BUILD_COMMAND: ${{ env.SB_BUILD_COMMAND }}
+        SB_REPOSITORY: ${{ github.repository }}
+        SB_SITE_URL: ${{ env.SB_SITE_URL }}
+        SB_BASE_PATH: ${{ env.SB_BASE_PATH }}
+        SB_EVENT_NAME: ${{ github.event_name }}
+        SB_PR_NUMBER: ${{ github.event.pull_request.number }}
+      run: |
+        CMD="$SB_BUILD_COMMAND"
+        if [ "$SB_AUTO_BASE_URL" = "true" ]; then
+          eval "$(node -e 'import(process.env.GITHUB_ACTION_PATH + "/src/base-url.js").then(({computeBaseUrl, augmentBuildCommand, buildEnvironment}) => { const baseUrl = computeBaseUrl({repository: process.env.SB_REPOSITORY, siteUrl: process.env.SB_SITE_URL, basePath: process.env.SB_BASE_PATH, eventName: process.env.SB_EVENT_NAME, prNumber: process.env.SB_PR_NUMBER}); const command = augmentBuildCommand(process.env.SB_BUILD_COMMAND, baseUrl); console.log(`CMD=${JSON.stringify(command)}`); for (const [key, value] of Object.entries(buildEnvironment(baseUrl))) console.log(`export ${key}=${JSON.stringify(value)}`); })')"
+        fi
+        echo "Running custom build command: $CMD"
+        eval "$CMD"
+
+    # The audit runs before badges/stats are written so it measures the
+    # Storybook build output only.
+    - name: Audit Storybook bundle size
+      if: ${{ env.SB_AUDIT_BUNDLE_SIZE == 'true' }}
+      shell: bash
+      env:
+        SB_PATH: ${{ env.SB_PATH }}
+        SB_BUNDLE_SIZE_MAX_MB: ${{ env.SB_BUNDLE_SIZE_MAX_MB }}
+        WORKSPACE_ROOT: ${{ github.workspace }}
+      run: node "$GITHUB_ACTION_PATH/src/audit-static.js" "$SB_PATH" "$WORKSPACE_ROOT"
+
+    - name: Generate Storybook badges
+      if: ${{ env.SB_GENERATE_BADGES == 'true' }}
+      shell: bash
+      env:
+        SB_PATH: ${{ env.SB_PATH }}
+        SB_BADGES_DIRECTORY: ${{ env.SB_BADGES_DIRECTORY }}
+        SB_TEST_RESULTS_PATH: ${{ env.SB_TEST_RESULTS_PATH }}
+        SB_COVERAGE_INCLUDE_PATHS: ${{ env.SB_COVERAGE_INCLUDE_PATHS }}
+        SB_COVERAGE_IGNORE_PATHS: ${{ env.SB_COVERAGE_IGNORE_PATHS }}
+        SB_SITE_URL: ${{ env.SB_SITE_URL }}
+        SB_BASE_PATH: ${{ env.SB_BASE_PATH }}
+        WORKSPACE_ROOT: ${{ github.workspace }}
+        GITHUB_SHA: ${{ github.sha }}
+      run: node "$GITHUB_ACTION_PATH/src/generate-badges.js" "$SB_PATH" "$WORKSPACE_ROOT"
+
+    - name: Generate Storybook growth graph
+      if: ${{ env.SB_GENERATE_STATS_GRAPH == 'true' }}
+      shell: bash
+      env:
+        SB_PATH: ${{ env.SB_PATH }}
+        SB_STATS_DIRECTORY: ${{ env.SB_STATS_DIRECTORY }}
+        SB_COVERAGE_INCLUDE_PATHS: ${{ env.SB_COVERAGE_INCLUDE_PATHS }}
+        SB_COVERAGE_IGNORE_PATHS: ${{ env.SB_COVERAGE_IGNORE_PATHS }}
+        SB_SITE_URL: ${{ env.SB_SITE_URL }}
+        SB_BASE_PATH: ${{ env.SB_BASE_PATH }}
+        WORKSPACE_ROOT: ${{ github.workspace }}
+        GITHUB_SHA: ${{ github.sha }}
+      run: node "$GITHUB_ACTION_PATH/src/generate-stats.js" "$SB_PATH" "$WORKSPACE_ROOT"
+
+    - name: Run Storybook smoke test
+      if: ${{ env.SB_SMOKE_TEST == 'true' }}
+      shell: bash
+      env:
+        SB_PATH: ${{ env.SB_PATH }}
+        WORKSPACE_ROOT: ${{ github.workspace }}
+        SB_SMOKE_TEST_STORIES: ${{ env.SB_SMOKE_TEST_STORIES }}
+        SB_SMOKE_TEST_TIMEOUT_MS: ${{ env.SB_SMOKE_TEST_TIMEOUT_MS }}
+      run: node "$GITHUB_ACTION_PATH/src/smoke-test.js" "$SB_PATH" "$WORKSPACE_ROOT" "$SB_SMOKE_TEST_STORIES" "$SB_SMOKE_TEST_TIMEOUT_MS"
+
+    - name: Validate static artifact
+      shell: bash
+      env:
+        SB_PATH: ${{ env.SB_PATH }}
+        WORKSPACE_ROOT: ${{ github.workspace }}
+      run: node "$GITHUB_ACTION_PATH/src/validate-artifact.js" "$SB_PATH" "$WORKSPACE_ROOT"
+
+    - name: Inject Storybook passcode gate
+      if: ${{ env.SB_ENABLE_PASSCODE_GATE == 'true' }}
+      shell: bash
+      env:
+        SB_PATH: ${{ env.SB_PATH }}
+        PASSCODE_HASH: ${{ inputs.passcode_hash }}
+        PASSCODE_SESSION_HOURS: ${{ env.SB_PASSCODE_SESSION_HOURS }}
+      run: node "$GITHUB_ACTION_PATH/src/inject-auth-gate.js" "$SB_PATH"
+
+    - name: Ensure .nojekyll exists
+      shell: bash
+      env:
+        SB_PATH: ${{ env.SB_PATH }}
+      run: |
+        if [ -d "$SB_PATH" ]; then
+          touch "$SB_PATH/.nojekyll"
+        fi
+
+    - name: Warn about ignored custom domain
+      if: ${{ env.SB_CNAME != '' && env.SB_MODE == 'artifact' }}
+      shell: bash
+      run: echo '::warning title=cname ignored in artifact mode::GitHub Pages ignores CNAME files for GitHub Actions (artifact) deployments. Configure the custom domain in repository Settings > Pages instead.'
+
+    - name: Upload Pages artifact
+      if: ${{ env.SB_PUBLISH == 'true' && env.SB_MODE == 'artifact' }}
+      uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+      with:
+        path: ${{ env.SB_PATH }}
+        name: ${{ env.SB_ARTIFACT_NAME }}
+
+    - name: Create GitHub deployment (pending)
+      id: create-deployment
+      if: ${{ env.SB_PUBLISH == 'true' && env.SB_MODE == 'artifact' && env.SB_CREATE_DEPLOYMENT == 'true' }}
+      shell: bash
+      env:
+        ACTION: create
+        GITHUB_TOKEN: ${{ github.token }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        DEPLOY_REF: ${{ github.sha }}
+        DEPLOYMENT_ENVIRONMENT: ${{ env.SB_ENVIRONMENT_NAME || 'github-pages' }}
+        ENVIRONMENT_URL: ${{ env.SB_ENVIRONMENT_URL }}
+        LOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        DEPLOYMENT_DESCRIPTION: ${{ env.SB_ENVIRONMENT_NAME || 'github-pages' }} deployment
+      run: node "$GITHUB_ACTION_PATH/src/github-deployments.js"
+
+    - name: Deploy to GitHub Pages
+      id: deploy
+      if: ${{ env.SB_PUBLISH == 'true' && env.SB_MODE == 'artifact' }}
+      uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+      with:
+        artifact_name: ${{ env.SB_ARTIFACT_NAME }}
+
+    - name: Update GitHub deployment status (success)
+      if: ${{ env.SB_PUBLISH == 'true' && env.SB_MODE == 'artifact' && env.SB_CREATE_DEPLOYMENT == 'true' && steps.create-deployment.outputs.deployment_id != '' && steps.deploy.outcome == 'success' }}
+      shell: bash
+      env:
+        ACTION: update
+        GITHUB_TOKEN: ${{ github.token }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        DEPLOYMENT_ID: ${{ steps.create-deployment.outputs.deployment_id }}
+        DEPLOYMENT_STATE: success
+        ENVIRONMENT_URL: ${{ steps.deploy.outputs.page_url || env.SB_ENVIRONMENT_URL }}
+        LOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        DEPLOYMENT_DESCRIPTION: ${{ env.SB_ENVIRONMENT_NAME || 'github-pages' }} deployment succeeded
+      run: node "$GITHUB_ACTION_PATH/src/github-deployments.js"
+
+    - name: Update GitHub deployment status (failure)
+      if: ${{ failure() && env.SB_PUBLISH == 'true' && env.SB_MODE == 'artifact' && env.SB_CREATE_DEPLOYMENT == 'true' && steps.create-deployment.outputs.deployment_id != '' }}
+      shell: bash
+      env:
+        ACTION: update
+        GITHUB_TOKEN: ${{ github.token }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        DEPLOYMENT_ID: ${{ steps.create-deployment.outputs.deployment_id }}
+        DEPLOYMENT_STATE: failure
+        ENVIRONMENT_URL: ${{ env.SB_ENVIRONMENT_URL }}
+        LOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        DEPLOYMENT_DESCRIPTION: ${{ env.SB_ENVIRONMENT_NAME || 'github-pages' }} deployment failed
+      run: node "$GITHUB_ACTION_PATH/src/github-deployments.js"
+
+    - name: Reject directory mode in composite action
+      if: ${{ env.SB_MODE == 'directory' }}
+      shell: bash
+      run: echo 'Directory mode requires the reusable workflow for repository-wide serialization.' >&2; exit 1
+
+    - name: Set deployment status output
+      id: set-status
+      shell: bash
+      run: |
+        if [ "$SB_PUBLISH" != "true" ]; then
+          echo "status=skipped" >> $GITHUB_OUTPUT
+        elif [ "$SB_MODE" = "directory" ]; then
+          echo "status=success" >> $GITHUB_OUTPUT
+        else
+          echo "status=success" >> $GITHUB_OUTPUT
+        fi

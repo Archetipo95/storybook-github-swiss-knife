@@ -1,0 +1,181 @@
+name: PR Preview Janitor
+
+# Manual or scheduled sweep for stale/orphaned PR preview directories. This
+# is a safety net for cleanup runs that never fired (workflow failures,
+# force-pushes, manual branch deletion, etc.) and for long-lived open PRs
+# whose previews have exceeded the configured retention window. It only
+# ever touches directories under `preview_root` that match the strict
+# `pr-<number>` naming scheme; production and named-environment directories
+# (and anything else at the Pages branch root) are never inspected or
+# removed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      retention_days:
+        description: 'Remove previews for still-open PRs after this many days (0 disables age-based pruning; closed-PR previews are always removed)'
+        required: false
+        default: ''
+      warning_days_before_cleanup:
+        description: 'Warn in the PR preview comment this many days before cleanup (0 disables warnings)'
+        required: false
+        default: '3'
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_call:
+    inputs:
+      preview_root:
+        description: 'Root directory for previews on the Pages branch'
+        required: false
+        type: string
+        default: ''
+      pages_branch:
+        description: 'Pages branch containing previews'
+        required: false
+        type: string
+        default: ''
+      retention_days:
+        description: 'Remove previews for still-open PRs after this many days (0 disables age-based pruning; closed-PR previews are always removed)'
+        required: false
+        type: string
+        default: ''
+      warning_days_before_cleanup:
+        description: 'Warn in the PR preview comment this many days before cleanup (0 disables warnings)'
+        required: false
+        type: string
+        default: '3'
+
+jobs:
+  janitor:
+    name: Prune stale preview directories (trusted)
+    concurrency:
+      group: storybook-pages-${{ github.repository }}
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pages: write
+      deployments: write
+      pull-requests: read
+    steps:
+      - name: Checkout repository (default branch, trusted)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Credentials must persist here because "Resolve preview
+          # configuration" / the Pages-branch-existence check below runs
+          # `git ls-remote` against `origin`; without a stored token that
+          # call fails with an auth error on private repositories
+          # (indistinguishable from a real "missing branch" result), silently
+          # skipping the rest of the janitor sweep while the job still
+          # reports success.
+          persist-credentials: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve preview configuration
+        id: config
+        env:
+          INPUT_PREVIEW_ROOT: ${{ inputs.preview_root }}
+          INPUT_PAGES_BRANCH: ${{ inputs.pages_branch }}
+          INPUT_RETENTION_DAYS: ${{ inputs.retention_days || github.event.inputs.retention_days }}
+          INPUT_WARNING_DAYS: ${{ inputs.warning_days_before_cleanup || github.event.inputs.warning_days_before_cleanup }}
+        run: |
+          node -e '
+            import("node:fs").then(async ({existsSync}) => {
+              if (existsSync("./src/config.js")) {
+                const {resolveConfiguration} = await import("./src/config.js");
+                const c = resolveConfiguration({inputs: {
+                  preview_root: process.env.INPUT_PREVIEW_ROOT,
+                  pages_branch: process.env.INPUT_PAGES_BRANCH,
+                  preview_retention_days: process.env.INPUT_RETENTION_DAYS,
+                  warning_days_before_cleanup: process.env.INPUT_WARNING_DAYS
+                }});
+                console.log(`preview_root=${c.preview_root}`);
+                console.log(`pages_branch=${c.pages_branch}`);
+                console.log(`retention_days=${c.preview_retention_days}`);
+                console.log(`warning_days_before_cleanup=${c.warning_days_before_cleanup}`);
+              } else {
+                let file_preview_root = undefined;
+                let file_pages_branch = undefined;
+                let file_retention_days = undefined;
+                let file_warning_days = undefined;
+                if (existsSync(".storybook-pages.yml")) {
+                  const {readFileSync} = await import("node:fs");
+                  const content = readFileSync(".storybook-pages.yml", "utf8");
+                  for (const line of content.split("\n")) {
+                    const trimmed = line.trim();
+                    if (file_preview_root === undefined && trimmed.startsWith("preview_root:")) {
+                      file_preview_root = trimmed.slice("preview_root:".length).trim().replace(/^["'\''"]|["'\''"]$/g, "");
+                    }
+                    if (file_pages_branch === undefined && trimmed.startsWith("pages_branch:")) {
+                      file_pages_branch = trimmed.slice("pages_branch:".length).trim().replace(/^["'\''"]|["'\''"]$/g, "");
+                    }
+                    if (file_retention_days === undefined && trimmed.startsWith("preview_retention_days:")) {
+                      file_retention_days = trimmed.slice("preview_retention_days:".length).trim().replace(/^["'\''"]|["'\''"]$/g, "");
+                    }
+                    if (file_warning_days === undefined && trimmed.startsWith("warning_days_before_cleanup:")) {
+                      file_warning_days = trimmed.slice("warning_days_before_cleanup:".length).trim().replace(/^["'\''"]|["'\''"]$/g, "");
+                    }
+                  }
+                }
+                const rawPreviewRoot = process.env.INPUT_PREVIEW_ROOT;
+                let preview_root;
+                if (rawPreviewRoot !== undefined && rawPreviewRoot !== "") {
+                  preview_root = (rawPreviewRoot === "." || rawPreviewRoot === "./") ? "" : rawPreviewRoot;
+                } else if (file_preview_root !== undefined) {
+                  preview_root = (file_preview_root === "." || file_preview_root === "./") ? "" : file_preview_root;
+                } else {
+                  preview_root = "pr-preview";
+                }
+                const rawPagesBranch = process.env.INPUT_PAGES_BRANCH;
+                const pages_branch = (rawPagesBranch !== undefined && rawPagesBranch !== "")
+                  ? rawPagesBranch
+                  : (file_pages_branch !== undefined ? file_pages_branch : "gh-pages");
+                const rawRetentionDays = process.env.INPUT_RETENTION_DAYS;
+                const retention_days = (rawRetentionDays !== undefined && rawRetentionDays !== "")
+                  ? rawRetentionDays
+                  : (file_retention_days !== undefined ? file_retention_days : "30");
+                const rawWarningDays = process.env.INPUT_WARNING_DAYS;
+                const warning_days_before_cleanup = (rawWarningDays !== undefined && rawWarningDays !== "")
+                  ? rawWarningDays
+                  : (file_warning_days !== undefined ? file_warning_days : "3");
+                console.log(`preview_root=${preview_root}`);
+                console.log(`pages_branch=${pages_branch}`);
+                console.log(`retention_days=${retention_days}`);
+                console.log(`warning_days_before_cleanup=${warning_days_before_cleanup}`);
+              }
+            });
+          ' >> "$GITHUB_OUTPUT"
+
+      - name: Check Pages branch existence
+        id: branch_check
+        env:
+          PAGES_BRANCH: ${{ steps.config.outputs.pages_branch || inputs.pages_branch || 'gh-pages' }}
+        run: |
+          if git ls-remote --exit-code --heads origin "$PAGES_BRANCH" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Pages branch '$PAGES_BRANCH' does not exist; skipping preview janitor."
+            if [ -n "$GITHUB_STEP_SUMMARY" ]; then
+              echo -e "### Storybook preview janitor\n\nPages branch \`$PAGES_BRANCH\` does not exist; no preview directory to prune.\n" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+
+      - name: Checkout Pages branch
+        if: steps.branch_check.outputs.exists == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.config.outputs.pages_branch || inputs.pages_branch || 'gh-pages' }}
+          path: pages-repo
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prune stale preview directories
+        if: steps.branch_check.outputs.exists == 'true'
+        uses: Archetipo95/storybook-github-pages/preview-janitor@227fd45a195eb7110996f3843277a97b5820b489
+        with:
+          pages_repo: ${{ github.workspace }}/pages-repo
+          pages_branch: ${{ steps.config.outputs.pages_branch || inputs.pages_branch || 'gh-pages' }}
+          preview_root: ${{ steps.config.outputs.preview_root }}
+          retention_days: ${{ steps.config.outputs.retention_days }}
+          warning_days_before_cleanup: ${{ steps.config.outputs.warning_days_before_cleanup }}
