@@ -14,15 +14,20 @@
   },
   "files": [
     "preset.cjs",
-    "dist/"
+    "dist/",
+    "cli/"
   ],
   "scripts": {
-    "build": "node build.js"
+    "build": "node build.js",
+    "prepack": "node build.js"
   },
   "peerDependencies": {
     "storybook": ">=8.6.0 <11"
   },
   "devDependencies": {
     "esbuild": "0.28.2"
+  },
+  "bin": {
+    "storybook-swiss-knife": "cli/index.js"
   }
 }
