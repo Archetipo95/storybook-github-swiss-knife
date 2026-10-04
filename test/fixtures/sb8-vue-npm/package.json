@@ -1,0 +1,16 @@
+{
+  "name": "swiss-knife-fixture-sb8-vue-npm",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build-storybook": "storybook build --quiet --output-dir storybook-static"
+  },
+  "devDependencies": {
+    "@storybook/test": "8.6.18",
+    "@storybook/vue3-vite": "8.6.18",
+    "@vitejs/plugin-vue": "5.2.4",
+    "storybook": "8.6.18",
+    "vite": "6.4.3",
+    "vue": "3.5.43"
+  }
+}
