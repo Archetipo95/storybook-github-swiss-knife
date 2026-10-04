@@ -98,3 +98,5 @@ The optional passcode gate is only casual client-side privacy. Static assets rem
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+> Status: private, in development (successor of storybook-github-pages). Not ready for use yet.
