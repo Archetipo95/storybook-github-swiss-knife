@@ -9,8 +9,11 @@ on:
   push:
     branches: [main]
 
+# Label events get their own group, so a label never cancels a running comparison.
 concurrency:
-  group: dogfood-visual-${{ github.event.pull_request.number || github.ref }}
+  group: >-
+    dogfood-visual-${{ github.event.pull_request.number || github.ref }}-${{
+    (github.event.action == 'labeled' || github.event.action == 'unlabeled') && 'label' || 'code' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:

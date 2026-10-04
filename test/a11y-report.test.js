@@ -105,3 +105,28 @@ test('summary with no violations', () => {
   assert.match(markdown, /0 stories with violations/);
   assert.doesNotMatch(markdown, /\| Impact \|/);
 });
+
+test('summary neutralises markdown and links coming from the run', () => {
+  const evaluation = evaluateA11yReports(
+    [
+      {
+        id: 'x--y`\n## Approved',
+        violations: [
+          {
+            id: 'rule](https://evil)',
+            impact: 'serious',
+            help: 'help | with pipe\nnew line',
+            helpUrl: 'javascript:alert(1)',
+            nodes: 1
+          }
+        ]
+      }
+    ],
+    {}
+  );
+  const markdown = renderA11ySummary(evaluation);
+  assert.doesNotMatch(markdown, /\n## Approved/);
+  assert.doesNotMatch(markdown, /javascript:/);
+  assert.match(markdown, /rule\\\]\\\(https:\/\/evil\\\)/);
+  assert.match(markdown, /help \\\| with pipe new line/);
+});

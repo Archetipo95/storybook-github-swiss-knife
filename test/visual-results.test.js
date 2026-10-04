@@ -4,12 +4,22 @@ import path from 'node:path';
 
 import { evaluateVisualGate, renderVisualSummary } from '../src/visual/gate.js';
 import { buildGalleryManifest } from '../src/visual/manifest.js';
-import { firstErrorLine, readVisualResults, storyIdOf } from '../src/visual/results.js';
+import { classifyVisualResults, firstErrorLine, readVisualResults, storyIdOf } from '../src/visual/results.js';
 import { fnv1a, parseShard, shardOf } from '../src/visual/shard.js';
 
 const results = readVisualResults(path.join(process.cwd(), 'test/fixtures/visual/merged-results.json'));
 const ids = tests => tests.map(storyIdOf).sort();
-const emptyResults = { interactions: [], changed: [], broken: [], added: [], flaky: [], unchanged: [] };
+const emptyResults = {
+  interactions: [],
+  changed: [],
+  broken: [],
+  added: [],
+  flaky: [],
+  skipped: [],
+  unchanged: [],
+  removed: [],
+  runErrors: []
+};
 
 test('classifies every outcome of a merged Playwright report', () => {
   assert.deepEqual(ids(results.changed), ['button--primary']);
@@ -53,7 +63,7 @@ test('gate: changes block until approved; incomplete runs always block', () => {
   assert.deepEqual(evaluateVisualGate(emptyResults), {
     blocking: false,
     reason: 'clean',
-    counts: { changed: 0, new: 0, interactions: 0, errors: 0, flaky: 0, unchanged: 0 }
+    counts: { changed: 0, removed: 0, new: 0, interactions: 0, errors: 0, flaky: 0, skipped: 0, unchanged: 0 }
   });
 });
 
@@ -65,7 +75,7 @@ test('summary names the configured approval label and lists every group', () => 
   assert.match(markdown, /add the `looks-good` label/);
   assert.match(markdown, /<summary>Changed stories \(1\)<\/summary>/);
   assert.match(markdown, /<summary>New stories \(1\)<\/summary>/);
-  assert.match(markdown, /\| 1 \| 1 \| 0 \| 0 \| 0 \| 0 \|/);
+  assert.match(markdown, /\| 1 \| 0 \| 1 \| 0 \| 0 \| 0 \| 0 \| 0 \|/);
   assert.match(markdown, /\[open the report\]\(https:\/\/example\.test\/report\/\)/);
 });
 
@@ -125,4 +135,56 @@ test('parseShard validates <index>/<total>', () => {
   assert.deepEqual(parseShard('2/4'), { index: 2, total: 4 });
   assert.deepEqual(parseShard(), { index: 1, total: 1 });
   for (const bad of ['0/4', '5/4', '1/0', 'two/4', '1-4']) assert.throws(() => parseShard(bad), /Invalid shard/);
+});
+
+const story = (title, id, status, extra = {}) => ({
+  title,
+  tests: [{ status, annotations: [{ type: 'story', description: id }], results: [{}], ...extra }]
+});
+
+test('skipped stories, removed baselines and runner errors are classified', () => {
+  const report = {
+    errors: [{ message: 'Error: No Storybook build at /x (index.json missing).' }],
+    suites: [
+      {
+        specs: [
+          story('Card › Opted out', 'card--opted-out', 'skipped'),
+          {
+            title: 'Removed stories',
+            tests: [
+              {
+                status: 'unexpected',
+                annotations: [{ type: 'removed', description: 'old--one,old--two' }],
+                results: [{ error: { message: 'Removed stories: old--one, old--two' } }]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  };
+  const classified = classifyVisualResults(report);
+  assert.deepEqual(ids(classified.skipped), ['card--opted-out']);
+  assert.deepEqual(classified.unchanged, []);
+  assert.deepEqual(classified.removed, ['old--one', 'old--two']);
+  assert.equal(classified.broken.length, 0, 'the removed check is not a render error');
+  assert.equal(classified.runErrors.length, 1);
+  assert.equal(
+    evaluateVisualGate(classified, { approved: true }).reason,
+    'error',
+    'runner errors block even when approved'
+  );
+  const withoutErrors = { ...classified, runErrors: [] };
+  assert.equal(evaluateVisualGate(withoutErrors).reason, 'changed', 'removed stories need approval');
+  assert.equal(evaluateVisualGate(withoutErrors, { approved: true }).blocking, false);
+});
+
+test('titles from the run cannot add markdown to the summary', () => {
+  const malicious = {
+    ...emptyResults,
+    changed: [{ title: 'Ok`\n\n:white_check_mark: Approved\n[link](https://evil)', results: [{}] }]
+  };
+  const markdown = renderVisualSummary(malicious);
+  assert.doesNotMatch(markdown, /\n:white_check_mark: Approved/);
+  assert.match(markdown, /- `Ok' :white_check_mark: Approved \[link\]\(https:\/\/evil\)`/);
 });

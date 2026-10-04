@@ -6,6 +6,7 @@ import { expect, test as base } from '@playwright/test';
 import { scanStory, isA11yDisabled } from '../lib/a11y.js';
 import {
   STORY_FAILURE_PREFIX,
+  clearStorage,
   imagesComplete,
   noLoadingIndicators,
   prepareAssets,
@@ -27,6 +28,7 @@ if (!fs.existsSync(indexPath)) {
   throw new Error(`No Storybook build at ${settings.storybookDir} (index.json missing). Build Storybook first.`);
 }
 const { entries } = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+const indexedIds = new Set(Object.keys(entries));
 const stories = Object.values(entries).filter(
   entry =>
     entry.type === 'story' &&
@@ -44,6 +46,8 @@ function saveToGallery(storyId, image, source) {
 }
 
 async function renderStory(page, url) {
+  await page.context().clearCookies();
+  if (page.url().startsWith('http')) await page.evaluate(clearStorage);
   await page.goto(url);
   await page.waitForFunction(storyHasSettled, undefined, { polling: 100, timeout: 30_000 });
   return page.evaluate(storyErrors);
@@ -80,6 +84,9 @@ const test = base.extend({
 for (const story of stories) {
   test(`${story.title} › ${story.name}`, async ({ storyPage: page }, testInfo) => {
     testInfo.annotations.push({ type: 'story', description: story.id });
+    // A retry starts clean: no images or axe report left by a failed attempt.
+    if (settings.galleryDir) fs.rmSync(path.join(settings.galleryDir, story.id), { recursive: true, force: true });
+    if (settings.a11yDir) fs.rmSync(path.join(settings.a11yDir, `${story.id}.json`), { force: true });
 
     await page.setViewportSize(visual.defaultViewport);
     const url = `/iframe.html?id=${encodeURIComponent(story.id)}&viewMode=story`;
@@ -155,3 +162,21 @@ for (const story of stories) {
     await scanA11y();
   });
 }
+
+// Baselines of this shard whose story no longer exists in the head Storybook: a deleted story, or
+// a broken stories glob that leaves Storybook empty. Reported as a change that needs approval.
+test('Removed stories', async ({}, testInfo) => {
+  test.skip(testInfo.config.updateSnapshots === 'all', 'capturing baselines');
+  const baselines = fs.existsSync(settings.snapshotDir)
+    ? fs
+        .readdirSync(settings.snapshotDir)
+        .filter(file => file.endsWith('.png'))
+        .map(file => file.slice(0, -'.png'.length))
+    : [];
+  const removed = baselines
+    .filter(id => shardOf(id, settings.shard.total) === settings.shard.index && !indexedIds.has(id))
+    .sort();
+  test.skip(removed.length === 0, 'no removed stories');
+  testInfo.annotations.push({ type: 'removed', description: removed.join(',') });
+  throw new Error(`Removed stories (baseline without a story): ${removed.join(', ')}`);
+});

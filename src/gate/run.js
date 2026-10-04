@@ -57,9 +57,37 @@ async function paginate(request, apiPath, key) {
 
 const readJson = file => (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null);
 
+/**
+ * The bundle is produced by the pull request's run: refuse anything that could make the gate
+ * write outside it (symlinks) or publish repository internals (.git, .github).
+ * @param {string} dir
+ * @returns {string | null} the first offending path, or null
+ */
+export function unsafeBundleEntry(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true, recursive: true })) {
+    const full = path.join(entry.parentPath ?? entry.path, entry.name);
+    if (entry.isSymbolicLink() || entry.name === '.git' || entry.name === '.github') return path.relative(dir, full);
+  }
+  return null;
+}
+
+/** Story/rule counts a pull request added to or raised in the a11y baseline. */
+export function raisedBaselineEntries(base = {}, head = {}) {
+  const raised = [];
+  for (const [story, rules] of Object.entries(head.stories ?? {})) {
+    for (const [rule, count] of Object.entries(rules ?? {})) {
+      const before = base.stories?.[story]?.[rule] ?? 0;
+      if (Number(count) > before) raised.push({ story, rule, before, after: Number(count) });
+    }
+  }
+  return raised;
+}
+
 /** @param {string | undefined} dir */
 export function readBundle(dir) {
   if (!dir || !fs.existsSync(path.join(dir, 'meta.json'))) return null;
+  const unsafe = unsafeBundleEntry(dir);
+  if (unsafe) return { unsafe };
   const a11yDir = path.join(dir, 'results', 'a11y');
   return {
     meta: readJson(path.join(dir, 'meta.json')),
@@ -97,6 +125,34 @@ async function resolvePullRequest(request, repository, run) {
 }
 
 /**
+ * When the caller names its visual workflow (CALLER_WORKFLOW) and the files that define the
+ * capture (PROTECTED_PATHS), the run must come from that workflow and those files must be
+ * unchanged from the default branch: a pull request cannot then replace the capture with one
+ * that uploads made-up results.
+ */
+async function verifyCaller(request, { repository, run, env }) {
+  const caller = String(env.CALLER_WORKFLOW || '').trim();
+  if (caller && run.path !== caller) return `The run came from ${run.path}, not the visual workflow ${caller}.`;
+  const protectedPaths = String(env.PROTECTED_PATHS || '')
+    .split(/\r?\n|,/)
+    .map(file => file.trim())
+    .filter(Boolean);
+  if (caller) protectedPaths.push(caller);
+  const repo = protectedPaths.length > 0 ? await request(`/repos/${repository}`) : null;
+  for (const file of new Set(protectedPaths)) {
+    const encoded = file.split('/').map(encodeURIComponent).join('/');
+    const [atHead, atDefault] = await Promise.all([
+      request(`/repos/${repository}/contents/${encoded}?ref=${run.head_sha}`, { raw: true }),
+      request(`/repos/${repository}/contents/${encoded}?ref=${encodeURIComponent(repo.default_branch)}`, { raw: true })
+    ]);
+    if (atHead !== atDefault) {
+      return `${file} differs from the default branch in this pull request, so its visual results cannot be trusted. Merge the workflow change separately first.`;
+    }
+  }
+  return null;
+}
+
+/**
  * @param {{ env: NodeJS.ProcessEnv, request: ReturnType<typeof githubClient>,
  *   publish?: typeof publishDirectory, log?: (line: string) => void }} options
  */
@@ -129,26 +185,30 @@ export async function runVisualGate({ env, request, publish = publishDirectory, 
   const prNumber = pr?.number ?? 0;
   const isFork = Boolean(pr && pr.head.repo.full_name !== repository);
   const isCurrentHead = Boolean(pr && pr.state === 'open' && pr.head.sha === headSha);
+  const callerProblem = await verifyCaller(request, { repository, run, env });
 
-  let baseline = {};
-  if (pr) {
-    const baselinePath = path.posix.join(workingDirectory, config.a11y.baseline);
+  const baselinePath = path.posix.join(workingDirectory, config.a11y.baseline);
+  const readBaseline = async ref => {
     const content = await request(
-      `/repos/${repository}/contents/${baselinePath.split('/').map(encodeURIComponent).join('/')}?ref=${headSha}`,
+      `/repos/${repository}/contents/${baselinePath.split('/').map(encodeURIComponent).join('/')}?ref=${ref}`,
       { raw: true }
     );
-    if (content) {
-      try {
-        baseline = JSON.parse(content);
-      } catch {
-        baseline = {};
-        log(`::warning::${config.a11y.baseline} at ${headSha} is not valid JSON; using an empty baseline.`);
-      }
+    if (!content) return {};
+    try {
+      return JSON.parse(content);
+    } catch {
+      log(`::warning::${config.a11y.baseline} at ${ref} is not valid JSON; using an empty baseline.`);
+      return {};
     }
-  }
+  };
+  // The baseline comes from the pull request (its changes are reviewed with the code); entries it
+  // raises over the base branch are listed in the check, so they cannot slip by unnoticed.
+  const baseline = pr ? await readBaseline(headSha) : {};
+  const raised = pr && pr.base?.sha ? raisedBaselineEntries(await readBaseline(pr.base.sha), baseline) : [];
 
   let approval = { approved: false, stale: false };
-  if (pr) {
+  // Approval is read only from the pull request whose head is this very commit.
+  if (pr && pr.head.sha === headSha) {
     const labelName = config.visual.approvalLabel;
     const [events, runs] = await Promise.all([
       paginate(request, `/repos/${repository}/issues/${prNumber}/events`),
@@ -181,8 +241,13 @@ export async function runVisualGate({ env, request, publish = publishDirectory, 
   const canPublish = Boolean(pr && !isFork && isCurrentHead && env.PAGES_REPO);
   const reportUrl = canPublish ? `${siteUrl}/${visualDir}/` : '';
 
-  const bundle = readBundle(env.BUNDLE_DIR);
-  const runProblem = run.conclusion === 'cancelled' ? 'The visual run was cancelled.' : bundle ? null : prProblem;
+  const read = readBundle(env.BUNDLE_DIR);
+  const bundle = read?.unsafe ? null : read;
+  const runProblem =
+    callerProblem ??
+    (read?.unsafe ? `The results bundle contains ${read.unsafe}, which is not allowed.` : null) ??
+    (run.conclusion !== 'success' ? `The visual run ended with "${run.conclusion}".` : null) ??
+    (bundle ? null : prProblem);
   const result = evaluateGate({
     bundle,
     config,
@@ -193,6 +258,14 @@ export async function runVisualGate({ env, request, publish = publishDirectory, 
     reportUrl,
     problem: runProblem ?? undefined
   });
+
+  if (raised.length > 0 && result.a11y.conclusion !== 'neutral') {
+    const inline = value => `\`${String(value).replace(/\s+/g, ' ').replaceAll('`', "'").slice(0, 200)}\``;
+    result.a11y.summary += `\n\n### Baseline raised in this pull request\n\nThese known violations were added to or raised in \`${config.a11y.baseline}\`; review them like code.\n\n${raised
+      .slice(0, 100)
+      .map(({ story, rule, before, after }) => `- ${inline(story)}: ${inline(rule)} ${before} → ${after}`)
+      .join('\n')}\n`;
+  }
 
   for (const check of [result.visual, result.a11y]) {
     await request(`/repos/${repository}/check-runs`, {
@@ -217,8 +290,8 @@ export async function runVisualGate({ env, request, publish = publishDirectory, 
   }
 
   let published = false;
-  const reportDir = env.BUNDLE_DIR ? path.join(env.BUNDLE_DIR, 'visual') : '';
-  if (canPublish && reportDir && fs.existsSync(path.join(reportDir, 'index.html'))) {
+  const reportDir = bundle && env.BUNDLE_DIR ? path.join(env.BUNDLE_DIR, 'visual') : '';
+  if (canPublish && !runProblem && reportDir && fs.existsSync(path.join(reportDir, 'index.html'))) {
     const manifestPath = path.join(reportDir, 'gallery', 'manifest.json');
     const manifest = readJson(manifestPath);
     if (manifest) fs.writeFileSync(manifestPath, JSON.stringify({ ...manifest, approved: result.approvedForManifest }));

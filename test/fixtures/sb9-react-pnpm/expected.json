@@ -1,12 +1,38 @@
 {
-  "changed": ["fixture-badge--low-contrast", "fixture-button--primary"],
-  "new": ["fixture-button--secondary"],
-  "interaction": ["fixture-counter--interaction-increment"],
+  "changed": [
+    "fixture-badge--low-contrast",
+    "fixture-button--primary"
+  ],
+  "removed": [
+    "fixture-legacy--obsolete"
+  ],
+  "new": [
+    "fixture-button--secondary",
+    "fixture-legacy--replacement"
+  ],
+  "interaction": [
+    "fixture-counter--interaction-increment"
+  ],
   "error": [],
   "flaky": [],
-  "unchanged": ["fixture-card--mobile"],
-  "a11yBlocking": ["fixture-badge--low-contrast:color-contrast:2"],
+  "skipped": [
+    "fixture-card--opted-out"
+  ],
+  "unchanged": [
+    "fixture-card--mobile"
+  ],
+  "a11yBlocking": [
+    "fixture-badge--low-contrast:color-contrast:2"
+  ],
   "gate": "interaction",
-  "changedImages": ["base", "pr", "diff"],
-  "viewports": { "fixture-card--mobile": { "width": 320 } }
+  "changedImages": [
+    "base",
+    "pr",
+    "diff"
+  ],
+  "viewports": {
+    "fixture-card--mobile": {
+      "width": 320
+    }
+  }
 }

@@ -29,11 +29,23 @@ export function recordStoryOutcome(markerAttribute) {
         (Array.isArray(errors) ? errors : [errors]).forEach(pushError)
       );
       value?.on?.('storyFinished', event => {
-        outcome.status = event?.status ?? 'success';
+        // Storybook 9+ also fails a story when a reporter fails, e.g. the a11y addon on any axe
+        // violation. Accessibility is judged by the baseline, so only other reporters count.
+        const failed = (event?.reporters ?? []).filter(reporter => reporter?.status === 'failed');
+        const failedReporters = failed.filter(reporter => reporter?.type !== 'a11y');
+        const onlyA11yFailed =
+          event?.status === 'error' && outcome.errors.length === 0 && failed.length > 0 && failedReporters.length === 0;
+        outcome.status = onlyA11yFailed ? 'success' : (event?.status ?? 'success');
+        if (failedReporters.length > 0 && outcome.errors.length === 0) {
+          outcome.errors.push(
+            `Storybook reporters failed: ${failedReporters.map(reporter => reporter.type).join(', ')}`
+          );
+        }
       });
-      // Older Storybook 8 builds emit no storyFinished; a finished render phase still means done.
+      // Storybook 8 builds before storyFinished: the 'finished' phase (after afterEach) means done.
+      // 'completed' is not used: afterEach hooks still run after it.
       value?.on?.('storyRenderPhaseChanged', event => {
-        if (event?.newPhase === 'completed' || event?.newPhase === 'finished') outcome.status ??= 'success';
+        if (event?.newPhase === 'finished') outcome.status ??= 'success';
       });
     }
   });
@@ -127,4 +139,27 @@ export function noLoadingIndicators() {
     );
   const busy = [...document.querySelectorAll('[aria-busy="true"]')].some(element => element.checkVisibility?.());
   return !spinning && !busy;
+}
+
+/**
+ * Clears what a previous story may have left in this origin's storage, so stories do not depend
+ * on the order the worker runs them in.
+ */
+export async function clearStorage() {
+  try {
+    localStorage.clear();
+    sessionStorage.clear();
+  } catch {
+    // Not available on about:blank.
+  }
+  const databases = (await indexedDB.databases?.().catch(() => [])) ?? [];
+  await Promise.all(
+    databases.map(
+      ({ name }) =>
+        new Promise(resolve => {
+          const request = indexedDB.deleteDatabase(name);
+          request.onsuccess = request.onerror = request.onblocked = () => resolve();
+        })
+    )
+  );
 }

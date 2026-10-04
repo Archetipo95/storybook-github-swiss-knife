@@ -9,6 +9,7 @@ import { runVisualGate } from '../src/gate/run.js';
 const REPO = 'acme/widgets';
 const HEAD = 'a'.repeat(40);
 const RUN_ID = 555;
+const BASE = 'b'.repeat(40);
 const mergedResults = JSON.parse(
   fs.readFileSync(path.join(process.cwd(), 'test/fixtures/visual/merged-results.json'), 'utf8')
 );
@@ -52,9 +53,13 @@ function fakeGitHub({
   labeledAt = '2026-10-04T09:00:00Z',
   firstRunAt = '2026-10-04T10:00:00Z',
   artifactRunId = RUN_ID,
-  conclusion = 'failure',
+  conclusion = 'success',
   baseline = { stories: { 'card--default': { 'color-contrast': 2 } } },
-  existingChecks = 0
+  baseBaseline = baseline,
+  existingChecks = 0,
+  runPath = '.github/workflows/visual-caller.yml',
+  callerAtHead = 'caller workflow',
+  prHead = HEAD
 } = {}) {
   const calls = [];
   const request = async (apiPath, { method = 'GET', body } = {}) => {
@@ -67,6 +72,7 @@ function fakeGitHub({
         workflow_id: 99,
         conclusion,
         html_url: 'https://github.com/acme/widgets/actions/runs/555',
+        path: runPath,
         head_repository: { full_name: headRepo }
       };
     }
@@ -77,11 +83,18 @@ function fakeGitHub({
       return {
         number: 7,
         state: 'open',
-        head: { sha: HEAD, repo: { full_name: headRepo } },
+        head: { sha: prHead, repo: { full_name: headRepo } },
+        base: { sha: BASE },
         labels: labels.map(name => ({ name }))
       };
     }
-    if (route.startsWith(`/repos/${REPO}/contents/`)) return JSON.stringify(baseline);
+    if (route === `/repos/${REPO}`) return { default_branch: 'main' };
+    if (route.startsWith(`/repos/${REPO}/contents/.github/`)) {
+      return apiPath.includes(`ref=${HEAD}`) ? callerAtHead : 'caller workflow';
+    }
+    if (route.startsWith(`/repos/${REPO}/contents/`)) {
+      return JSON.stringify(apiPath.includes(`ref=${BASE}`) ? baseBaseline : baseline);
+    }
     if (route === `/repos/${REPO}/issues/7/events`) {
       return [{ event: 'labeled', created_at: labeledAt, label: { name: 'visual-approved' } }];
     }
@@ -96,7 +109,12 @@ function fakeGitHub({
 const checkRuns = calls =>
   calls.filter(call => call.method === 'POST' && call.apiPath.endsWith('/check-runs')).map(call => call.body);
 
-async function run({ github = fakeGitHub(), bundleDir = bundle(), pagesRepo = tmp({ '.nojekyll': '' }) } = {}) {
+async function run({
+  github = fakeGitHub(),
+  bundleDir = bundle(),
+  pagesRepo = tmp({ '.nojekyll': '' }),
+  env = {}
+} = {}) {
   const published = [];
   const output = await runVisualGate({
     env: {
@@ -105,7 +123,8 @@ async function run({ github = fakeGitHub(), bundleDir = bundle(), pagesRepo = tm
       PROJECT_DIR: project(),
       BUNDLE_DIR: bundleDir,
       PAGES_REPO: pagesRepo,
-      GITHUB_TOKEN: 't'
+      GITHUB_TOKEN: 't',
+      ...env
     },
     request: github.request,
     publish: async options => {
@@ -238,5 +257,68 @@ test('a successful run without results on an ungated commit fails both checks (c
   assert.deepEqual(
     checkRuns(github.calls).map(check => check.conclusion),
     ['failure', 'failure']
+  );
+});
+
+test('a run that ended in failure fails both checks even with a bundle', async () => {
+  const { calls, published } = await run({ github: fakeGitHub({ conclusion: 'failure' }) });
+  assert.deepEqual(
+    checkRuns(calls).map(check => check.conclusion),
+    ['failure', 'failure']
+  );
+  assert.match(checkRuns(calls)[0].output.summary, /ended with "failure"/);
+  assert.equal(published.length, 0);
+});
+
+test('caller verification: the run must come from the visual workflow, unchanged from the default branch', async () => {
+  const env = {
+    CALLER_WORKFLOW: '.github/workflows/visual-caller.yml',
+    PROTECTED_PATHS: '.github/workflows/visual.yml'
+  };
+  const good = await run({ github: fakeGitHub({ conclusion: 'success', labeledAt: '2026-10-04T11:00:00Z' }), env });
+  assert.equal(checkRuns(good.calls)[0].conclusion, 'success');
+
+  const renamed = await run({
+    github: fakeGitHub({ conclusion: 'success', runPath: '.github/workflows/evil.yml' }),
+    env
+  });
+  assert.match(checkRuns(renamed.calls)[0].output.summary, /not the visual workflow/);
+  assert.equal(checkRuns(renamed.calls)[1].conclusion, 'failure');
+
+  const edited = await run({
+    github: fakeGitHub({ conclusion: 'success', callerAtHead: 'uploads fake results' }),
+    env
+  });
+  assert.match(checkRuns(edited.calls)[0].output.summary, /differs from the default branch/);
+  assert.equal(edited.published.length, 0);
+});
+
+test('approval is not borrowed from a pull request whose head is another commit', async () => {
+  const { calls } = await run({
+    github: fakeGitHub({ conclusion: 'success', labeledAt: '2026-10-04T11:00:00Z', prHead: 'c'.repeat(40) })
+  });
+  assert.equal(checkRuns(calls)[0].conclusion, 'failure');
+});
+
+test('a bundle with a symlink is rejected and nothing is published', async () => {
+  const bundleDir = bundle();
+  fs.symlinkSync('/etc/passwd', path.join(bundleDir, 'visual', 'leak'));
+  const { calls, published } = await run({ github: fakeGitHub({ conclusion: 'success' }), bundleDir });
+  assert.match(checkRuns(calls)[0].output.summary, /contains visual\/leak/);
+  assert.equal(published.length, 0);
+});
+
+test('baseline entries raised by the pull request are listed in the accessibility check', async () => {
+  const { calls } = await run({
+    github: fakeGitHub({
+      conclusion: 'success',
+      baseBaseline: { stories: { 'card--default': { 'color-contrast': 1 } } }
+    })
+  });
+  const a11y = checkRuns(calls)[1];
+  assert.equal(a11y.conclusion, 'success');
+  assert.match(
+    a11y.output.summary,
+    /Baseline raised in this pull request[\s\S]*`card--default`: `color-contrast` 1 → 2/
   );
 });

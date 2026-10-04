@@ -3,6 +3,8 @@ import path from 'node:path';
 
 import { AxeBuilder } from '@axe-core/playwright';
 
+import { storyRuleSettings } from './a11y-rules.js';
+
 /**
  * Whether a story opted out of the accessibility scan. Storybook 8: `a11y.disable`; Storybook 9+:
  * `a11y.test: 'off'`; any version: `swissKnife.a11y.skip`.
@@ -19,12 +21,15 @@ export function isA11yDisabled(parameters = {}) {
  * @param {{ storyId: string, parameters: any, reportDir: string, scope: string, disabledRules: string[] }} options
  */
 export async function scanStory(page, { storyId, parameters, reportDir, scope, disabledRules }) {
-  const storyRules = (parameters?.a11y?.config?.rules ?? []).filter(rule => rule && typeof rule.id === 'string');
-  const disabled = [
-    ...new Set([...disabledRules, ...storyRules.filter(rule => rule.enabled === false).map(rule => rule.id)])
-  ];
-  let builder = new AxeBuilder({ page }).include(scope);
-  if (disabled.length > 0) builder = builder.disableRules(disabled);
+  const { enabled, disabled } = storyRuleSettings(parameters);
+  const off = [...new Set([...disabledRules.filter(rule => !enabled.has(rule)), ...disabled])];
+  // Storybook 8 `a11y.element`, Storybook 9+ `a11y.context` (selector form only).
+  const storyScope = [parameters?.a11y?.context, parameters?.a11y?.element].find(value => typeof value === 'string');
+  let builder = new AxeBuilder({ page }).include(storyScope || scope);
+  if (off.length > 0) builder = builder.disableRules(off);
+  if (enabled.size > 0) {
+    builder = builder.options({ rules: Object.fromEntries([...enabled].map(rule => [rule, { enabled: true }])) });
+  }
   const { violations } = await builder.analyze();
   if (violations.length === 0) return [];
   const report = {

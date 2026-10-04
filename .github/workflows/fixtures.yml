@@ -1,0 +1,70 @@
+name: Fixtures
+
+# End-to-end check of the runner and the trusted gate modules on real Storybooks: each fixture
+# is built twice (base, and head with mutate/ applied), captured like CI does, and its
+# classification compared with expected.json. Storybook 8 + Vue (npm), 9 + React (pnpm) and
+# 10 + Vue (yarn).
+
+on:
+  pull_request:
+    paths:
+      - 'runner/**'
+      - 'src/visual/**'
+      - 'src/a11y/**'
+      - 'src/swiss-knife-config.js'
+      - 'scripts/fixture-e2e.mjs'
+      - 'test/fixtures/sb*/**'
+      - '.github/workflows/fixtures.yml'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fixtures-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fixture:
+    name: ${{ matrix.fixture }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        fixture: [sb8-vue-npm, sb9-react-pnpm, sb10-vue-yarn]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
+      - name: Install the runner
+        run: |
+          npm ci --no-audit --no-fund
+          npm ci --prefix runner --no-audit --no-fund
+          echo "PLAYWRIGHT_VERSION=$(node -p "require('./runner/node_modules/@playwright/test/package.json').version")" >> "$GITHUB_ENV"
+
+      - name: Cache Chromium
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: swiss-knife-chromium-${{ runner.os }}-${{ env.PLAYWRIGHT_VERSION }}
+
+      - name: Install Chromium
+        working-directory: runner
+        run: npx playwright install --with-deps --only-shell chromium
+
+      - name: Run the fixture end to end
+        env:
+          FIXTURE: test/fixtures/${{ matrix.fixture }}
+        run: npm run test:fixture -- "$FIXTURE"
