@@ -256,6 +256,8 @@ export async function publishPreview({
       branch: pagesBranch,
       targetDirectory: metadata.target,
       managedDirectories,
+      // The visual regression report is published into the same PR directory by the visual gate.
+      preserveEntries: ['visual'],
       siteUrl,
       basePath,
       triggerPagesRebuild,

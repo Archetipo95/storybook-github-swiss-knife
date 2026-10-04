@@ -4,14 +4,28 @@ import { resolveDeploymentTarget, validateConfig, validateRelativeDirectory } fr
 import { CNAME_FILE, normalizeCname, readCnameFile, writeCnameFile } from './cname.js';
 import { requestPagesRebuild, withSerializedBranchWrite, WRITE_LOCK_NAME } from './git-branch-writer.js';
 
+async function pathExists(file) {
+  try {
+    await fs.lstat(file);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function replaceDirectory(
   repo,
   targetDirectory,
   sourceDirectory,
   managedDirectories = [],
-  { cname = '', preserveCname = true } = {}
+  { cname = '', preserveCname = true, preserveEntries = [] } = {}
 ) {
   validateRelativeDirectory(targetDirectory, 'target_directory', { allowEmpty: true });
+  for (const entry of preserveEntries) {
+    if (!/^[A-Za-z0-9._-]+$/.test(entry) || entry === '.' || entry === '..') {
+      throw new Error(`preserveEntries must be plain entry names, got "${entry}"`);
+    }
+  }
   const hostname = normalizeCname(cname);
   if (!targetDirectory) {
     // Keep the branch's existing custom domain when the new build does not ship one,
@@ -52,6 +66,15 @@ export async function replaceDirectory(
   const backup = `${target}.previous-${process.pid}`;
   await fs.rm(staging, { recursive: true, force: true });
   await fs.cp(sourceDirectory, staging, { recursive: true, preserveTimestamps: true });
+  // Entries published separately into this directory (e.g. the visual report in visual/) are
+  // carried over unless the new content ships its own.
+  for (const entry of preserveEntries) {
+    const existing = path.join(target, entry);
+    const incoming = path.join(staging, entry);
+    if ((await pathExists(existing)) && !(await pathExists(incoming))) {
+      await fs.cp(existing, incoming, { recursive: true, preserveTimestamps: true });
+    }
+  }
   try {
     await fs.rename(target, backup);
   } catch (error) {
@@ -77,11 +100,13 @@ export async function publishDirectory({
   branch = 'gh-pages',
   targetDirectory = '',
   managedDirectories = [],
+  preserveEntries = [],
   siteUrl = '',
   basePath = '',
   cname = '',
   preserveCname = true,
   triggerPagesRebuild = false,
+  commitMessage,
   token,
   repository
 }) {
@@ -98,9 +123,13 @@ export async function publishDirectory({
   const writeResult = await withSerializedBranchWrite({
     repo,
     branch,
-    commitMessage: `Deploy Storybook${targetDirectory ? ` to ${targetDirectory}` : ''}`,
+    commitMessage: commitMessage ?? `Deploy Storybook${targetDirectory ? ` to ${targetDirectory}` : ''}`,
     mutate: async repoPath => {
-      await replaceDirectory(repoPath, targetDirectory, source, managedDirectories, { cname, preserveCname });
+      await replaceDirectory(repoPath, targetDirectory, source, managedDirectories, {
+        cname,
+        preserveCname,
+        preserveEntries
+      });
       return true;
     }
   });
