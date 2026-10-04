@@ -1,0 +1,92 @@
+name: 'storybook-github-swiss-knife visual capture'
+description: >-
+  Screenshots (and scans with axe) every story of one shard of a built Storybook. Runs untrusted
+  build output: use it only in a job with read-only permissions and no secrets.
+author: 'Archetipo95'
+inputs:
+  storybook_dir:
+    description: 'Built Storybook directory (contains index.json), relative to project_dir'
+    required: true
+  project_dir:
+    description: 'Project root holding .storybook/swiss-knife.json'
+    required: false
+    default: '.'
+  shard:
+    description: 'Shard to run, "<index>/<total>"'
+    required: false
+    default: '1/1'
+  mode:
+    description: '"compare" against the baselines, or "baseline" to capture them'
+    required: false
+    default: 'compare'
+  snapshot_dir:
+    description: 'Baseline screenshots directory, relative to project_dir'
+    required: false
+    default: '.swiss-knife/snapshots'
+  gallery_dir:
+    description: 'Where to write base/pr/diff images per story (compare mode), relative to project_dir'
+    required: false
+    default: ''
+  a11y_dir:
+    description: 'Where to write axe reports per story (compare mode), relative to project_dir'
+    required: false
+    default: ''
+  blob_dir:
+    description: 'Where to write the Playwright blob report, relative to project_dir'
+    required: false
+    default: '.swiss-knife/blob-report'
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Node.js for the runner
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: '24'
+
+    - name: Install the runner
+      id: runner
+      shell: bash
+      run: |
+        runner="$(cd "$GITHUB_ACTION_PATH/../../runner" && pwd)"
+        npm ci --prefix "$runner" --no-audit --no-fund --loglevel=error
+        echo "dir=$runner" >> "$GITHUB_OUTPUT"
+        echo "playwright=$(node -p "require('$runner/node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+    - name: Cache Chromium
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: swiss-knife-chromium-${{ runner.os }}-${{ steps.runner.outputs.playwright }}
+
+    # Headless runs only need the headless shell; a cached one is not downloaded again.
+    - name: Install Chromium
+      shell: bash
+      working-directory: ${{ steps.runner.outputs.dir }}
+      run: npx playwright install --with-deps --only-shell chromium
+
+    - name: Run the runner
+      shell: bash
+      working-directory: ${{ steps.runner.outputs.dir }}
+      env:
+        CI: 'true'
+        SWISS_KNIFE_PROJECT_DIR: ${{ github.workspace }}/${{ inputs.project_dir }}
+        SWISS_KNIFE_STORYBOOK_DIR: ${{ inputs.storybook_dir }}
+        SWISS_KNIFE_SNAPSHOT_DIR: ${{ inputs.snapshot_dir }}
+        SWISS_KNIFE_OUTPUT_DIR: .swiss-knife/test-results
+        SWISS_KNIFE_GALLERY_DIR: ${{ inputs.gallery_dir }}
+        SWISS_KNIFE_A11Y_DIR: ${{ inputs.a11y_dir }}
+        SWISS_KNIFE_SHARD: ${{ inputs.shard }}
+        PLAYWRIGHT_BLOB_OUTPUT_DIR: ${{ github.workspace }}/${{ inputs.project_dir }}/${{ inputs.blob_dir }}
+        MODE: ${{ inputs.mode }}
+      run: |
+        case "$MODE" in
+          baseline)
+            # A story that fails to render has no baseline; its head screenshot is reported as new.
+            npx playwright test -c playwright.config.js --update-snapshots=all --retries=0 || true ;;
+          compare)
+            # Differences are gated by the trusted gate, which honours the approval label.
+            npx playwright test -c playwright.config.js || true ;;
+          *)
+            echo "::error::mode must be compare or baseline, got '$MODE'" >&2
+            exit 1 ;;
+        esac

@@ -1,0 +1,81 @@
+name: 'storybook-github-swiss-knife visual report'
+description: >-
+  Merges the shards' blob reports into the HTML report and visual-results.json, and assembles
+  the results bundle the trusted gate reads. Runs no project code.
+author: 'Archetipo95'
+inputs:
+  blob_dir:
+    description: 'Directory with every shard blob report'
+    required: true
+  gallery_dir:
+    description: 'Merged gallery images of every shard'
+    required: false
+    default: ''
+  a11y_dir:
+    description: 'Merged axe reports of every shard'
+    required: false
+    default: ''
+  bundle_dir:
+    description: 'Where to assemble the bundle'
+    required: false
+    default: '.swiss-knife/bundle'
+  shards_expected:
+    description: 'Number of shards the run started'
+    required: true
+  pr_number:
+    description: 'Pull request number'
+    required: true
+  head_sha:
+    description: 'Pull request head SHA'
+    required: true
+  base_sha:
+    description: 'Pull request base SHA'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Node.js for the runner
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: '24'
+
+    - name: Install the runner
+      id: runner
+      shell: bash
+      run: |
+        runner="$(cd "$GITHUB_ACTION_PATH/../../runner" && pwd)"
+        npm ci --prefix "$runner" --no-audit --no-fund --loglevel=error
+        echo "dir=$runner" >> "$GITHUB_OUTPUT"
+
+    - name: Merge shard reports
+      shell: bash
+      working-directory: ${{ steps.runner.outputs.dir }}
+      env:
+        BLOB_DIR: ${{ github.workspace }}/${{ inputs.blob_dir }}
+        PLAYWRIGHT_HTML_OUTPUT_DIR: ${{ github.workspace }}/${{ inputs.bundle_dir }}/visual
+        PLAYWRIGHT_HTML_OPEN: never
+        PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/${{ inputs.bundle_dir }}/results/visual-results.json
+      run: |
+        mkdir -p "$(dirname "$PLAYWRIGHT_JSON_OUTPUT_NAME")"
+        if find "$BLOB_DIR" -name 'report-*.zip' 2>/dev/null | grep -q .; then
+          # Blob reports may sit in per-shard artifact folders; merge-reports wants one directory.
+          merged="$RUNNER_TEMP/swiss-knife-blobs"
+          mkdir -p "$merged"
+          find "$BLOB_DIR" -name 'report-*.zip' -exec cp {} "$merged/" \;
+          npx playwright merge-reports --reporter html,json "$merged"
+        else
+          echo "::warning::No shard reported results."
+        fi
+
+    - name: Assemble results bundle
+      shell: bash
+      env:
+        BUNDLE_DIR: ${{ github.workspace }}/${{ inputs.bundle_dir }}
+        BLOB_DIR: ${{ github.workspace }}/${{ inputs.blob_dir }}
+        GALLERY_DIR: ${{ inputs.gallery_dir && format('{0}/{1}', github.workspace, inputs.gallery_dir) || '' }}
+        A11Y_DIR: ${{ inputs.a11y_dir && format('{0}/{1}', github.workspace, inputs.a11y_dir) || '' }}
+        SHARDS_EXPECTED: ${{ inputs.shards_expected }}
+        PR_NUMBER: ${{ inputs.pr_number }}
+        HEAD_SHA: ${{ inputs.head_sha }}
+        BASE_SHA: ${{ inputs.base_sha }}
+      run: node "$GITHUB_ACTION_PATH/../../src/visual/bundle.js"
