@@ -77,7 +77,7 @@ jobs:
       # Trusted swiss-knife source for the steps below (exports SWISS_KNIFE_ROOT). Never
       # import ./src from the checked-out repository: that is the caller's code.
       - name: Load swiss-knife toolkit
-        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@68d78142cc7e4a7eaa261ac41ad0f4fd97cdd29d
+        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@5ac0ba3ed0765036a1ee954a00ca962ab482b392
 
       - name: Resolve preview configuration
         id: config
@@ -128,7 +128,7 @@ jobs:
 
       - name: Prune stale preview directories
         if: steps.branch_check.outputs.exists == 'true'
-        uses: Archetipo95/storybook-github-swiss-knife/actions/preview-janitor@68d78142cc7e4a7eaa261ac41ad0f4fd97cdd29d
+        uses: Archetipo95/storybook-github-swiss-knife/actions/preview-janitor@5ac0ba3ed0765036a1ee954a00ca962ab482b392
         with:
           pages_repo: ${{ github.workspace }}/pages-repo
           pages_branch: ${{ steps.config.outputs.pages_branch || inputs.pages_branch || 'gh-pages' }}
