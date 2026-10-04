@@ -5,7 +5,8 @@ name: Visual
 # `push` to the branches listed in visual.baselineBranches. It builds and screenshots PR code,
 # so every job is read-only and uses no secrets: it only uploads artifacts. Pass/fail is decided
 # by the trusted visual-gate workflow, which runs after this one. Set the concurrency group in
-# the caller (one group per pull request, cancel in progress).
+# the caller: one group per pull request that cancels in progress, and a separate group for
+# label events, so a label change never cancels a comparison.
 
 on:
   workflow_call:
@@ -60,15 +61,31 @@ jobs:
       key_prefix: ${{ steps.plan.outputs.key_prefix }}
       retention_days: ${{ steps.plan.outputs.retention_days }}
       base_needed: ${{ steps.cache.outputs.base_needed }}
+      base_sha: ${{ steps.base.outputs.sha }}
       reuse_run_id: ${{ steps.reuse.outputs.run_id }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The merge commit's first parent is the base the head build is merged onto.
+          fetch-depth: 2
+
+      # Screenshots come from the PR merge commit, so the baseline is its first parent (the base
+      # branch as merged), not pull_request.base.sha, which can be older.
+      - name: Resolve baseline commit
+        id: base
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" = pull_request ]; then
+            echo "sha=$(git rev-parse HEAD^1)" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Load swiss-knife toolkit
-        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@5ac0ba3ed0765036a1ee954a00ca962ab482b392
+        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@15d183f63cfa5aaecf152719e87f09f86bff6d0c
 
       - name: Plan the run
         id: plan
@@ -78,7 +95,7 @@ jobs:
           EVENT_ACTION: ${{ github.event.action }}
           LABEL_NAME: ${{ github.event.label.name }}
           REF_NAME: ${{ github.ref_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_SHA: ${{ steps.base.outputs.sha }}
           HEAD_SHA: ${{ github.sha }}
         run: node "$SWISS_KNIFE_ROOT/src/visual/plan.js"
 
@@ -91,11 +108,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           KEY_PREFIX: ${{ steps.plan.outputs.key_prefix }}
           SHARD_TOTAL: ${{ steps.plan.outputs.shard_total }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
           missing=0
           for shard in $(seq 1 "$SHARD_TOTAL"); do
             key="$KEY_PREFIX-$ImageOS-$ImageVersion-$shard"
-            found="$(gh api "repos/$GITHUB_REPOSITORY/actions/caches?key=$key" --jq "[.actions_caches[] | select(.key == \"$key\")] | length" || echo 0)"
+            # Only the base branch's caches: a pull request can save caches under any key in its
+            # own scope, which other pull requests cannot restore.
+            found="$(gh api "repos/$GITHUB_REPOSITORY/actions/caches?key=$key&ref=refs/heads/$BASE_REF" --jq "[.actions_caches[] | select(.key == \"$key\")] | length" || echo 0)"
             if [ "$found" = "0" ]; then missing=$((missing + 1)); fi
           done
           echo "Baselines missing for $missing of $SHARD_TOTAL shards."
@@ -156,7 +176,13 @@ jobs:
             fi
           fi
           eval "$INSTALL_COMMAND"
-          eval "${BUILD_COMMAND:-node_modules/.bin/storybook build --quiet --output-dir \"\$STORYBOOK_DIR\"}"
+          if [ -z "$BUILD_COMMAND" ]; then
+            if [ -f pnpm-lock.yaml ]; then BUILD_COMMAND='corepack pnpm exec storybook build --quiet --output-dir "$STORYBOOK_DIR"'
+            elif [ -f yarn.lock ]; then BUILD_COMMAND='corepack yarn storybook build --quiet --output-dir "$STORYBOOK_DIR"'
+            else BUILD_COMMAND='npx --no-install storybook build --quiet --output-dir "$STORYBOOK_DIR"'
+            fi
+          fi
+          eval "$BUILD_COMMAND"
           test -f "$STORYBOOK_DIR/index.json" || { echo "::error::No Storybook build at $STORYBOOK_DIR (index.json missing)." >&2; exit 1; }
 
       - name: Upload Storybook
@@ -178,7 +204,7 @@ jobs:
       - name: Checkout base commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ needs.plan.outputs.base_sha }}
           persist-credentials: false
 
       - name: Set up Node.js
@@ -202,7 +228,13 @@ jobs:
             fi
           fi
           eval "$INSTALL_COMMAND"
-          eval "${BUILD_COMMAND:-node_modules/.bin/storybook build --quiet --output-dir \"\$STORYBOOK_DIR\"}"
+          if [ -z "$BUILD_COMMAND" ]; then
+            if [ -f pnpm-lock.yaml ]; then BUILD_COMMAND='corepack pnpm exec storybook build --quiet --output-dir "$STORYBOOK_DIR"'
+            elif [ -f yarn.lock ]; then BUILD_COMMAND='corepack yarn storybook build --quiet --output-dir "$STORYBOOK_DIR"'
+            else BUILD_COMMAND='npx --no-install storybook build --quiet --output-dir "$STORYBOOK_DIR"'
+            fi
+          fi
+          eval "$BUILD_COMMAND"
           test -f "$STORYBOOK_DIR/index.json" || { echo "::error::No Storybook build at $STORYBOOK_DIR (index.json missing)." >&2; exit 1; }
 
       - name: Upload Storybook
@@ -264,20 +296,28 @@ jobs:
 
       - name: Capture missing baselines
         if: needs.plan.outputs.mode == 'compare' && steps.baseline.outputs.cache-hit != 'true' && steps.base.outcome == 'success'
-        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@5ac0ba3ed0765036a1ee954a00ca962ab482b392
+        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@15d183f63cfa5aaecf152719e87f09f86bff6d0c
         with:
           project_dir: ${{ inputs.working_directory }}
           storybook_dir: .swiss-knife/storybook-base
           shard: ${{ matrix.shard }}
           mode: baseline
 
-      # Without baselines (cache miss and no base build) the shard reports nothing, so the
-      # gate fails the run as incomplete instead of passing every story as new.
+      - name: No baselines available
+        if: >-
+          needs.plan.outputs.mode == 'compare' &&
+          steps.baseline.outputs.cache-hit != 'true' && steps.base.outcome != 'success'
+        run: |
+          echo "::error::No baseline screenshots for this shard: the cache missed and no base Storybook was built (the runner image may have changed since the plan job). Re-run the workflow." >&2
+          exit 1
+
+      # Without baselines the shard reports nothing, so the gate fails the run instead of passing
+      # every story as new.
       - name: Compare
         if: >-
           needs.plan.outputs.mode == 'compare' &&
           (steps.baseline.outputs.cache-hit == 'true' || steps.base.outcome == 'success')
-        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@5ac0ba3ed0765036a1ee954a00ca962ab482b392
+        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@15d183f63cfa5aaecf152719e87f09f86bff6d0c
         with:
           project_dir: ${{ inputs.working_directory }}
           storybook_dir: .swiss-knife/storybook-head
@@ -288,7 +328,7 @@ jobs:
 
       - name: Capture branch baselines
         if: needs.plan.outputs.mode == 'baseline'
-        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@5ac0ba3ed0765036a1ee954a00ca962ab482b392
+        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@15d183f63cfa5aaecf152719e87f09f86bff6d0c
         with:
           project_dir: ${{ inputs.working_directory }}
           storybook_dir: .swiss-knife/storybook-head
@@ -349,7 +389,7 @@ jobs:
           merge-multiple: true
 
       - name: Assemble report and results bundle
-        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-report@5ac0ba3ed0765036a1ee954a00ca962ab482b392
+        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-report@15d183f63cfa5aaecf152719e87f09f86bff6d0c
         with:
           blob_dir: .swiss-knife/shards
           gallery_dir: .swiss-knife/shards/gallery
@@ -358,7 +398,7 @@ jobs:
           shards_expected: ${{ needs.plan.outputs.shard_total }}
           pr_number: ${{ github.event.pull_request.number }}
           head_sha: ${{ github.event.pull_request.head.sha }}
-          base_sha: ${{ github.event.pull_request.base.sha }}
+          base_sha: ${{ needs.plan.outputs.base_sha }}
 
       - name: Upload results bundle
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

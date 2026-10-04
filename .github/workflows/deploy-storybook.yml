@@ -209,7 +209,7 @@ jobs:
       # The steps below run swiss-knife's own scripts (SWISS_KNIFE_ROOT), never ./src of the
       # checked-out caller repository.
       - name: Load swiss-knife toolkit
-        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@5ac0ba3ed0765036a1ee954a00ca962ab482b392
+        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@15d183f63cfa5aaecf152719e87f09f86bff6d0c
 
       - name: Resolve and validate configuration
         id: config
@@ -401,7 +401,7 @@ jobs:
     steps:
       - name: Load swiss-knife toolkit
         if: ${{ needs.build-and-upload.outputs.create_deployment == 'true' }}
-        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@5ac0ba3ed0765036a1ee954a00ca962ab482b392
+        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@15d183f63cfa5aaecf152719e87f09f86bff6d0c
 
       - name: Create GitHub deployment (pending)
         id: create-deployment
@@ -484,7 +484,7 @@ jobs:
           BASE_PATH: ${{ needs.build-and-upload.outputs.base_path }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        uses: Archetipo95/storybook-github-swiss-knife/actions/publisher@5ac0ba3ed0765036a1ee954a00ca962ab482b392
+        uses: Archetipo95/storybook-github-swiss-knife/actions/publisher@15d183f63cfa5aaecf152719e87f09f86bff6d0c
         with:
           pages_repo: ${{ github.workspace }}/pages-repo
           source_directory: ${{ github.workspace }}/storybook-static

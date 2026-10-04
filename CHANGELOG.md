@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `.github/workflows/visual-gate.yml` (trusted, from the default branch): posts the required `swiss-knife / visual` and `swiss-knife / accessibility` check runs using the default branch's configuration, withdraws stale approvals (label older than the commit) and publishes the report to `<preview_root>/pr-<N>/visual/`.
   - `actions/visual-capture` and `actions/visual-report` composite actions.
   - End-to-end fixtures (`npm run test:fixture -- test/fixtures/<name>`) for Storybook 8 + Vue (npm), 9 + React (pnpm) and 10 + Vue (yarn).
+  - Removed stories (a baseline without a story) need approval like changes; skipped stories and runner errors are reported separately.
+  - The gate can require the run to come from the caller workflow, unchanged from the default branch (`caller_workflow`, `protected_paths`). See `docs/visual-regression.md` for setup and the threat model.
+  - Local CLI: `runner/cli.js visual [--update] [--docker]`, `a11y --update-baseline`.
 
 - Visual regression and accessibility result processing, ported from kinboo2.0 as zero-dependency modules: `src/visual/results.js` (classifies merged Playwright results), `src/visual/gate.js` (gate decision and summary, with a configurable approval label), `src/visual/manifest.js` (Storybook gallery manifest), `src/visual/shard.js` (story sharding, same assignment as kinboo2.0) and `src/a11y/report.js` (axe report evaluation against the node-count baseline, baseline builder and summary). The accessibility gate recomputes which violations are new from raw node counts instead of trusting the runner.
 

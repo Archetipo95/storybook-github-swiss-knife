@@ -22,6 +22,18 @@ on:
         required: false
         type: string
         default: '.'
+      caller_workflow:
+        description: >-
+          Path of the workflow that calls visual.yml (e.g. .github/workflows/visual.yml). When set,
+          runs from any other workflow file, or from a pull request that changes it, fail the checks.
+        required: false
+        type: string
+        default: ''
+      protected_paths:
+        description: 'More files (newline-separated) that must be unchanged from the default branch'
+        required: false
+        type: string
+        default: ''
       site_url:
         description: 'Public Pages URL, when not https://<owner>.github.io/<repo>'
         required: false
@@ -41,10 +53,8 @@ jobs:
     if: github.event.workflow_run.event == 'pull_request' || inputs.workflow_run_id != ''
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    # Serializes Pages branch writes with the preview publisher.
-    concurrency:
-      group: storybook-pages-${{ github.repository }}
-      cancel-in-progress: false
+    # No concurrency group: GitHub drops pending jobs of a group, which could leave a stale
+    # check. Pages writes retry on conflicts (src/git-branch-writer.js).
     permissions:
       actions: read
       checks: write
@@ -60,16 +70,27 @@ jobs:
           persist-credentials: false
 
       - name: Load swiss-knife toolkit
-        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@5ac0ba3ed0765036a1ee954a00ca962ab482b392
+        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@15d183f63cfa5aaecf152719e87f09f86bff6d0c
+
+      - name: Find the results bundle
+        id: artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          names="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts?per_page=100" --jq '.artifacts[] | select(.expired | not) | .name' | grep -E "^swiss-knife-visual-pr-[0-9]+-run-$RUN_ID\$" || true)"
+          if [ "$(printf '%s\n' "$names" | grep -c .)" = 1 ]; then
+            echo "name=$names" >> "$GITHUB_OUTPUT"
+          else
+            echo "No single results bundle in run $RUN_ID."
+          fi
 
       - name: Download results bundle
-        id: bundle
+        if: steps.artifact.outputs.name != ''
         continue-on-error: true
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: swiss-knife-visual-pr-*
+          name: ${{ steps.artifact.outputs.name }}
           path: ${{ runner.temp }}/swiss-knife-bundle
-          merge-multiple: true
           run-id: ${{ env.RUN_ID }}
           github-token: ${{ github.token }}
 
@@ -104,5 +125,7 @@ jobs:
           BUNDLE_DIR: ${{ runner.temp }}/swiss-knife-bundle
           PAGES_REPO: ${{ steps.pages.outputs.branch != '' && format('{0}/.swiss-knife-pages', github.workspace) || '' }}
           SITE_URL: ${{ inputs.site_url }}
+          CALLER_WORKFLOW: ${{ inputs.caller_workflow }}
+          PROTECTED_PATHS: ${{ inputs.protected_paths }}
           PASSCODE_HASH: ${{ secrets.passcode_hash }}
         run: node "$SWISS_KNIFE_ROOT/src/gate/run.js"
