@@ -14,7 +14,21 @@ export function isCustomDomain({ repository = '', siteUrl = '' } = {}) {
   }
 }
 
-export function computeBaseUrl({ repository = '', siteUrl = '', basePath = '', eventName = '', prNumber = '' } = {}) {
+export function normalizePreviewRoot(previewRoot = '') {
+  const trimmed = String(previewRoot ?? '')
+    .trim()
+    .replace(/^\.?\/+|\/+$/g, '');
+  return trimmed === '.' ? '' : trimmed;
+}
+
+export function computeBaseUrl({
+  repository = '',
+  siteUrl = '',
+  basePath = '',
+  eventName = '',
+  prNumber = '',
+  previewRoot = ''
+} = {}) {
   if (basePath) {
     const normalized = String(basePath).startsWith('/') ? String(basePath) : `/${basePath}`;
     return normalized.endsWith('/') ? normalized : `${normalized}/`;
@@ -22,8 +36,9 @@ export function computeBaseUrl({ repository = '', siteUrl = '', basePath = '', e
   const [, repoName = ''] = String(repository).split('/');
   const customDomain = isCustomDomain({ repository, siteUrl });
   const isPreview = eventName === 'pull_request' && /^\d+$/.test(String(prNumber)) && Number(prNumber) > 0;
+  const root = normalizePreviewRoot(previewRoot);
   const path = isPreview
-    ? `${customDomain ? '' : `/${repoName}`}/pr-${Number(prNumber)}/`
+    ? `${customDomain ? '' : `/${repoName}`}${root ? `/${root}` : ''}/pr-${Number(prNumber)}/`
     : customDomain
       ? '/'
       : `/${repoName}/`;

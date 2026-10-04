@@ -535,3 +535,19 @@ test('resolveBaseDirectoryForRef trims long slash runs in linear time', () => {
   resolveBaseDirectoryForRef(ref, { default_branch: 'main' });
   assert.ok(Date.now() - started < 1000, 'slash trimming must not be quadratic');
 });
+
+test('computeBaseUrl puts PR previews under preview_root, where the publisher writes them', () => {
+  const pr = { repository: 'acme/design-system', eventName: 'pull_request', prNumber: 7 };
+  assert.equal(computeBaseUrl({ ...pr, previewRoot: 'pr-preview' }), '/design-system/pr-preview/pr-7/');
+  assert.equal(computeBaseUrl({ ...pr, previewRoot: '.' }), '/design-system/pr-7/');
+  assert.equal(computeBaseUrl({ ...pr, previewRoot: '' }), '/design-system/pr-7/');
+  assert.equal(
+    computeBaseUrl({ ...pr, previewRoot: './previews/storybook/' }),
+    '/design-system/previews/storybook/pr-7/'
+  );
+  assert.equal(
+    computeBaseUrl({ ...pr, siteUrl: 'https://storybook.example.com', previewRoot: 'pr-preview' }),
+    '/pr-preview/pr-7/'
+  );
+  assert.equal(computeBaseUrl({ repository: 'acme/design-system', previewRoot: 'pr-preview' }), '/design-system/');
+});

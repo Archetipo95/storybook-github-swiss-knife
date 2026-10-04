@@ -280,10 +280,11 @@ jobs:
           BASE_PATH: ${{ steps.config.outputs.base_path }}
           EVENT_NAME: ${{ github.event_name }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PREVIEW_ROOT: ${{ steps.config.outputs.preview_root }}
         run: |
           CMD="$BUILD_COMMAND"
           if [ "$AUTO_BASE_URL" = "true" ]; then
-            eval "$(node -e 'import(process.env.SWISS_KNIFE_ROOT + "/src/base-url.js").then(({computeBaseUrl, augmentBuildCommand, buildEnvironment}) => { const baseUrl = computeBaseUrl({repository: process.env.REPOSITORY, siteUrl: process.env.SITE_URL, basePath: process.env.BASE_PATH, eventName: process.env.EVENT_NAME, prNumber: process.env.PR_NUMBER}); const command = augmentBuildCommand(process.env.BUILD_COMMAND, baseUrl); console.log(`CMD=${JSON.stringify(command)}`); for (const [key, value] of Object.entries(buildEnvironment(baseUrl))) console.log(`export ${key}=${JSON.stringify(value)}`); })')"
+            eval "$(node -e 'import(process.env.SWISS_KNIFE_ROOT + "/src/base-url.js").then(({computeBaseUrl, augmentBuildCommand, buildEnvironment}) => { const baseUrl = computeBaseUrl({repository: process.env.REPOSITORY, siteUrl: process.env.SITE_URL, basePath: process.env.BASE_PATH, eventName: process.env.EVENT_NAME, prNumber: process.env.PR_NUMBER, previewRoot: process.env.PREVIEW_ROOT}); const command = augmentBuildCommand(process.env.BUILD_COMMAND, baseUrl); console.log(`CMD=${JSON.stringify(command)}`); for (const [key, value] of Object.entries(buildEnvironment(baseUrl))) console.log(`export ${key}=${JSON.stringify(value)}`); })')"
           fi
           eval "$CMD"
 
