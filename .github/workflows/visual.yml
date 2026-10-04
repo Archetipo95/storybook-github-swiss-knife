@@ -1,0 +1,387 @@
+name: Visual
+
+# Untrusted visual regression + accessibility capture (reusable). Call it from a workflow that
+# runs on `pull_request` (types: opened, synchronize, reopened, labeled, unlabeled) and on
+# `push` to the branches listed in visual.baselineBranches. It builds and screenshots PR code,
+# so every job is read-only and uses no secrets: it only uploads artifacts. Pass/fail is decided
+# by the trusted visual-gate workflow, which runs after this one. Set the concurrency group in
+# the caller (one group per pull request, cancel in progress).
+
+on:
+  workflow_call:
+    inputs:
+      working_directory:
+        description: 'Project directory (holds package.json and .storybook/)'
+        required: false
+        type: string
+        default: '.'
+      node_version_file:
+        description: 'Node.js version file for the build (e.g. .nvmrc), relative to working_directory'
+        required: false
+        type: string
+        default: ''
+      node_version:
+        description: 'Node.js version for the build when no node_version_file is given'
+        required: false
+        type: string
+        default: '24'
+      install_command:
+        description: 'Install command (default: from the lockfile, e.g. npm ci)'
+        required: false
+        type: string
+        default: ''
+      build_command:
+        description: 'Storybook build command; must write to storybook_dir (default: storybook build)'
+        required: false
+        type: string
+        default: ''
+      storybook_dir:
+        description: 'Storybook build output, relative to working_directory'
+        required: false
+        type: string
+        default: 'storybook-static'
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      # Cache lookups (does a baseline exist?) and finding the bundle to reuse.
+      actions: read
+    outputs:
+      mode: ${{ steps.plan.outputs.mode }}
+      shards: ${{ steps.plan.outputs.shards }}
+      shard_total: ${{ steps.plan.outputs.shard_total }}
+      key_prefix: ${{ steps.plan.outputs.key_prefix }}
+      retention_days: ${{ steps.plan.outputs.retention_days }}
+      base_needed: ${{ steps.cache.outputs.base_needed }}
+      reuse_run_id: ${{ steps.reuse.outputs.run_id }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Load swiss-knife toolkit
+        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@14ae37fcd7802d7f3a70c7f7d26cef1505c1f87a
+
+      - name: Plan the run
+        id: plan
+        env:
+          PROJECT_DIR: ${{ inputs.working_directory }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          LABEL_NAME: ${{ github.event.label.name }}
+          REF_NAME: ${{ github.ref_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: node "$SWISS_KNIFE_ROOT/src/visual/plan.js"
+
+      # The base Storybook is only built when a shard's baseline screenshots are not cached
+      # (first run, eviction, runner image update, changed runner or visual config).
+      - name: Look up cached baselines
+        id: cache
+        if: steps.plan.outputs.mode == 'compare'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEY_PREFIX: ${{ steps.plan.outputs.key_prefix }}
+          SHARD_TOTAL: ${{ steps.plan.outputs.shard_total }}
+        run: |
+          missing=0
+          for shard in $(seq 1 "$SHARD_TOTAL"); do
+            key="$KEY_PREFIX-$ImageOS-$ImageVersion-$shard"
+            found="$(gh api "repos/$GITHUB_REPOSITORY/actions/caches?key=$key" --jq "[.actions_caches[] | select(.key == \"$key\")] | length" || echo 0)"
+            if [ "$found" = "0" ]; then missing=$((missing + 1)); fi
+          done
+          echo "Baselines missing for $missing of $SHARD_TOTAL shards."
+          echo "base_needed=$([ "$missing" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Find results to reuse
+        id: reuse
+        if: steps.plan.outputs.mode == 'reuse'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          CURRENT_RUN: ${{ github.run_id }}
+        run: |
+          workflow_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CURRENT_RUN" --jq .workflow_id)"
+          for run_id in $(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow_id/runs?head_sha=$HEAD_SHA&status=completed&per_page=50" --jq '.workflow_runs[].id'); do
+            name="swiss-knife-visual-pr-$PR_NUMBER-run-$run_id"
+            if gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/artifacts?name=$name" --jq '.artifacts[] | select(.expired | not) | .id' | grep -q .; then
+              echo "Reusing the results of run $run_id."
+              echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          echo "::warning::No earlier results for this commit; the gate will report the run as having no results. Push again or re-run the visual workflow."
+
+  build-head:
+    name: Build Storybook
+    needs: plan
+    if: needs.plan.outputs.mode == 'compare' || needs.plan.outputs.mode == 'baseline'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ inputs.node_version_file == '' && inputs.node_version || '' }}
+          node-version-file: ${{ inputs.node_version_file != '' && format('{0}/{1}', inputs.working_directory, inputs.node_version_file) || '' }}
+
+      - name: Install and build
+        working-directory: ${{ inputs.working_directory }}
+        env:
+          INSTALL_COMMAND: ${{ inputs.install_command }}
+          BUILD_COMMAND: ${{ inputs.build_command }}
+          STORYBOOK_DIR: ${{ inputs.storybook_dir }}
+        run: |
+          if [ -z "$INSTALL_COMMAND" ]; then
+            if [ -f pnpm-lock.yaml ]; then INSTALL_COMMAND='corepack pnpm install --frozen-lockfile'
+            elif [ -f yarn.lock ]; then INSTALL_COMMAND='corepack yarn install --immutable'
+            elif [ -f bun.lock ] || [ -f bun.lockb ]; then INSTALL_COMMAND='bun install --frozen-lockfile'
+            else INSTALL_COMMAND='npm ci'
+            fi
+          fi
+          eval "$INSTALL_COMMAND"
+          eval "${BUILD_COMMAND:-node_modules/.bin/storybook build --quiet --output-dir \"\$STORYBOOK_DIR\"}"
+          test -f "$STORYBOOK_DIR/index.json" || { echo "::error::No Storybook build at $STORYBOOK_DIR (index.json missing)." >&2; exit 1; }
+
+      - name: Upload Storybook
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: swiss-knife-storybook-head
+          path: ${{ inputs.working_directory }}/${{ inputs.storybook_dir }}
+          retention-days: 1
+
+  build-base:
+    name: Build base Storybook
+    needs: plan
+    if: needs.plan.outputs.mode == 'compare' && needs.plan.outputs.base_needed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout base commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ inputs.node_version_file == '' && inputs.node_version || '' }}
+          node-version-file: ${{ inputs.node_version_file != '' && format('{0}/{1}', inputs.working_directory, inputs.node_version_file) || '' }}
+
+      - name: Install and build
+        working-directory: ${{ inputs.working_directory }}
+        env:
+          INSTALL_COMMAND: ${{ inputs.install_command }}
+          BUILD_COMMAND: ${{ inputs.build_command }}
+          STORYBOOK_DIR: ${{ inputs.storybook_dir }}
+        run: |
+          if [ -z "$INSTALL_COMMAND" ]; then
+            if [ -f pnpm-lock.yaml ]; then INSTALL_COMMAND='corepack pnpm install --frozen-lockfile'
+            elif [ -f yarn.lock ]; then INSTALL_COMMAND='corepack yarn install --immutable'
+            elif [ -f bun.lock ] || [ -f bun.lockb ]; then INSTALL_COMMAND='bun install --frozen-lockfile'
+            else INSTALL_COMMAND='npm ci'
+            fi
+          fi
+          eval "$INSTALL_COMMAND"
+          eval "${BUILD_COMMAND:-node_modules/.bin/storybook build --quiet --output-dir \"\$STORYBOOK_DIR\"}"
+          test -f "$STORYBOOK_DIR/index.json" || { echo "::error::No Storybook build at $STORYBOOK_DIR (index.json missing)." >&2; exit 1; }
+
+      - name: Upload Storybook
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: swiss-knife-storybook-base
+          path: ${{ inputs.working_directory }}/${{ inputs.storybook_dir }}
+          retention-days: 1
+
+  screenshots:
+    name: Screenshots (${{ matrix.shard }})
+    needs: [plan, build-head, build-base]
+    if: >-
+      !cancelled() && needs.build-head.result == 'success' &&
+      needs.build-base.result != 'failure' && needs.build-base.result != 'cancelled'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Baseline cache key
+        id: key
+        env:
+          KEY_PREFIX: ${{ needs.plan.outputs.key_prefix }}
+          SHARD: ${{ matrix.shard }}
+        run: echo "key=$KEY_PREFIX-$ImageOS-$ImageVersion-${SHARD%%/*}" >> "$GITHUB_OUTPUT"
+
+      - name: Download Storybook
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: swiss-knife-storybook-head
+          path: ${{ inputs.working_directory }}/.swiss-knife/storybook-head
+
+      - name: Restore baselines
+        id: baseline
+        if: needs.plan.outputs.mode == 'compare'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ inputs.working_directory }}/.swiss-knife/snapshots
+          key: ${{ steps.key.outputs.key }}
+
+      - name: Download base Storybook
+        id: base
+        if: needs.plan.outputs.mode == 'compare' && steps.baseline.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: swiss-knife-storybook-base
+          path: ${{ inputs.working_directory }}/.swiss-knife/storybook-base
+
+      - name: Capture missing baselines
+        if: needs.plan.outputs.mode == 'compare' && steps.baseline.outputs.cache-hit != 'true' && steps.base.outcome == 'success'
+        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@14ae37fcd7802d7f3a70c7f7d26cef1505c1f87a
+        with:
+          project_dir: ${{ inputs.working_directory }}
+          storybook_dir: .swiss-knife/storybook-base
+          shard: ${{ matrix.shard }}
+          mode: baseline
+
+      # Without baselines (cache miss and no base build) the shard reports nothing, so the
+      # gate fails the run as incomplete instead of passing every story as new.
+      - name: Compare
+        if: >-
+          needs.plan.outputs.mode == 'compare' &&
+          (steps.baseline.outputs.cache-hit == 'true' || steps.base.outcome == 'success')
+        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@14ae37fcd7802d7f3a70c7f7d26cef1505c1f87a
+        with:
+          project_dir: ${{ inputs.working_directory }}
+          storybook_dir: .swiss-knife/storybook-head
+          shard: ${{ matrix.shard }}
+          mode: compare
+          gallery_dir: .swiss-knife/gallery
+          a11y_dir: .swiss-knife/a11y
+
+      - name: Capture branch baselines
+        if: needs.plan.outputs.mode == 'baseline'
+        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@14ae37fcd7802d7f3a70c7f7d26cef1505c1f87a
+        with:
+          project_dir: ${{ inputs.working_directory }}
+          storybook_dir: .swiss-knife/storybook-head
+          shard: ${{ matrix.shard }}
+          mode: baseline
+
+      - name: Save branch baselines
+        if: needs.plan.outputs.mode == 'baseline'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ inputs.working_directory }}/.swiss-knife/snapshots
+          key: ${{ steps.key.outputs.key }}
+
+      - name: Shard name
+        id: name
+        if: needs.plan.outputs.mode == 'compare'
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: echo "id=${SHARD%%/*}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload shard results
+        if: needs.plan.outputs.mode == 'compare'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: swiss-knife-shard-${{ steps.name.outputs.id }}
+          path: |
+            ${{ inputs.working_directory }}/.swiss-knife/blob-report
+            ${{ inputs.working_directory }}/.swiss-knife/gallery
+            ${{ inputs.working_directory }}/.swiss-knife/a11y
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 1
+
+  report:
+    name: Report
+    needs: [plan, screenshots]
+    if: >-
+      !cancelled() && github.event_name == 'pull_request' && needs.plan.outputs.mode == 'compare' &&
+      needs.screenshots.result != 'skipped'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Download shard results
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: swiss-knife-shard-*
+          path: .swiss-knife/shards
+          merge-multiple: true
+
+      - name: Assemble report and results bundle
+        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-report@14ae37fcd7802d7f3a70c7f7d26cef1505c1f87a
+        with:
+          blob_dir: .swiss-knife/shards
+          gallery_dir: .swiss-knife/shards/gallery
+          a11y_dir: .swiss-knife/shards/a11y
+          bundle_dir: .swiss-knife/bundle
+          shards_expected: ${{ needs.plan.outputs.shard_total }}
+          pr_number: ${{ github.event.pull_request.number }}
+          head_sha: ${{ github.event.pull_request.head.sha }}
+          base_sha: ${{ github.event.pull_request.base.sha }}
+
+      - name: Upload results bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: swiss-knife-visual-pr-${{ github.event.pull_request.number }}-run-${{ github.run_id }}
+          path: .swiss-knife/bundle
+          include-hidden-files: true
+          retention-days: ${{ fromJSON(needs.plan.outputs.retention_days) }}
+
+  reuse:
+    name: Reuse results (approval label)
+    needs: plan
+    if: needs.plan.outputs.mode == 'reuse' && needs.plan.outputs.reuse_run_id != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Download the results of this commit
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: swiss-knife-visual-pr-${{ github.event.pull_request.number }}-run-${{ needs.plan.outputs.reuse_run_id }}
+          path: .swiss-knife/bundle
+          run-id: ${{ needs.plan.outputs.reuse_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Upload results bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: swiss-knife-visual-pr-${{ github.event.pull_request.number }}-run-${{ github.run_id }}
+          path: .swiss-knife/bundle
+          include-hidden-files: true
+          retention-days: ${{ fromJSON(needs.plan.outputs.retention_days) }}

@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Visual regression and accessibility pipeline for pull requests:
+  - `runner/`: Playwright + axe runner for a built Storybook (8, 9 and 10), configured by `.storybook/swiss-knife.json`; viewports come from each story's own parameters.
+  - `.github/workflows/visual.yml` (untrusted, read-only): builds the head Storybook once, builds the base only when cached baselines are missing, screenshots in shards, and uploads a results bundle. Pushes to `visual.baselineBranches` capture baselines; the approval label reuses the commit's results.
+  - `.github/workflows/visual-gate.yml` (trusted, from the default branch): posts the required `swiss-knife / visual` and `swiss-knife / accessibility` check runs using the default branch's configuration, withdraws stale approvals (label older than the commit) and publishes the report to `<preview_root>/pr-<N>/visual/`.
+  - `actions/visual-capture` and `actions/visual-report` composite actions.
+  - End-to-end fixtures (`npm run test:fixture -- test/fixtures/<name>`) for Storybook 8 + Vue (npm), 9 + React (pnpm) and 10 + Vue (yarn).
+
 - Visual regression and accessibility result processing, ported from kinboo2.0 as zero-dependency modules: `src/visual/results.js` (classifies merged Playwright results), `src/visual/gate.js` (gate decision and summary, with a configurable approval label), `src/visual/manifest.js` (Storybook gallery manifest), `src/visual/shard.js` (story sharding, same assignment as kinboo2.0) and `src/a11y/report.js` (axe report evaluation against the node-count baseline, baseline builder and summary). The accessibility gate recomputes which violations are new from raw node counts instead of trusting the runner.
 
 - `actions/toolkit`: exposes this repository's source to later steps of a job (`SWISS_KNIFE_ROOT`), so trusted scripts never need a checkout of this repository.

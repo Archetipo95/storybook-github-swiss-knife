@@ -1,0 +1,26 @@
+name: Dogfood Visual
+
+# Runs this repository's own visual pipeline on the SB9 React fixture, the way a consumer
+# would: visual.yml (untrusted) here, then visual-gate.yml (trusted) on workflow_run.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  push:
+    branches: [main]
+
+concurrency:
+  group: dogfood-visual-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  visual:
+    uses: ./.github/workflows/visual.yml
+    permissions:
+      contents: read
+      actions: read
+    with:
+      working_directory: test/fixtures/sb9-react-pnpm

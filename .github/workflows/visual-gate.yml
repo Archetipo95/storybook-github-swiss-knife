@@ -1,0 +1,107 @@
+name: Visual Gate
+
+# Trusted half of the visual pipeline. Runs after an untrusted visual run completes, from the
+# default branch: it never checks out or runs pull request code. It evaluates the run's results
+# bundle with the default branch's configuration, posts the required check runs
+# (swiss-knife / visual, swiss-knife / accessibility) on the head commit, withdraws a stale
+# approval label, and publishes the report next to the PR's Storybook preview.
+#
+# Call it from a workflow on `workflow_run` (types: completed) of the workflow that calls
+# visual.yml; a workflow_run trigger cannot live in a reusable workflow. This repository does
+# so in dogfood-visual-gate.yml.
+
+on:
+  workflow_call:
+    inputs:
+      workflow_run_id:
+        description: 'Run to gate (defaults to github.event.workflow_run.id)'
+        required: false
+        type: number
+      working_directory:
+        description: 'Project directory (holds .storybook/), relative to the repository root'
+        required: false
+        type: string
+        default: '.'
+      site_url:
+        description: 'Public Pages URL, when not https://<owner>.github.io/<repo>'
+        required: false
+        type: string
+        default: ''
+    secrets:
+      passcode_hash:
+        description: 'SHA-256 hex hash of the Storybook passcode, to gate the published report'
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Gate visual and accessibility results (trusted)
+    if: github.event.workflow_run.event == 'pull_request' || inputs.workflow_run_id != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # Serializes Pages branch writes with the preview publisher.
+    concurrency:
+      group: storybook-pages-${{ github.repository }}
+      cancel-in-progress: false
+    permissions:
+      actions: read
+      checks: write
+      contents: write
+      issues: write
+      pull-requests: write
+    env:
+      RUN_ID: ${{ inputs.workflow_run_id || github.event.workflow_run.id }}
+    steps:
+      - name: Checkout default branch (trusted configuration)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Load swiss-knife toolkit
+        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@14ae37fcd7802d7f3a70c7f7d26cef1505c1f87a
+
+      - name: Download results bundle
+        id: bundle
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: swiss-knife-visual-pr-*
+          path: ${{ runner.temp }}/swiss-knife-bundle
+          merge-multiple: true
+          run-id: ${{ env.RUN_ID }}
+          github-token: ${{ github.token }}
+
+      - name: Resolve Pages branch
+        id: pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKING_DIRECTORY: ${{ inputs.working_directory }}
+        run: |
+          branch="$(cd "$WORKING_DIRECTORY" && node -e 'import(process.env.SWISS_KNIFE_ROOT + "/src/config.js").then(({resolveConfiguration}) => console.log(resolveConfiguration({inputs: {}}).pages_branch))')"
+          if gh api "repos/$GITHUB_REPOSITORY/branches/$branch" --silent 2>/dev/null; then
+            echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          else
+            echo "Pages branch $branch does not exist; the report will not be published."
+          fi
+
+      - name: Checkout Pages branch
+        if: steps.pages.outputs.branch != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.pages.outputs.branch }}
+          path: ${{ runner.temp }}/swiss-knife-pages
+          fetch-depth: 0
+
+      - name: Gate and post checks
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PROJECT_DIR: ${{ github.workspace }}/${{ inputs.working_directory }}
+          WORKING_DIRECTORY: ${{ inputs.working_directory }}
+          BUNDLE_DIR: ${{ runner.temp }}/swiss-knife-bundle
+          PAGES_REPO: ${{ steps.pages.outputs.branch != '' && format('{0}/swiss-knife-pages', runner.temp) || '' }}
+          SITE_URL: ${{ inputs.site_url }}
+          PASSCODE_HASH: ${{ secrets.passcode_hash }}
+        run: node "$SWISS_KNIFE_ROOT/src/gate/run.js"

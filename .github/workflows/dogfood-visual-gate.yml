@@ -1,0 +1,26 @@
+name: Dogfood Visual Gate
+
+# Trusted gate for the dogfood visual run, set up exactly as a consumer would.
+
+on:
+  workflow_run:
+    workflows: ['Dogfood Visual']
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    if: github.event.workflow_run.event == 'pull_request'
+    uses: ./.github/workflows/visual-gate.yml
+    permissions:
+      actions: read
+      checks: write
+      contents: write
+      issues: write
+      pull-requests: write
+    with:
+      working_directory: test/fixtures/sb9-react-pnpm
+    secrets:
+      passcode_hash: ${{ secrets.STORYBOOK_PREVIEW_PASSCODE_HASH }}

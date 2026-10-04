@@ -80,7 +80,9 @@ function filesToScan() {
     '.github/workflows/pr-preview-build.yml',
     '.github/workflows/pr-preview-publish.yml',
     '.github/workflows/pr-preview-cleanup.yml',
-    '.github/workflows/pr-preview-janitor.yml'
+    '.github/workflows/pr-preview-janitor.yml',
+    '.github/workflows/visual.yml',
+    '.github/workflows/visual-gate.yml'
   ];
   return candidates.map(file => path.join(repoRoot, file)).filter(file => fs.existsSync(file));
 }
