@@ -1,4 +1,4 @@
-import { evaluateA11yReports, renderA11ySummary } from '../a11y/report.js';
+import { A11Y_COMMENT_MARKER, evaluateA11yReports, renderA11ySummary } from '../a11y/report.js';
 import { evaluateVisualGate, renderVisualSummary } from '../visual/gate.js';
 import { classifyVisualResults } from '../visual/results.js';
 
@@ -98,4 +98,41 @@ export function evaluateGate({ bundle, config, baseline, approved, headSha, prNu
     };
   }
   return { visual, a11y, approvedForManifest: approved, changed: gate.counts.changed + gate.counts.removed };
+}
+
+const ICONS = { success: ':white_check_mark:', failure: ':x:', neutral: ':heavy_minus_sign:' };
+// Both summaries fit in one comment (65536 characters) with the preview part.
+const MAX_COMMENT_SUMMARY = 20000;
+
+/**
+ * The gate's block in the pull request comment: both checks at a glance, details folded.
+ * @param {{ visual: { name: string, conclusion: string, title: string, summary: string },
+ *   a11y: { name: string, conclusion: string, title: string, summary: string } }} result
+ * @param {{ headSha: string, reportUrl?: string, runUrl?: string }} links
+ */
+export function renderChecksComment({ visual, a11y }, { headSha, reportUrl = '', runUrl = '' }) {
+  const details = (label, summary) => {
+    const text = summary.replace(A11Y_COMMENT_MARKER, '').trim();
+    const shown =
+      text.length > MAX_COMMENT_SUMMARY ? `${text.slice(0, MAX_COMMENT_SUMMARY)}\n\n_Truncated; see the check._` : text;
+    return ['<details>', `<summary>${label}</summary>`, '', shown, '', '</details>'];
+  };
+  const links = [
+    `commit \`${headSha.slice(0, 7)}\``,
+    reportUrl && `[visual report](${reportUrl})`,
+    runUrl && `[run](${runUrl})`
+  ].filter(Boolean);
+  return [
+    '### Visual regression and accessibility',
+    '',
+    '| Check | Result |',
+    '| --- | --- |',
+    ...[visual, a11y].map(check => `| ${check.name} | ${ICONS[check.conclusion] ?? ''} ${check.title} |`),
+    '',
+    links.join(' · '),
+    '',
+    ...details('Visual details', visual.summary),
+    '',
+    ...details('Accessibility details', a11y.summary)
+  ].join('\n');
 }

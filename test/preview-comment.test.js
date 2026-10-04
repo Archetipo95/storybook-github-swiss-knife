@@ -4,9 +4,11 @@ import {
   buildMarker,
   buildCommentBody,
   buildExpirationStatus,
+  extractChecksSection,
   previewCommentMarkers,
   updatePreviewCommentStatus,
-  upsertPreviewComment
+  upsertPreviewComment,
+  withChecksSection
 } from '../src/preview-comment.js';
 
 const SHA = 'c'.repeat(40);
@@ -366,6 +368,37 @@ test('updatePreviewCommentStatus replaces the expiry block of a storybook-github
       expired: true
     });
     assert.deepEqual(result, { action: 'updated', commentId: 57 });
+  } finally {
+    mock.restore();
+  }
+});
+
+test('withChecksSection sets the gate block before the footer and replaces it on later runs', () => {
+  const body = buildCommentBody({ prNumber: 7, previewUrl: 'https://x.test/pr-7', headSha: SHA, runId: 1 });
+  const first = withChecksSection(body, 'first $& run');
+  assert.ok(first.indexOf('first $& run') < first.indexOf('<sub>'));
+  const second = withChecksSection(first, 'second run');
+  assert.equal(extractChecksSection(second), '<!-- swiss-knife-checks -->\nsecond run\n<!-- /swiss-knife-checks -->');
+  assert.ok(!second.includes('first'));
+  assert.equal(extractChecksSection(body), null);
+});
+
+test('upsertPreviewComment keeps the block the visual gate wrote first', async () => {
+  const marker = buildMarker(7);
+  const gateComment = withChecksSection(marker, 'visual results');
+  let written;
+  const mock = mockFetchSequence([
+    () => jsonResponse(200, [{ id: 42, body: gateComment, user: { login: 'github-actions[bot]', type: 'Bot' } }]),
+    (url, options) => {
+      written = JSON.parse(options.body).body;
+      return jsonResponse(200, { id: 42 });
+    }
+  ]);
+  try {
+    const body = buildCommentBody({ prNumber: 7, previewUrl: 'https://x.test/pr-7', headSha: SHA, runId: 1 });
+    await upsertPreviewComment({ token: 't', repository: 'octo/widgets', prNumber: 7, body });
+    assert.match(written, /Storybook preview/);
+    assert.equal(extractChecksSection(written), extractChecksSection(gateComment));
   } finally {
     mock.restore();
   }

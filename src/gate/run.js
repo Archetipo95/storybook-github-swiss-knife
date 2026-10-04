@@ -14,9 +14,10 @@ import path from 'node:path';
 import { resolveConfiguration } from '../config.js';
 import { injectAuthGate } from '../inject-auth-gate.js';
 import { publishDirectory } from '../publish-directory.js';
+import { buildMarker, pickPreviewComment, previewCommentMarkers, withChecksSection } from '../preview-comment.js';
 import { loadSwissKnifeConfig } from '../swiss-knife-config.js';
 import { evaluateApproval } from './approval.js';
-import { evaluateGate } from './core.js';
+import { evaluateGate, renderChecksComment } from './core.js';
 
 export const VISUAL_ARTIFACT_PATTERN = /^swiss-knife-visual-pr-(\d+)-run-(\d+)$/;
 
@@ -156,6 +157,27 @@ async function verifyCaller(request, { repository, run, env, baseSha }) {
 }
 
 /**
+ * Sets the gate's block in the pull request's preview comment, creating the comment when the
+ * preview has not posted one yet (the preview publisher keeps the block when it rewrites it).
+ */
+async function upsertChecksComment(request, { repository, prNumber, markdown }) {
+  const comments = await paginate(request, `/repos/${repository}/issues/${prNumber}/comments`);
+  const existing = pickPreviewComment(comments, previewCommentMarkers(prNumber));
+  if (existing) {
+    const body = withChecksSection(existing.body, markdown);
+    if (body !== existing.body) {
+      await request(`/repos/${repository}/issues/comments/${existing.id}`, { method: 'PATCH', body: { body } });
+    }
+    return existing.id;
+  }
+  const created = await request(`/repos/${repository}/issues/${prNumber}/comments`, {
+    method: 'POST',
+    body: { body: withChecksSection(buildMarker(prNumber), markdown) }
+  });
+  return created?.id;
+}
+
+/**
  * @param {{ env: NodeJS.ProcessEnv, request: ReturnType<typeof githubClient>,
  *   publish?: typeof publishDirectory, log?: (line: string) => void }} options
  */
@@ -283,6 +305,19 @@ export async function runVisualGate({ env, request, publish = publishDirectory, 
       }
     });
     log(`${check.name}: ${check.conclusion} (${check.title})`);
+  }
+
+  // Results for an older commit would overwrite the current ones.
+  if (pr && isCurrentHead && config.visual.prComment) {
+    try {
+      await upsertChecksComment(request, {
+        repository,
+        prNumber,
+        markdown: renderChecksComment(result, { headSha, reportUrl, runUrl: run.html_url })
+      });
+    } catch (error) {
+      log(`::warning::The pull request comment was not updated: ${error.message}`);
+    }
   }
 
   if (pr && approval.stale && result.changed > 0 && isCurrentHead) {

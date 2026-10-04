@@ -89,6 +89,8 @@ parameters (`a11y.disable` / `a11y.test: 'off'`, `a11y.config.rules`, `a11y.opti
 - Adding or removing the approval label re-evaluates the commit's results in about a minute;
   nothing is screenshotted again.
 - The report and the Storybook gallery are published to `<preview_root>/pr-<N>/visual/`.
+- Both results are added to the pull request's preview comment (created if the preview has not
+  posted one yet); set `visual.prComment: false` to keep them in the checks only.
 
 ## Local runs
 

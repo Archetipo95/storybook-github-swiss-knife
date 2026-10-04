@@ -59,7 +59,8 @@ function fakeGitHub({
   existingChecks = 0,
   runPath = '.github/workflows/visual-caller.yml',
   callerAtHead = 'caller workflow',
-  prHead = HEAD
+  prHead = HEAD,
+  comments = []
 } = {}) {
   const calls = [];
   const request = async (apiPath, { method = 'GET', body } = {}) => {
@@ -101,7 +102,8 @@ function fakeGitHub({
     }
     if (route === `/repos/${REPO}/actions/workflows/99/runs`) return { workflow_runs: [{ created_at: firstRunAt }] };
     if (route === `/repos/${REPO}/commits/${HEAD}/check-runs`) return { total_count: existingChecks };
-    if (method === 'POST' || method === 'DELETE') return {};
+    if (route === `/repos/${REPO}/issues/7/comments` && method === 'GET') return comments;
+    if (method === 'POST' || method === 'DELETE' || method === 'PATCH') return {};
     throw new Error(`unexpected ${method} ${apiPath}`);
   };
   return { calls, request };
@@ -322,4 +324,49 @@ test('baseline entries raised by the pull request are listed in the accessibilit
     a11y.output.summary,
     /Baseline raised in this pull request[\s\S]*`card--default`: `color-contrast` 1 → 2/
   );
+});
+
+const commentWrites = calls =>
+  calls.filter(call => call.apiPath.includes('/comments') && (call.method === 'POST' || call.method === 'PATCH'));
+
+test('the results are added to a new pull request comment when the preview has not posted one', async () => {
+  const { calls } = await run();
+  const [write] = commentWrites(calls);
+  assert.equal(write.method, 'POST');
+  assert.equal(write.apiPath, `/repos/${REPO}/issues/7/comments`);
+  assert.ok(write.body.body.startsWith('<!-- swiss-knife:pr-7 -->'));
+  assert.match(write.body.body, /\| swiss-knife \/ visual \| :x: 1 visual change to review \|/);
+  assert.match(write.body.body, /\| swiss-knife \/ accessibility \| :white_check_mark: No new violations \|/);
+  assert.match(write.body.body, /\[visual report\]\(https:\/\/acme\.github\.io\/widgets\/pr-preview\/pr-7\/visual\/\)/);
+  assert.ok(!write.body.body.includes('<!-- swiss-knife:a11y -->'));
+});
+
+test('the results replace their block in the preview comment and keep the preview part', async () => {
+  const preview =
+    '<!-- swiss-knife:pr-7 -->\n## Storybook preview\n\n<!-- swiss-knife-checks -->\nold\n<!-- /swiss-knife-checks -->\n<sub>footer</sub>';
+  const github = fakeGitHub({
+    comments: [{ id: 9, body: preview, user: { login: 'github-actions[bot]', type: 'Bot' } }]
+  });
+  const { calls } = await run({ github });
+  const writes = commentWrites(calls);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].method, 'PATCH');
+  assert.equal(writes[0].apiPath, `/repos/${REPO}/issues/comments/9`);
+  assert.match(writes[0].body.body, /^<!-- swiss-knife:pr-7 -->\n## Storybook preview/);
+  assert.ok(!writes[0].body.body.includes('\nold\n'));
+  assert.match(writes[0].body.body, /<\/details>\n<!-- \/swiss-knife-checks -->\n<sub>footer<\/sub>$/);
+});
+
+test('a marker in a comment the bot did not write is left alone and the checks still post', async () => {
+  const github = fakeGitHub({
+    comments: [{ id: 3, body: '<!-- swiss-knife:pr-7 -->', user: { login: 'mallory', type: 'User' } }]
+  });
+  const { calls } = await run({ github });
+  assert.equal(commentWrites(calls).length, 0);
+  assert.equal(checkRuns(calls).length, 2);
+});
+
+test('results for a commit that is no longer the head do not touch the comment', async () => {
+  const { calls } = await run({ github: fakeGitHub({ prHead: 'c'.repeat(40) }) });
+  assert.equal(commentWrites(calls).length, 0);
 });

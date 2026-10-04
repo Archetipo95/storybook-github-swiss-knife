@@ -233,6 +233,11 @@
           "description": "PR label that accepts visual changes.",
           "default": "visual-approved"
         },
+        "prComment": {
+          "type": "boolean",
+          "description": "Add the visual and accessibility results to the pull request's preview comment (created when there is none).",
+          "default": true
+        },
         "fixedTime": {
           "type": ["string", "null"],
           "format": "date-time",

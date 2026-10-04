@@ -10,6 +10,9 @@ const STATUS_MARKER = '<!-- swiss-knife-preview-status -->';
 const STATUS_END_MARKER = '<!-- /swiss-knife-preview-status -->';
 // Comments written by storybook-github-pages are found and taken over (rewritten with the
 // new markers) instead of a second comment being posted.
+// The visual gate's results, kept when the preview part of the comment is rewritten.
+const CHECKS_MARKER = '<!-- swiss-knife-checks -->';
+const CHECKS_END_MARKER = '<!-- /swiss-knife-checks -->';
 const LEGACY_MARKER_PREFIX = '<!-- storybook-pages-preview:pr-';
 const LEGACY_STATUS_MARKER = '<!-- storybook-pages-preview-status -->';
 const LEGACY_STATUS_END_MARKER = '<!-- /storybook-pages-preview-status -->';
@@ -40,18 +43,36 @@ ${STATUS_END_MARKER}`;
 ${STATUS_END_MARKER}`;
 }
 
-function replaceExpirationStatus(body, status) {
-  for (const [start, end] of [
-    [STATUS_MARKER, STATUS_END_MARKER],
-    [LEGACY_STATUS_MARKER, LEGACY_STATUS_END_MARKER]
-  ]) {
-    const block = new RegExp(`${start}[\\s\\S]*?${end}`);
-    if (block.test(body)) return body.replace(block, status);
+/** Replaces the delimited block, or inserts it before the footer (`<sub>`) when missing. */
+function replaceBlock(body, block, delimiters) {
+  for (const [start, end] of delimiters) {
+    const existing = new RegExp(`${start}[\\s\\S]*?${end}`);
+    if (existing.test(body)) return body.replace(existing, () => block);
   }
   const insertionPoint = body.indexOf('\n<sub>');
   return insertionPoint === -1
-    ? `${body}\n\n${status}`
-    : `${body.slice(0, insertionPoint)}\n\n${status}${body.slice(insertionPoint)}`;
+    ? `${body}\n\n${block}`
+    : `${body.slice(0, insertionPoint)}\n\n${block}${body.slice(insertionPoint)}`;
+}
+
+function replaceExpirationStatus(body, status) {
+  return replaceBlock(body, status, [
+    [STATUS_MARKER, STATUS_END_MARKER],
+    [LEGACY_STATUS_MARKER, LEGACY_STATUS_END_MARKER]
+  ]);
+}
+
+/** The visual gate's block in a comment body, or null. */
+export function extractChecksSection(body) {
+  const match = new RegExp(`${CHECKS_MARKER}[\\s\\S]*?${CHECKS_END_MARKER}`).exec(String(body ?? ''));
+  return match ? match[0] : null;
+}
+
+/** The body with the visual gate's block (markdown) set; the rest of the comment is kept. */
+export function withChecksSection(body, markdown) {
+  return replaceBlock(body, `${CHECKS_MARKER}\n${markdown}\n${CHECKS_END_MARKER}`, [
+    [CHECKS_MARKER, CHECKS_END_MARKER]
+  ]);
 }
 
 function formatDiff(baseVal, prVal, isPercent = false) {
@@ -229,6 +250,25 @@ async function githubRequest(url, { token, method = 'GET', body } = {}) {
   return response.status === 204 ? null : response.json();
 }
 
+/**
+ * This PR's preview comment among `comments`: the one with the current marker, else a legacy
+ * one. Throws when a marker sits in a comment the bot did not write.
+ */
+export function pickPreviewComment(comments, markers) {
+  const marked = comments.filter(
+    comment => typeof comment.body === 'string' && markers.some(value => comment.body.includes(value))
+  );
+  const conflicting = marked.find(
+    comment => comment.user?.login !== PREVIEW_COMMENT_AUTHOR || comment.user?.type !== 'Bot'
+  );
+  if (conflicting) {
+    throw new Error(
+      `Refusing to update comment ${conflicting.id}: preview marker is owned by a non-${PREVIEW_COMMENT_AUTHOR} account`
+    );
+  }
+  return marked.find(comment => comment.body.includes(markers[0])) ?? marked[0] ?? null;
+}
+
 export async function findExistingComment({ token, repository, prNumber, marker }) {
   const number = Number(prNumber);
   if (!Number.isInteger(number) || number <= 0) {
@@ -241,21 +281,8 @@ export async function findExistingComment({ token, repository, prNumber, marker 
       `https://api.github.com/repos/${repository}/issues/${number}/comments?per_page=100&page=${page}`,
       { token }
     );
-    const markers = [].concat(marker);
-    const marked = comments.filter(
-      comment => typeof comment.body === 'string' && markers.some(value => comment.body.includes(value))
-    );
-    const conflicting = marked.find(
-      comment => comment.user?.login !== PREVIEW_COMMENT_AUTHOR || comment.user?.type !== 'Bot'
-    );
-    if (conflicting) {
-      throw new Error(
-        `Refusing to update comment ${conflicting.id}: preview marker is owned by a non-${PREVIEW_COMMENT_AUTHOR} account`
-      );
-    }
-    if (marked.length > 0) {
-      return marked.find(comment => comment.body.includes(markers[0])) ?? marked[0];
-    }
+    const found = pickPreviewComment(comments, [].concat(marker));
+    if (found) return found;
     if (comments.length < 100) return null;
     page += 1;
   }
@@ -287,10 +314,13 @@ export async function upsertPreviewComment({ token, repository, prNumber, body }
     marker: previewCommentMarkers(number)
   });
   if (existing) {
+    // The visual gate may have written its results first: keep them.
+    const checks = extractChecksSection(existing.body);
+    const merged = checks && !extractChecksSection(body) ? replaceBlock(body, checks, []) : body;
     await githubRequest(`https://api.github.com/repos/${repository}/issues/comments/${existing.id}`, {
       token,
       method: 'PATCH',
-      body: { body }
+      body: { body: merged }
     });
     return { action: 'updated', commentId: existing.id };
   }

@@ -13,6 +13,7 @@ export const VISUAL_DEFAULTS = Object.freeze({
   retries: 1,
   skipTag: 'skip-visual',
   approvalLabel: 'visual-approved',
+  prComment: true,
   fixedTime: null,
   timezone: 'UTC',
   locale: 'en-US',
@@ -96,6 +97,7 @@ export function validateVisualConfig(visual) {
   const v = visual;
   if (v.enabled !== undefined) checkBoolean(s, 'enabled', v.enabled);
   if (v.fullPage !== undefined) checkBoolean(s, 'fullPage', v.fullPage);
+  if (v.prComment !== undefined) checkBoolean(s, 'prComment', v.prComment);
   if (v.shards !== undefined) checkInteger(s, 'shards', v.shards, { min: 1 });
   if (v.workers !== undefined) checkInteger(s, 'workers', v.workers, { min: 1 });
   if (v.retries !== undefined) checkInteger(s, 'retries', v.retries, { min: 0 });
