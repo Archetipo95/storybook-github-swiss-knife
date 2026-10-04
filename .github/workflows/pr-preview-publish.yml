@@ -156,7 +156,7 @@ jobs:
       # is the caller's repository, and a private swiss-knife repository can't be
       # checked out with the caller's token.
       - name: Load swiss-knife toolkit
-        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@15d183f63cfa5aaecf152719e87f09f86bff6d0c
+        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@aa8c4aa46880108ec396d840167e5873934ffc1c
 
       - name: Extract trusted pull request context
         id: context
@@ -298,7 +298,7 @@ jobs:
       # Trusted swiss-knife source for the steps below (exports SWISS_KNIFE_ROOT). Never
       # import ./src from the checked-out repository: that is the caller's code.
       - name: Load swiss-knife toolkit
-        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@15d183f63cfa5aaecf152719e87f09f86bff6d0c
+        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@aa8c4aa46880108ec396d840167e5873934ffc1c
 
       - name: Resolve trusted base configuration
         id: config
@@ -372,7 +372,7 @@ jobs:
       - name: Validate provenance and publish
         id: publisher
         if: steps.branch_check.outputs.exists == 'true'
-        uses: Archetipo95/storybook-github-swiss-knife/actions/preview-publisher@15d183f63cfa5aaecf152719e87f09f86bff6d0c
+        uses: Archetipo95/storybook-github-swiss-knife/actions/preview-publisher@aa8c4aa46880108ec396d840167e5873934ffc1c
         with:
           bundle_dir: ${{ runner.temp }}/preview-bundle
           pages_repo: ${{ github.workspace }}/pages-repo

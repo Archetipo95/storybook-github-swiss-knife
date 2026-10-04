@@ -64,7 +64,7 @@ jobs:
       # Trusted swiss-knife source for the steps below (exports SWISS_KNIFE_ROOT). Never
       # import ./src from the checked-out repository: that is the caller's code.
       - name: Load swiss-knife toolkit
-        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@15d183f63cfa5aaecf152719e87f09f86bff6d0c
+        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@aa8c4aa46880108ec396d840167e5873934ffc1c
 
       - name: Resolve trusted base configuration
         id: config
@@ -106,7 +106,7 @@ jobs:
 
       - name: Remove preview directory for closed pull request
         if: steps.branch_check.outputs.exists == 'true'
-        uses: Archetipo95/storybook-github-swiss-knife/actions/preview-cleanup@15d183f63cfa5aaecf152719e87f09f86bff6d0c
+        uses: Archetipo95/storybook-github-swiss-knife/actions/preview-cleanup@aa8c4aa46880108ec396d840167e5873934ffc1c
         with:
           pages_repo: ${{ github.workspace }}/pages-repo
           pages_branch: ${{ steps.config.outputs.pages_branch || inputs.pages_branch || 'gh-pages' }}
