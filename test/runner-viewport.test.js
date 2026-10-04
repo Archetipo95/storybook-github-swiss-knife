@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { storyRuleSettings } from '../runner/lib/a11y.js';
+import { storyRuleSettings } from '../runner/lib/a11y-rules.js';
 import { resolveStaticPath } from '../runner/lib/serve.js';
 import { hostResolverRules } from '../runner/lib/settings.js';
 import { resolveViewport, selectedViewport } from '../runner/lib/viewport.js';

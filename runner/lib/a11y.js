@@ -3,6 +3,8 @@ import path from 'node:path';
 
 import { AxeBuilder } from '@axe-core/playwright';
 
+import { storyRuleSettings } from './a11y-rules.js';
+
 /**
  * Whether a story opted out of the accessibility scan. Storybook 8: `a11y.disable`; Storybook 9+:
  * `a11y.test: 'off'`; any version: `swissKnife.a11y.skip`.
@@ -10,28 +12,6 @@ import { AxeBuilder } from '@axe-core/playwright';
  */
 export function isA11yDisabled(parameters = {}) {
   return Boolean(parameters?.a11y?.disable || parameters?.a11y?.test === 'off' || parameters?.swissKnife?.a11y?.skip);
-}
-
-/**
- * Rules a story turns on or off: `a11y.config.rules` ([{ id, enabled }]) and the axe run-options
- * form `a11y.options.rules` ({ id: { enabled } }).
- * @param {any} parameters
- */
-export function storyRuleSettings(parameters = {}) {
-  const enabled = new Set();
-  const disabled = new Set();
-  const apply = (id, on) => {
-    if (typeof id !== 'string') return;
-    (on === false ? disabled : enabled).add(id);
-    (on === false ? enabled : disabled).delete(id);
-  };
-  for (const rule of parameters?.a11y?.config?.rules ?? []) {
-    if (rule && 'enabled' in rule) apply(rule.id, rule.enabled);
-  }
-  for (const [id, rule] of Object.entries(parameters?.a11y?.options?.rules ?? {})) {
-    if (rule && typeof rule === 'object' && 'enabled' in rule) apply(id, rule.enabled);
-  }
-  return { enabled, disabled };
 }
 
 /**
