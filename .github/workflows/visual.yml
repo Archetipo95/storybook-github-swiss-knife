@@ -68,7 +68,7 @@ jobs:
           persist-credentials: false
 
       - name: Load swiss-knife toolkit
-        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@14ae37fcd7802d7f3a70c7f7d26cef1505c1f87a
+        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@d84c792a13cd023b4a1f8862843a1890cd982607
 
       - name: Plan the run
         id: plan
@@ -264,7 +264,7 @@ jobs:
 
       - name: Capture missing baselines
         if: needs.plan.outputs.mode == 'compare' && steps.baseline.outputs.cache-hit != 'true' && steps.base.outcome == 'success'
-        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@14ae37fcd7802d7f3a70c7f7d26cef1505c1f87a
+        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@d84c792a13cd023b4a1f8862843a1890cd982607
         with:
           project_dir: ${{ inputs.working_directory }}
           storybook_dir: .swiss-knife/storybook-base
@@ -277,7 +277,7 @@ jobs:
         if: >-
           needs.plan.outputs.mode == 'compare' &&
           (steps.baseline.outputs.cache-hit == 'true' || steps.base.outcome == 'success')
-        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@14ae37fcd7802d7f3a70c7f7d26cef1505c1f87a
+        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@d84c792a13cd023b4a1f8862843a1890cd982607
         with:
           project_dir: ${{ inputs.working_directory }}
           storybook_dir: .swiss-knife/storybook-head
@@ -288,12 +288,20 @@ jobs:
 
       - name: Capture branch baselines
         if: needs.plan.outputs.mode == 'baseline'
-        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@14ae37fcd7802d7f3a70c7f7d26cef1505c1f87a
+        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@d84c792a13cd023b4a1f8862843a1890cd982607
         with:
           project_dir: ${{ inputs.working_directory }}
           storybook_dir: .swiss-knife/storybook-head
           shard: ${{ matrix.shard }}
           mode: baseline
+
+      # A shard with no stories still saves a (marker-only) cache, so pull requests do not
+      # mistake it for a missing baseline and rebuild the base Storybook.
+      - name: Mark the shard's baselines
+        if: needs.plan.outputs.mode == 'baseline'
+        env:
+          SNAPSHOTS: ${{ inputs.working_directory }}/.swiss-knife/snapshots
+        run: mkdir -p "$SNAPSHOTS" && touch "$SNAPSHOTS/.swiss-knife-baseline"
 
       - name: Save branch baselines
         if: needs.plan.outputs.mode == 'baseline'
@@ -341,7 +349,7 @@ jobs:
           merge-multiple: true
 
       - name: Assemble report and results bundle
-        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-report@14ae37fcd7802d7f3a70c7f7d26cef1505c1f87a
+        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-report@d84c792a13cd023b4a1f8862843a1890cd982607
         with:
           blob_dir: .swiss-knife/shards
           gallery_dir: .swiss-knife/shards/gallery
