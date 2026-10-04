@@ -1,0 +1,419 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Archetipo95/storybook-github-swiss-knife/main/schema/swiss-knife.schema.json",
+  "title": "storybook-github-swiss-knife configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "pages": {
+      "type": "object",
+      "description": "Deploy and PR preview settings (storybook-github-pages keys).",
+      "properties": {
+        "version": {
+          "const": 1,
+          "description": "Configuration format version."
+        },
+        "mode": {
+          "enum": ["artifact", "directory"],
+          "description": "Deploy with a Pages artifact or into a directory of the Pages branch."
+        },
+        "path": {
+          "type": "string",
+          "description": "Storybook build output directory, relative to the repository root."
+        },
+        "package_manager": {
+          "enum": ["npm", "yarn", "pnpm", "bun"],
+          "description": "Package manager used to install and build."
+        },
+        "pages_branch": {
+          "type": "string",
+          "description": "Branch that holds the published site in directory mode and for PR previews."
+        },
+        "target_directory": {
+          "type": "string",
+          "description": "Directory on the Pages branch to publish into."
+        },
+        "environment": {
+          "type": "string",
+          "description": "Deprecated alias of environment_name."
+        },
+        "environment_name": {
+          "type": "string",
+          "description": "Deployment environment name."
+        },
+        "environment_url": {
+          "type": "string",
+          "description": "Deployment environment URL."
+        },
+        "site_url": {
+          "type": "string",
+          "description": "Public site URL, e.g. https://owner.github.io/repo."
+        },
+        "base_path": {
+          "type": "string",
+          "description": "Base path Storybook is served from."
+        },
+        "artifact_name": {
+          "type": "string",
+          "description": "Pages artifact name."
+        },
+        "cname": {
+          "type": "string",
+          "description": "Custom domain written to CNAME."
+        },
+        "preserve_cname": {
+          "type": "boolean",
+          "description": "Keep an existing CNAME file."
+        },
+        "create_deployment": {
+          "type": "boolean",
+          "description": "Create a GitHub deployment record."
+        },
+        "auto_base_url": {
+          "type": "boolean",
+          "description": "Derive the Storybook base URL automatically."
+        },
+        "managed_directories": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "Directories on the Pages branch owned by other publishers; kept on deploy."
+        },
+        "preview_root": {
+          "type": "string",
+          "description": "Directory that holds PR previews (pr-<N>/)."
+        },
+        "preview_retention_days": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Days before the janitor removes an open PR's preview."
+        },
+        "warning_days_before_cleanup": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Days of warning before a preview expires."
+        },
+        "generate_badges": {
+          "type": "boolean",
+          "description": "Generate SVG badges."
+        },
+        "badges_directory": {
+          "type": "string",
+          "description": "Directory for badges."
+        },
+        "test_results_path": {
+          "type": "string",
+          "description": "JSON test results used for the tests badge."
+        },
+        "coverage_include_paths": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "Globs counted for component coverage."
+        },
+        "coverage_ignore_paths": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "Globs excluded from component coverage."
+        },
+        "generate_stats_graph": {
+          "type": "boolean",
+          "description": "Generate the stats history graph."
+        },
+        "stats_directory": {
+          "type": "string",
+          "description": "Directory for stats."
+        },
+        "enable_passcode_gate": {
+          "type": "boolean",
+          "description": "Protect published pages with the passcode gate."
+        },
+        "passcode_session_hours": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Hours an unlock lasts."
+        },
+        "smoke_test": {
+          "type": "boolean",
+          "description": "Load the built Storybook in Chromium before publishing."
+        },
+        "smoke_test_stories": {
+          "type": "string",
+          "description": "Story id globs for the smoke test, or 'all'."
+        },
+        "smoke_test_timeout_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Smoke test timeout per page."
+        },
+        "audit_bundle_size": {
+          "type": "boolean",
+          "description": "Report the Storybook bundle size."
+        },
+        "bundle_size_max_mb": {
+          "type": ["number", "string"],
+          "description": "Fail above this bundle size in MB."
+        },
+        "build": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "install_command": {
+              "type": ["string", "null"]
+            },
+            "build_command": {
+              "type": ["string", "null"]
+            }
+          }
+        }
+      }
+    },
+    "visual": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Run visual regression.",
+          "default": true
+        },
+        "shards": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Parallel screenshot jobs.",
+          "default": 4
+        },
+        "workers": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Playwright workers per shard.",
+          "default": 2
+        },
+        "retries": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Retries per story in CI.",
+          "default": 1
+        },
+        "skipTag": {
+          "type": "string",
+          "description": "Stories with this tag are not screenshotted.",
+          "default": "skip-visual"
+        },
+        "approvalLabel": {
+          "type": "string",
+          "description": "PR label that accepts visual changes.",
+          "default": "visual-approved"
+        },
+        "fixedTime": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "default": null,
+          "description": "Freeze Date to this instant; null keeps the real clock."
+        },
+        "timezone": {
+          "type": "string",
+          "description": "IANA time zone of the browser.",
+          "default": "UTC"
+        },
+        "locale": {
+          "type": "string",
+          "description": "Browser locale.",
+          "default": "en-US"
+        },
+        "allowedHosts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Remote hosts stories may load from (localhost is always allowed).",
+          "default": []
+        },
+        "maxDiffPixels": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Differing pixels tolerated per screenshot.",
+          "default": 100
+        },
+        "threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.2,
+          "description": "Per-pixel colour difference tolerance."
+        },
+        "fullPage": {
+          "type": "boolean",
+          "description": "Capture the full scrollable page.",
+          "default": true
+        },
+        "viewports": {
+          "default": "storybook",
+          "description": "\"storybook\" reads each story's viewport parameters; or a list of viewport names; or a map of name to size.",
+          "oneOf": [
+            {
+              "const": "storybook"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["width", "height"],
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "defaultViewport": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "height"],
+          "properties": {
+            "width": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "default": {
+            "width": 1280,
+            "height": 720
+          },
+          "description": "Size used when a story sets no viewport."
+        },
+        "loadingTimeoutMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Longest wait for loading indicators before the screenshot.",
+          "default": 3000
+        },
+        "ciMarkerAttribute": {
+          "type": "string",
+          "pattern": "^data-[a-z0-9-]+$",
+          "default": "data-storybook-ci",
+          "description": "Attribute set on <html> during CI runs."
+        },
+        "baselineBranches": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Pushes to these branches save screenshot baselines.",
+          "minItems": 1,
+          "default": ["main"]
+        },
+        "reportRetentionDays": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Days to keep reports and reusable results.",
+          "maximum": 90,
+          "default": 14
+        }
+      }
+    },
+    "a11y": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Run the axe scan.",
+          "default": true
+        },
+        "blockingImpacts": {
+          "type": "array",
+          "items": {
+            "enum": ["minor", "moderate", "serious", "critical"]
+          },
+          "default": ["critical", "serious"],
+          "description": "Impacts that block when not in the baseline."
+        },
+        "enforcedRules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Rules that block on any violation, whatever the baseline.",
+          "default": []
+        },
+        "disabledRules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "axe rules that are not run.",
+          "default": ["region"]
+        },
+        "baseline": {
+          "type": "string",
+          "description": "Known violations per story and rule (node counts).",
+          "default": ".storybook/a11y-baseline.json"
+        },
+        "scope": {
+          "type": "string",
+          "description": "CSS selector axe scans.",
+          "default": "body"
+        }
+      }
+    },
+    "passcode": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "expiryHours": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 24,
+          "description": "Hours an unlock lasts; the hash comes from a secret."
+        }
+      }
+    }
+  }
+}

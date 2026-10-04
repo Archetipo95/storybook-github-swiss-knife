@@ -1,5 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
+
+import { loadSwissKnifeConfig } from './swiss-knife-config.js';
 import { normalizeCname } from './cname.js';
 
 export const DEFAULT_CONFIG = {
@@ -387,12 +389,16 @@ export function loadConfigFile(filePath) {
 
 export function resolveConfiguration({
   inputs = {},
-  configFilePath = '.storybook-pages.yml',
+  configFilePath,
   allowedPackageManagers = ALLOWED_PACKAGE_MANAGERS
 } = {}) {
   let fileConfig = null;
-  if (fs.existsSync(configFilePath)) {
-    fileConfig = loadConfigFile(configFilePath);
+  if (configFilePath !== undefined) {
+    if (fs.existsSync(configFilePath)) fileConfig = loadConfigFile(configFilePath);
+  } else {
+    const { pages, warnings } = loadSwissKnifeConfig();
+    fileConfig = pages;
+    if (process.env.GITHUB_ACTIONS === 'true') warnings.forEach(warning => console.warn(`::warning::${warning}`));
   }
 
   const packageManager = inputs.package_manager || fileConfig?.package_manager || DEFAULT_CONFIG.package_manager;

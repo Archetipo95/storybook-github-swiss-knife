@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - Unreleased
 
+### Added
+
+- `.storybook/swiss-knife.json` configuration with a JSON schema (`schema/swiss-knife.schema.json`): `pages` (the storybook-github-pages keys), plus validated `visual`, `a11y` and `passcode` sections with defaults. `.storybook-pages.yml` still works for `pages` and logs a deprecation warning; when both files exist the JSON file wins.
+
 ### Changed
 
 - Imported `storybook-github-pages` 1.11.0 as the starting point and renamed every reference to `Archetipo95/storybook-github-swiss-knife`. Internal action pins point at this repository.
