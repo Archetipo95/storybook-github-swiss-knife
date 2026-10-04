@@ -7,11 +7,11 @@ test('verify all action uses are pinned to full commit SHAs', () => {
   const root = process.cwd();
   const filesToCheck = [
     path.join(root, 'action.yml'),
-    path.join(root, 'publisher/action.yml'),
-    path.join(root, 'preview-publisher/action.yml'),
-    path.join(root, 'preview-cleanup/action.yml'),
-    path.join(root, 'preview-janitor/action.yml'),
-    path.join(root, 'preview-build/action.yml'),
+    path.join(root, 'actions/publisher/action.yml'),
+    path.join(root, 'actions/preview-publisher/action.yml'),
+    path.join(root, 'actions/preview-cleanup/action.yml'),
+    path.join(root, 'actions/preview-janitor/action.yml'),
+    path.join(root, 'actions/preview-build/action.yml'),
     ...fs
       .readdirSync(path.join(root, '.github/workflows'))
       .filter(file => /\.ya?ml$/.test(file))
@@ -146,17 +146,17 @@ test('directory publisher has Pages permission and rebuild is outside push retri
 
 test('directory publisher reference pins the reviewed implementation commit', () => {
   const workflow = fs.readFileSync(path.join(process.cwd(), '.github/workflows/deploy-storybook.yml'), 'utf8');
-  assert.match(workflow, /Archetipo95\/storybook-github-swiss-knife\/publisher@[a-f0-9]{40}/);
+  assert.match(workflow, /Archetipo95\/storybook-github-swiss-knife\/actions\/publisher@[a-f0-9]{40}/);
   assert.doesNotMatch(workflow, /publisher@9be19be83cb05f2f648b4c78dac27befdb93d740/);
 });
 
 test('preview cleanup and janitor references pin the reviewed implementation commit', () => {
   const cleanup = fs.readFileSync(path.join(process.cwd(), '.github/workflows/pr-preview-cleanup.yml'), 'utf8');
-  assert.match(cleanup, /Archetipo95\/storybook-github-swiss-knife\/preview-cleanup@[a-f0-9]{40}/);
+  assert.match(cleanup, /Archetipo95\/storybook-github-swiss-knife\/actions\/preview-cleanup@[a-f0-9]{40}/);
 
   const janitor = fs.readFileSync(path.join(process.cwd(), '.github/workflows/pr-preview-janitor.yml'), 'utf8');
-  assert.match(janitor, /Archetipo95\/storybook-github-swiss-knife\/preview-janitor@[a-f0-9]{40}/);
+  assert.match(janitor, /Archetipo95\/storybook-github-swiss-knife\/actions\/preview-janitor@[a-f0-9]{40}/);
 
   const publish = fs.readFileSync(path.join(process.cwd(), '.github/workflows/pr-preview-publish.yml'), 'utf8');
-  assert.match(publish, /Archetipo95\/storybook-github-swiss-knife\/preview-publisher@[a-f0-9]{40}/);
+  assert.match(publish, /Archetipo95\/storybook-github-swiss-knife\/actions\/preview-publisher@[a-f0-9]{40}/);
 });

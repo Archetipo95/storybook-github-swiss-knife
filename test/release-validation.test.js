@@ -63,28 +63,28 @@ test('release validation - version metadata consistency across files', () => {
   assert.match(actionYml, /name:\s*['"]?Security-Hardened Storybook to GitHub Pages['"]?/);
   assert.match(actionYml, /using:\s*['"]?composite['"]?/);
 
-  // Check publisher/action.yml
-  const publisherYml = fs.readFileSync(path.join(root, 'publisher/action.yml'), 'utf8');
+  // Check actions/publisher/action.yml
+  const publisherYml = fs.readFileSync(path.join(root, 'actions/publisher/action.yml'), 'utf8');
   assert.match(publisherYml, /name:\s*['"]?Trusted Storybook Pages publisher['"]?/);
   assert.match(publisherYml, /using:\s*['"]?composite['"]?/);
 
-  // Check preview-cleanup/action.yml
-  const cleanupYml = fs.readFileSync(path.join(root, 'preview-cleanup/action.yml'), 'utf8');
+  // Check actions/preview-cleanup/action.yml
+  const cleanupYml = fs.readFileSync(path.join(root, 'actions/preview-cleanup/action.yml'), 'utf8');
   assert.match(cleanupYml, /name:\s*['"]?Trusted Storybook preview cleanup['"]?/);
   assert.match(cleanupYml, /using:\s*['"]?composite['"]?/);
 
-  // Check preview-janitor/action.yml
-  const janitorYml = fs.readFileSync(path.join(root, 'preview-janitor/action.yml'), 'utf8');
+  // Check actions/preview-janitor/action.yml
+  const janitorYml = fs.readFileSync(path.join(root, 'actions/preview-janitor/action.yml'), 'utf8');
   assert.match(janitorYml, /name:\s*['"]?Trusted Storybook preview janitor['"]?/);
   assert.match(janitorYml, /using:\s*['"]?composite['"]?/);
 
-  // Check preview-publisher/action.yml
-  const previewPublisherYml = fs.readFileSync(path.join(root, 'preview-publisher/action.yml'), 'utf8');
+  // Check actions/preview-publisher/action.yml
+  const previewPublisherYml = fs.readFileSync(path.join(root, 'actions/preview-publisher/action.yml'), 'utf8');
   assert.match(previewPublisherYml, /name:\s*['"]?Trusted Storybook preview publisher['"]?/);
   assert.match(previewPublisherYml, /using:\s*['"]?composite['"]?/);
 
-  // Check preview-build/action.yml
-  const previewBuildYml = fs.readFileSync(path.join(root, 'preview-build/action.yml'), 'utf8');
+  // Check actions/preview-build/action.yml
+  const previewBuildYml = fs.readFileSync(path.join(root, 'actions/preview-build/action.yml'), 'utf8');
   assert.match(previewBuildYml, /name:\s*['"]?Storybook PR preview bundle['"]?/);
   assert.match(previewBuildYml, /using:\s*['"]?composite['"]?/);
 });
@@ -193,7 +193,7 @@ test('release validation - directory mode integration documents dedicated publis
   // Directory mode requires publisher action
   assert.match(
     docs,
-    new RegExp(`uses:\\s*Archetipo95/storybook-github-swiss-knife/publisher@${releaseTagPattern().source}`),
+    new RegExp(`uses:\\s*Archetipo95/storybook-github-swiss-knife/actions/publisher@${releaseTagPattern().source}`),
     `Docs Option 3 directory mode pipeline must use publisher@v${releaseVersion()}`
   );
   assert.match(

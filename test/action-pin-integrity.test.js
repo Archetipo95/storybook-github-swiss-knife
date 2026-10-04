@@ -64,8 +64,8 @@ function gitCommitExists(sha) {
 
 function findInternalActionRefs(content) {
   // Matches `Archetipo95/storybook-github-swiss-knife[/<subaction>]@<40-hex-sha>`
-  // e.g. `Archetipo95/storybook-github-swiss-knife/preview-publisher@6fdc8e3...`
-  const regex = /Archetipo95\/storybook-github-swiss-knife(\/[a-zA-Z0-9_-]+)?@([a-f0-9]{40})/g;
+  // e.g. `Archetipo95/storybook-github-swiss-knife/actions/preview-publisher@6fdc8e3...`
+  const regex = /Archetipo95\/storybook-github-swiss-knife(\/actions\/[a-zA-Z0-9_-]+)?@([a-f0-9]{40})/g;
   const refs = [];
   for (const match of content.matchAll(regex)) {
     refs.push({ subaction: match[1] ? match[1].slice(1) : null, sha: match[2] });
@@ -118,20 +118,20 @@ test('internal action pins reference a commit that actually contains that action
 
 test('preview-publisher pin resolves alongside the src it depends on', () => {
   const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/pr-preview-publish.yml'), 'utf8');
-  const match = workflow.match(/Archetipo95\/storybook-github-swiss-knife\/preview-publisher@([a-f0-9]{40})/);
+  const match = workflow.match(/Archetipo95\/storybook-github-swiss-knife\/actions\/preview-publisher@([a-f0-9]{40})/);
   assert.ok(match, 'expected a SHA-pinned preview-publisher reference in pr-preview-publish.yml');
 
   const sha = match[1];
   assert.ok(gitCommitExists(sha), `pinned commit ${sha} does not exist in this repository's history`);
   assert.ok(
-    gitShowExists(sha, 'preview-publisher/action.yml'),
-    `pinned commit ${sha} is missing preview-publisher/action.yml`
+    gitShowExists(sha, 'actions/preview-publisher/action.yml'),
+    `pinned commit ${sha} is missing actions/preview-publisher/action.yml`
   );
-  // preview-publisher/action.yml invokes `$GITHUB_ACTION_PATH/../src/preview-publish.js`,
+  // actions/preview-publisher/action.yml invokes `$GITHUB_ACTION_PATH/../src/preview-publish.js`,
   // so the pinned commit must also contain the script it depends on.
   assert.ok(
     gitShowExists(sha, 'src/preview-publish.js'),
-    `pinned commit ${sha} is missing src/preview-publish.js required by preview-publisher/action.yml`
+    `pinned commit ${sha} is missing src/preview-publish.js required by actions/preview-publisher/action.yml`
   );
 
   // Guard against ever regressing to the known-bad pre-preview-publisher pin from #35.
@@ -151,7 +151,7 @@ test('preview-publisher pin resolves alongside the src it depends on', () => {
 // *content* - not just its existence - includes the #124 fix.
 test('preview-publisher pin content includes the current-PR snapshot preservation fix (#124)', () => {
   const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/pr-preview-publish.yml'), 'utf8');
-  const match = workflow.match(/Archetipo95\/storybook-github-swiss-knife\/preview-publisher@([a-f0-9]{40})/);
+  const match = workflow.match(/Archetipo95\/storybook-github-swiss-knife\/actions\/preview-publisher@([a-f0-9]{40})/);
   assert.ok(match, 'expected a SHA-pinned preview-publisher reference in pr-preview-publish.yml');
   const sha = match[1];
 
@@ -177,7 +177,7 @@ test('preview-publisher pin content includes the current-PR snapshot preservatio
 
 test('preview-publisher pin content includes compact stats graph rendering', () => {
   const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/pr-preview-publish.yml'), 'utf8');
-  const match = workflow.match(/Archetipo95\/storybook-github-swiss-knife\/preview-publisher@([a-f0-9]{40})/);
+  const match = workflow.match(/Archetipo95\/storybook-github-swiss-knife\/actions\/preview-publisher@([a-f0-9]{40})/);
   assert.ok(match, 'expected a SHA-pinned preview-publisher reference in pr-preview-publish.yml');
   const sha = match[1];
 
@@ -208,7 +208,7 @@ test('preview-publisher pin content includes compact stats graph rendering', () 
 
 test('preview-cleanup pin content includes best-effort optional post-cleanup updates', () => {
   const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/pr-preview-cleanup.yml'), 'utf8');
-  const match = workflow.match(/Archetipo95\/storybook-github-swiss-knife\/preview-cleanup@([a-f0-9]{40})/);
+  const match = workflow.match(/Archetipo95\/storybook-github-swiss-knife\/actions\/preview-cleanup@([a-f0-9]{40})/);
   assert.ok(match, 'expected a SHA-pinned preview-cleanup reference in pr-preview-cleanup.yml');
   const sha = match[1];
 
@@ -234,7 +234,9 @@ function internalActionSteps(content) {
   const lines = content.split('\n');
   const steps = [];
   lines.forEach((line, index) => {
-    const match = line.match(/uses: Archetipo95\/storybook-github-swiss-knife\/([a-zA-Z0-9_-]+)@([a-f0-9]{40})/);
+    const match = line.match(
+      /uses: Archetipo95\/storybook-github-swiss-knife\/(actions\/[a-zA-Z0-9_-]+)@([a-f0-9]{40})/
+    );
     if (!match) return;
     const stepIndent = line.search(/\S/);
     const passed = [];

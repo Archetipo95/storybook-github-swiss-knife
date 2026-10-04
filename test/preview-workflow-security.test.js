@@ -111,7 +111,7 @@ test('pr-preview-publish workflow gates on success/event/repository and requires
 
 test('pr-preview-publish pins a preview-publisher action schema that supports the passcode gate', () => {
   const content = read('.github/workflows/pr-preview-publish.yml');
-  const match = content.match(/Archetipo95\/storybook-github-swiss-knife\/preview-publisher@([a-f0-9]{40})/);
+  const match = content.match(/Archetipo95\/storybook-github-swiss-knife\/actions\/preview-publisher@([a-f0-9]{40})/);
   assert.ok(match, 'publish must pin preview-publisher to a full commit SHA');
 
   const action = execFileSync('git', ['show', `${match[1]}:preview-publisher/action.yml`], {
@@ -215,14 +215,14 @@ test('preview target resolution and metadata modules are wired into the workflow
   const publish = read('.github/workflows/pr-preview-publish.yml');
   const cleanupWorkflow = read('.github/workflows/pr-preview-cleanup.yml');
   const janitorWorkflow = read('.github/workflows/pr-preview-janitor.yml');
-  const buildAction = read('preview-build/action.yml');
-  const publisherAction = read('preview-publisher/action.yml');
-  const cleanupAction = read('preview-cleanup/action.yml');
-  const janitorAction = read('preview-janitor/action.yml');
+  const buildAction = read('actions/preview-build/action.yml');
+  const publisherAction = read('actions/preview-publisher/action.yml');
+  const cleanupAction = read('actions/preview-cleanup/action.yml');
+  const janitorAction = read('actions/preview-janitor/action.yml');
 
   assert.match(
     build,
-    /uses:\s*\.\/preview-build/,
+    /uses:\s*\.\/actions\/preview-build/,
     'the reference build workflow must dogfood the public preview-build action'
   );
   assert.match(buildAction, /preview-metadata\.js/);

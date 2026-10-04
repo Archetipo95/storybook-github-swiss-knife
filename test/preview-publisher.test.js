@@ -88,8 +88,8 @@ function makeBundle({
 }
 
 test('preview-publisher action.yml schema, inputs, and outputs are well-formed', () => {
-  const actionPath = path.join(process.cwd(), 'preview-publisher/action.yml');
-  assert.ok(fs.existsSync(actionPath), 'preview-publisher/action.yml must exist');
+  const actionPath = path.join(process.cwd(), 'actions/preview-publisher/action.yml');
+  assert.ok(fs.existsSync(actionPath), 'actions/preview-publisher/action.yml must exist');
   const content = fs.readFileSync(actionPath, 'utf8');
 
   assert.match(content, /name:\s*['"]?Trusted Storybook preview publisher['"]?/);
@@ -122,7 +122,7 @@ test('preview-publisher action.yml schema, inputs, and outputs are well-formed',
   assert.match(content, /action:/);
 
   // Implementation wiring
-  assert.match(content, /node "\$GITHUB_ACTION_PATH\/\.\.\/src\/preview-publish\.js"/);
+  assert.match(content, /node "\$GITHUB_ACTION_PATH\/\.\.\/\.\.\/src\/preview-publish\.js"/);
   assert.match(
     fs.readFileSync(path.join(process.cwd(), 'src/preview-publish.js'), 'utf8'),
     /triggerPagesRebuild: process\.env\.TRIGGER_PAGES_REBUILD === 'true'/

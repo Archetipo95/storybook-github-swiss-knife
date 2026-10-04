@@ -8,11 +8,11 @@ const read = relativePath => fs.readFileSync(path.join(root, relativePath), 'utf
 
 const ACTION_FILES = [
   'action.yml',
-  'publisher/action.yml',
-  'preview-build/action.yml',
-  'preview-publisher/action.yml',
-  'preview-cleanup/action.yml',
-  'preview-janitor/action.yml'
+  'actions/publisher/action.yml',
+  'actions/preview-build/action.yml',
+  'actions/preview-publisher/action.yml',
+  'actions/preview-cleanup/action.yml',
+  'actions/preview-janitor/action.yml'
 ];
 
 function workflowFiles() {

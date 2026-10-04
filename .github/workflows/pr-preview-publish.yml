@@ -150,23 +150,13 @@ jobs:
       head_repository: ${{ steps.context.outputs.head_repository }}
       current_head_sha: ${{ steps.current.outputs.head_sha }}
     steps:
-      # Only used to import the trusted, unit-tested pull-request-identity
-      # resolver below (src/resolve-run-context.js). This workflow supports
-      # `workflow_call` from *any* consumer repository, and a plain
-      # `actions/checkout` (no `repository:` override) inside a reusable
-      # workflow checks out the *caller's* repository, not the repo this
-      # file lives in - the consumer never has `src/resolve-run-context.js`.
-      # Explicitly pin the checkout to this action repository at a fixed
-      # commit so the resolver source is always fetched regardless of who
-      # invokes this workflow. Public repo, read-only, never persists
-      # credentials - not PR content.
-      - name: Checkout resolver source (storybook-github-swiss-knife, pinned)
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: Archetipo95/storybook-github-swiss-knife
-          ref: dd8d1052f7759a95bafd7f44a06d1df196e5c849
-          path: .storybook-github-swiss-knife-resolver
-          persist-credentials: false
+      # The trusted, unit-tested pull-request-identity resolver
+      # (src/resolve-run-context.js) comes from this repository's toolkit action, pinned
+      # to a commit, never from a checkout: inside a reusable workflow a plain checkout
+      # is the caller's repository, and a private swiss-knife repository can't be
+      # checked out with the caller's token.
+      - name: Load swiss-knife toolkit
+        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@91ad0c913ab2f6caee99c7e6c99abc723c22bf88
 
       - name: Extract trusted pull request context
         id: context
@@ -179,7 +169,7 @@ jobs:
         run: |
           node -e '
             async function main() {
-              const { resolveTrustedPullRequestContext } = await import("./.storybook-github-swiss-knife-resolver/src/resolve-run-context.js");
+              const { resolveTrustedPullRequestContext } = await import(process.env.SWISS_KNIFE_ROOT + "/src/resolve-run-context.js");
 
               let runData = process.env.WORKFLOW_RUN_EVENT ? JSON.parse(process.env.WORKFLOW_RUN_EVENT) : null;
               const inputRunId = process.env.INPUT_RUN_ID ? Number(process.env.INPUT_RUN_ID) : null;
@@ -305,6 +295,11 @@ jobs:
           persist-credentials: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      # Trusted swiss-knife source for the steps below (exports SWISS_KNIFE_ROOT). Never
+      # import ./src from the checked-out repository: that is the caller's code.
+      - name: Load swiss-knife toolkit
+        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@91ad0c913ab2f6caee99c7e6c99abc723c22bf88
+
       - name: Resolve trusted base configuration
         id: config
         env:
@@ -319,125 +314,25 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           node -e '
-            import("node:fs").then(async ({existsSync}) => {
-              if (existsSync("./src/config.js")) {
-                const {resolveConfiguration} = await import("./src/config.js");
-                const c = resolveConfiguration({inputs: {
-                  preview_root: process.env.INPUT_PREVIEW_ROOT,
-                  pages_branch: process.env.INPUT_PAGES_BRANCH,
-                  site_url: process.env.INPUT_SITE_URL,
-                  base_path: process.env.INPUT_BASE_PATH,
-                  generate_stats_graph: process.env.INPUT_GENERATE_STATS_GRAPH,
-                  stats_directory: process.env.INPUT_STATS_DIRECTORY,
-                  badges_directory: process.env.INPUT_BADGES_DIRECTORY,
-                  managed_directories: process.env.INPUT_MANAGED_DIRECTORIES
-                }});
-                console.log(`preview_root=${c.preview_root}`);
-                console.log(`pages_branch=${c.pages_branch}`);
-                console.log(`site_url=${c.site_url}`);
-                console.log(`base_path=${c.base_path}`);
-                console.log(`generate_stats_graph=${c.generate_stats_graph}`);
-                console.log(`stats_directory=${c.stats_directory}`);
-                console.log(`badges_directory=${c.badges_directory}`);
-                console.log(`managed_directories=${Array.isArray(c.managed_directories) ? c.managed_directories.join(",") : c.managed_directories || ""}`);
-              } else {
-                let file_preview_root = undefined;
-                let file_pages_branch = undefined;
-                let file_site_url = undefined;
-                let file_base_path = undefined;
-                let file_generate_stats_graph = undefined;
-                let file_stats_directory = undefined;
-                let file_badges_directory = undefined;
-                let file_managed_directories = undefined;
-                if (existsSync(".storybook-pages.yml")) {
-                  const {readFileSync} = await import("node:fs");
-                  const content = readFileSync(".storybook-pages.yml", "utf8");
-                  for (const line of content.split("\n")) {
-                    const trimmed = line.trim();
-                    if (file_preview_root === undefined && trimmed.startsWith("preview_root:")) {
-                      file_preview_root = trimmed.slice("preview_root:".length).trim().replace(/^["'\''"]|["'\''"]$/g, "");
-                    }
-                    if (file_pages_branch === undefined && trimmed.startsWith("pages_branch:")) {
-                      file_pages_branch = trimmed.slice("pages_branch:".length).trim().replace(/^["'\''"]|["'\''"]$/g, "");
-                    }
-                    if (file_site_url === undefined && trimmed.startsWith("site_url:")) {
-                      file_site_url = trimmed.slice("site_url:".length).trim().replace(/^["'\''"]|["'\''"]$/g, "");
-                    }
-                    if (file_base_path === undefined && trimmed.startsWith("base_path:")) {
-                      file_base_path = trimmed.slice("base_path:".length).trim().replace(/^["'\''"]|["'\''"]$/g, "");
-                    }
-                    if (file_generate_stats_graph === undefined && trimmed.startsWith("generate_stats_graph:")) {
-                      file_generate_stats_graph = trimmed.slice("generate_stats_graph:".length).trim().replace(/^["'\''"]|["'\''"]$/g, "");
-                    }
-                    if (file_stats_directory === undefined && trimmed.startsWith("stats_directory:")) {
-                      file_stats_directory = trimmed.slice("stats_directory:".length).trim().replace(/^["'\''"]|["'\''"]$/g, "");
-                    }
-                    if (file_badges_directory === undefined && trimmed.startsWith("badges_directory:")) {
-                      file_badges_directory = trimmed.slice("badges_directory:".length).trim().replace(/^["'\''"]|["'\''"]$/g, "");
-                    }
-                    if (file_managed_directories === undefined && trimmed.startsWith("managed_directories:")) {
-                      file_managed_directories = trimmed.slice("managed_directories:".length).trim().replace(/^["'\''"]|["'\''"]$/g, "");
-                    }
-                  }
-                }
-                const rawPreviewRoot = process.env.INPUT_PREVIEW_ROOT;
-                let preview_root;
-                if (rawPreviewRoot !== undefined && rawPreviewRoot !== "") {
-                  preview_root = (rawPreviewRoot === "." || rawPreviewRoot === "./") ? "" : rawPreviewRoot;
-                } else if (file_preview_root !== undefined) {
-                  preview_root = (file_preview_root === "." || file_preview_root === "./") ? "" : file_preview_root;
-                } else {
-                  preview_root = "pr-preview";
-                }
-                const rawPagesBranch = process.env.INPUT_PAGES_BRANCH;
-                const pages_branch = (rawPagesBranch !== undefined && rawPagesBranch !== "")
-                  ? rawPagesBranch
-                  : (file_pages_branch !== undefined ? file_pages_branch : "gh-pages");
-                const rawSiteUrl = process.env.INPUT_SITE_URL;
-                let site_url;
-                if (rawSiteUrl !== undefined && rawSiteUrl !== "") {
-                  site_url = rawSiteUrl;
-                } else if (file_site_url !== undefined) {
-                  site_url = file_site_url;
-                } else {
-                  const repo = process.env.REPOSITORY || "";
-                  const [owner, repoName] = repo.split("/");
-                  if (owner && repoName) {
-                    const isUserPage = repoName.toLowerCase() === `${owner.toLowerCase()}.github.io`;
-                    site_url = isUserPage ? `https://${owner}.github.io` : `https://${owner}.github.io/${repoName}`;
-                  } else {
-                    site_url = "";
-                  }
-                }
-                const rawBasePath = process.env.INPUT_BASE_PATH;
-                const base_path = (rawBasePath !== undefined && rawBasePath !== "")
-                  ? rawBasePath
-                  : (file_base_path !== undefined ? file_base_path : "");
-                const rawGenerateStatsGraph = process.env.INPUT_GENERATE_STATS_GRAPH;
-                const generate_stats_graph = (rawGenerateStatsGraph !== undefined && rawGenerateStatsGraph !== "")
-                  ? rawGenerateStatsGraph
-                  : (file_generate_stats_graph !== undefined ? file_generate_stats_graph : "true");
-                const rawStatsDirectory = process.env.INPUT_STATS_DIRECTORY;
-                const stats_directory = (rawStatsDirectory !== undefined && rawStatsDirectory !== "")
-                  ? rawStatsDirectory
-                  : (file_stats_directory !== undefined ? file_stats_directory : "stats");
-                const rawBadgesDirectory = process.env.INPUT_BADGES_DIRECTORY;
-                const badges_directory = (rawBadgesDirectory !== undefined && rawBadgesDirectory !== "")
-                  ? rawBadgesDirectory
-                  : (file_badges_directory !== undefined ? file_badges_directory : "badges");
-                const rawManagedDirs = process.env.INPUT_MANAGED_DIRECTORIES;
-                const managed_directories = (rawManagedDirs !== undefined && rawManagedDirs !== "")
-                  ? rawManagedDirs
-                  : (file_managed_directories !== undefined ? file_managed_directories : "");
-                console.log(`preview_root=${preview_root}`);
-                console.log(`pages_branch=${pages_branch}`);
-                console.log(`site_url=${site_url}`);
-                console.log(`base_path=${base_path}`);
-                console.log(`generate_stats_graph=${generate_stats_graph}`);
-                console.log(`stats_directory=${stats_directory}`);
-                console.log(`badges_directory=${badges_directory}`);
-                console.log(`managed_directories=${managed_directories}`);
-              }
+            import(process.env.SWISS_KNIFE_ROOT + "/src/config.js").then(({resolveConfiguration}) => {
+              const c = resolveConfiguration({inputs: {
+                preview_root: process.env.INPUT_PREVIEW_ROOT,
+                pages_branch: process.env.INPUT_PAGES_BRANCH,
+                site_url: process.env.INPUT_SITE_URL,
+                base_path: process.env.INPUT_BASE_PATH,
+                generate_stats_graph: process.env.INPUT_GENERATE_STATS_GRAPH,
+                stats_directory: process.env.INPUT_STATS_DIRECTORY,
+                badges_directory: process.env.INPUT_BADGES_DIRECTORY,
+                managed_directories: process.env.INPUT_MANAGED_DIRECTORIES
+              }});
+              console.log(`preview_root=${c.preview_root}`);
+              console.log(`pages_branch=${c.pages_branch}`);
+              console.log(`site_url=${c.site_url}`);
+              console.log(`base_path=${c.base_path}`);
+              console.log(`generate_stats_graph=${c.generate_stats_graph}`);
+              console.log(`stats_directory=${c.stats_directory}`);
+              console.log(`badges_directory=${c.badges_directory}`);
+              console.log(`managed_directories=${Array.isArray(c.managed_directories) ? c.managed_directories.join(",") : c.managed_directories || ""}`);
             });
           ' >> "$GITHUB_OUTPUT"
 
@@ -477,7 +372,7 @@ jobs:
       - name: Validate provenance and publish
         id: publisher
         if: steps.branch_check.outputs.exists == 'true'
-        uses: Archetipo95/storybook-github-swiss-knife/preview-publisher@dd8d1052f7759a95bafd7f44a06d1df196e5c849
+        uses: Archetipo95/storybook-github-swiss-knife/actions/preview-publisher@91ad0c913ab2f6caee99c7e6c99abc723c22bf88
         with:
           bundle_dir: ${{ runner.temp }}/preview-bundle
           pages_repo: ${{ github.workspace }}/pages-repo

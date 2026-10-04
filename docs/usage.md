@@ -123,7 +123,7 @@ jobs:
           fetch-depth: 0
 
       - name: Publish directory
-        uses: Archetipo95/storybook-github-swiss-knife/publisher@v0.1.0
+        uses: Archetipo95/storybook-github-swiss-knife/actions/publisher@v0.1.0
         with:
           pages_repo: ${{ github.workspace }}/pages-repo
           source_directory: ${{ github.workspace }}/storybook-static

@@ -206,12 +206,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # The steps below run swiss-knife's own scripts (SWISS_KNIFE_ROOT), never ./src of the
+      # checked-out caller repository.
+      - name: Load swiss-knife toolkit
+        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@91ad0c913ab2f6caee99c7e6c99abc723c22bf88
+
       - name: Resolve and validate configuration
         id: config
         env:
           CONFIG_INPUTS: ${{ toJSON(inputs) }}
         run: |
-          node -e 'import("./src/config.js").then(({resolveConfiguration}) => {
+          node -e 'import(process.env.SWISS_KNIFE_ROOT + "/src/config.js").then(({resolveConfiguration}) => {
             const c = resolveConfiguration({inputs: JSON.parse(process.env.CONFIG_INPUTS)});
             for (const [key, value] of Object.entries(c)) {
               if (typeof value !== "object") console.log(`${key}=${value ?? ""}`);
@@ -278,7 +283,7 @@ jobs:
         run: |
           CMD="$BUILD_COMMAND"
           if [ "$AUTO_BASE_URL" = "true" ]; then
-            eval "$(node -e 'import("./src/base-url.js").then(({computeBaseUrl, augmentBuildCommand, buildEnvironment}) => { const baseUrl = computeBaseUrl({repository: process.env.REPOSITORY, siteUrl: process.env.SITE_URL, basePath: process.env.BASE_PATH, eventName: process.env.EVENT_NAME, prNumber: process.env.PR_NUMBER}); const command = augmentBuildCommand(process.env.BUILD_COMMAND, baseUrl); console.log(`CMD=${JSON.stringify(command)}`); for (const [key, value] of Object.entries(buildEnvironment(baseUrl))) console.log(`export ${key}=${JSON.stringify(value)}`); })')"
+            eval "$(node -e 'import(process.env.SWISS_KNIFE_ROOT + "/src/base-url.js").then(({computeBaseUrl, augmentBuildCommand, buildEnvironment}) => { const baseUrl = computeBaseUrl({repository: process.env.REPOSITORY, siteUrl: process.env.SITE_URL, basePath: process.env.BASE_PATH, eventName: process.env.EVENT_NAME, prNumber: process.env.PR_NUMBER}); const command = augmentBuildCommand(process.env.BUILD_COMMAND, baseUrl); console.log(`CMD=${JSON.stringify(command)}`); for (const [key, value] of Object.entries(buildEnvironment(baseUrl))) console.log(`export ${key}=${JSON.stringify(value)}`); })')"
           fi
           eval "$CMD"
 
@@ -290,13 +295,13 @@ jobs:
           TARGET_PATH: ${{ steps.config.outputs.path }}
           SB_BUNDLE_SIZE_MAX_MB: ${{ steps.config.outputs.bundle_size_max_mb }}
           WORKSPACE_ROOT: ${{ github.workspace }}
-        run: node src/audit-static.js "$TARGET_PATH" "$WORKSPACE_ROOT"
+        run: node "$SWISS_KNIFE_ROOT/src/audit-static.js" "$TARGET_PATH" "$WORKSPACE_ROOT"
 
       - name: Generate Storybook badges
         if: ${{ steps.config.outputs.generate_badges == 'true' }}
         run: |
           node -e '
-            import("./src/generate-badges.js").then(m => {
+            import(process.env.SWISS_KNIFE_ROOT + "/src/generate-badges.js").then(m => {
               m.generateBadges({
                 staticDir: process.env.TARGET_PATH,
                 workspaceRoot: process.env.WORKSPACE_ROOT,
@@ -323,12 +328,12 @@ jobs:
           WORKSPACE_ROOT: ${{ github.workspace }}
           SMOKE_TEST_STORIES: ${{ steps.config.outputs.smoke_test_stories }}
           SMOKE_TEST_TIMEOUT_MS: ${{ steps.config.outputs.smoke_test_timeout_ms }}
-        run: node src/smoke-test.js "$TARGET_PATH" "$WORKSPACE_ROOT" "$SMOKE_TEST_STORIES" "$SMOKE_TEST_TIMEOUT_MS"
+        run: node "$SWISS_KNIFE_ROOT/src/smoke-test.js" "$TARGET_PATH" "$WORKSPACE_ROOT" "$SMOKE_TEST_STORIES" "$SMOKE_TEST_TIMEOUT_MS"
 
       - name: Validate static artifact
         run: |
           node -e '
-            import("./src/validate-artifact.js").then(m => {
+            import(process.env.SWISS_KNIFE_ROOT + "/src/validate-artifact.js").then(m => {
               m.validateArtifactDirectory(process.env.TARGET_PATH, process.env.WORKSPACE_ROOT);
               console.log("Artifact validation successful");
             });
@@ -343,7 +348,7 @@ jobs:
           TARGET_PATH: ${{ steps.config.outputs.path }}
           PASSCODE_HASH: ${{ secrets.passcode_hash }}
           PASSCODE_SESSION_HOURS: ${{ steps.config.outputs.passcode_session_hours }}
-        run: node src/inject-auth-gate.js "$TARGET_PATH"
+        run: node "$SWISS_KNIFE_ROOT/src/inject-auth-gate.js" "$TARGET_PATH"
 
       - name: Ensure .nojekyll exists
         env:
@@ -393,9 +398,9 @@ jobs:
       deployment_id: ${{ steps.create-deployment.outputs.deployment_id || steps.deploy-pages.outputs.deployment_id }}
 
     steps:
-      - name: Checkout repository
+      - name: Load swiss-knife toolkit
         if: ${{ needs.build-and-upload.outputs.create_deployment == 'true' }}
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@91ad0c913ab2f6caee99c7e6c99abc723c22bf88
 
       - name: Create GitHub deployment (pending)
         id: create-deployment
@@ -409,7 +414,7 @@ jobs:
           ENVIRONMENT_URL: ${{ needs.build-and-upload.outputs.environment_url }}
           LOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           DEPLOYMENT_DESCRIPTION: ${{ needs.build-and-upload.outputs.environment_name || needs.build-and-upload.outputs.environment || 'github-pages' }} deployment
-        run: node src/github-deployments.js
+        run: node "$SWISS_KNIFE_ROOT/src/github-deployments.js"
 
       - name: Deploy to GitHub Pages
         id: deploy-pages
@@ -428,7 +433,7 @@ jobs:
           ENVIRONMENT_URL: ${{ needs.build-and-upload.outputs.environment_url || steps.deploy-pages.outputs.page_url }}
           LOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           DEPLOYMENT_DESCRIPTION: Deployment succeeded for ${{ needs.build-and-upload.outputs.environment_name || needs.build-and-upload.outputs.environment || 'github-pages' }}
-        run: node src/github-deployments.js
+        run: node "$SWISS_KNIFE_ROOT/src/github-deployments.js"
 
       - name: Update GitHub deployment status (failure)
         if: ${{ failure() && steps.create-deployment.outputs.deployment_id != '' }}
@@ -441,7 +446,7 @@ jobs:
           ENVIRONMENT_URL: ${{ needs.build-and-upload.outputs.environment_url || steps.deploy-pages.outputs.page_url }}
           LOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           DEPLOYMENT_DESCRIPTION: Deployment failed for ${{ needs.build-and-upload.outputs.environment_name || needs.build-and-upload.outputs.environment || 'github-pages' }}
-        run: node src/github-deployments.js
+        run: node "$SWISS_KNIFE_ROOT/src/github-deployments.js"
 
   directory-publish:
     name: Publish Storybook directory
@@ -478,7 +483,7 @@ jobs:
           BASE_PATH: ${{ needs.build-and-upload.outputs.base_path }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        uses: Archetipo95/storybook-github-swiss-knife/publisher@dd8d1052f7759a95bafd7f44a06d1df196e5c849
+        uses: Archetipo95/storybook-github-swiss-knife/actions/publisher@91ad0c913ab2f6caee99c7e6c99abc723c22bf88
         with:
           pages_repo: ${{ github.workspace }}/pages-repo
           source_directory: ${{ github.workspace }}/storybook-static

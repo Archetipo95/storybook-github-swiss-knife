@@ -28,11 +28,14 @@ function makeGitHubFiles(prefix) {
 }
 
 function extractConfigStepScript() {
-  const content = fs.readFileSync(path.join(process.cwd(), 'preview-build/action.yml'), 'utf8');
+  const content = fs.readFileSync(path.join(process.cwd(), 'actions/preview-build/action.yml'), 'utf8');
   const stepMatch = content.match(
     /- name: Resolve bundle configuration[\s\S]*?run: \|\n([\s\S]*?)\n\n    - name: Run Storybook smoke test/
   );
-  assert.ok(stepMatch, 'could not locate the "Resolve bundle configuration" step script in preview-build/action.yml');
+  assert.ok(
+    stepMatch,
+    'could not locate the "Resolve bundle configuration" step script in actions/preview-build/action.yml'
+  );
   return stepMatch[1];
 }
 
@@ -50,8 +53,8 @@ function runConfigStep(env) {
 const SHA_VALID = 'e'.repeat(40);
 
 test('preview-build action.yml is a read-only, untrusted-job-scoped composite action', () => {
-  const actionPath = path.join(process.cwd(), 'preview-build/action.yml');
-  assert.ok(fs.existsSync(actionPath), 'preview-build/action.yml must exist');
+  const actionPath = path.join(process.cwd(), 'actions/preview-build/action.yml');
+  assert.ok(fs.existsSync(actionPath), 'actions/preview-build/action.yml must exist');
   const content = fs.readFileSync(actionPath, 'utf8');
 
   assert.match(content, /name:\s*['"]?Storybook PR preview bundle['"]?/);
@@ -75,8 +78,8 @@ test('preview-build action.yml is a read-only, untrusted-job-scoped composite ac
   assert.match(content, /run_id:[\s\S]*?default:\s*\$\{\{ github\.run_id \}\}/);
 
   // Reuses existing preview-metadata/validate-artifact internals rather than duplicating logic
-  assert.match(content, /node "\$GITHUB_ACTION_PATH\/\.\.\/src\/validate-artifact\.js"/);
-  assert.match(content, /node "\$GITHUB_ACTION_PATH\/\.\.\/src\/preview-metadata\.js"/);
+  assert.match(content, /node "\$GITHUB_ACTION_PATH\/\.\.\/\.\.\/src\/validate-artifact\.js"/);
+  assert.match(content, /node "\$GITHUB_ACTION_PATH\/\.\.\/\.\.\/src\/preview-metadata\.js"/);
 
   // Never references secrets, tokens, or write/publish targets - this must stay usable only
   // as the untrusted build-side of the contract, never as a trusted publisher component.
@@ -123,7 +126,7 @@ test('preview-build action.yml is a read-only, untrusted-job-scoped composite ac
 
 test('preview-build reference workflow dogfoods the public action instead of inline scripts', () => {
   const content = fs.readFileSync(path.join(process.cwd(), '.github/workflows/pr-preview-build.yml'), 'utf8');
-  assert.match(content, /uses:\s*\.\/preview-build/);
+  assert.match(content, /uses:\s*\.\/actions\/preview-build/);
   assert.match(content, /source_path:\s*'test\/fixtures\/sample-storybook'/);
   assert.doesNotMatch(
     content,
@@ -139,7 +142,7 @@ test('pr-preview-build reference workflow exercises the opt-in Playwright smoke-
   assert.ok(rootActionStep, 'could not locate the root composite action ("uses: ./") step');
   assert.match(rootActionStep[1], /smoke_test:\s*'true'/, 'root composite action step must enable smoke_test');
 
-  const previewBuildStep = content.match(/uses:\s*\.\/preview-build\n([\s\S]*?)$/);
+  const previewBuildStep = content.match(/uses:\s*\.\/actions\/preview-build\n([\s\S]*?)$/);
   assert.ok(previewBuildStep, 'could not locate the preview-build composite action step');
   assert.match(
     previewBuildStep[1],

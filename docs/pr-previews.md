@@ -98,7 +98,7 @@ jobs:
       - run: npm ci && npm run build-storybook
 
       - name: Package and upload preview bundle
-        uses: Archetipo95/storybook-github-swiss-knife/preview-build@v0.1.0
+        uses: Archetipo95/storybook-github-swiss-knife/actions/preview-build@v0.1.0
         with:
           source_path: storybook-static # your built static Storybook output directory
 ```
@@ -211,7 +211,7 @@ steps:
       token: ${{ secrets.GITHUB_TOKEN }}
 
   - name: Validate provenance and publish preview
-    uses: Archetipo95/storybook-github-swiss-knife/preview-publisher@v0.1.0
+    uses: Archetipo95/storybook-github-swiss-knife/actions/preview-publisher@v0.1.0
     with:
       bundle_dir: ${{ runner.temp }}/preview-bundle
       pages_repo: pages-repo
@@ -271,7 +271,7 @@ steps:
       path: pages-repo
       token: ${{ secrets.GITHUB_TOKEN }}
   - name: Remove preview directory
-    uses: Archetipo95/storybook-github-swiss-knife/preview-cleanup@v0.1.0
+    uses: Archetipo95/storybook-github-swiss-knife/actions/preview-cleanup@v0.1.0
     with:
       pages_repo: pages-repo
       pages_branch: gh-pages
@@ -320,7 +320,7 @@ steps:
       path: pages-repo
       token: ${{ secrets.GITHUB_TOKEN }}
   - name: Prune stale previews
-    uses: Archetipo95/storybook-github-swiss-knife/preview-janitor@v0.1.0
+    uses: Archetipo95/storybook-github-swiss-knife/actions/preview-janitor@v0.1.0
     with:
       pages_repo: pages-repo
       pages_branch: gh-pages

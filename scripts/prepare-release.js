@@ -79,7 +79,10 @@ if (uncommitted) {
 for (const file of walkFiles('.github/workflows').filter(file => /\.ya?ml$/.test(file))) {
   write(
     file,
-    read(file).replace(/(Archetipo95\/storybook-github-swiss-knife\/[A-Za-z0-9_-]+@)[0-9a-f]{40}/g, `$1${pinSha}`)
+    read(file).replace(
+      /(Archetipo95\/storybook-github-swiss-knife\/actions\/[A-Za-z0-9_-]+@)[0-9a-f]{40}/g,
+      `$1${pinSha}`
+    )
   );
 }
 

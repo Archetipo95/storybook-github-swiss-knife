@@ -6,35 +6,18 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { execFileSync } from 'node:child_process';
 
-// Regression test for the v1.9.1 bug: `pr-preview-publish.yml`'s `gate` job
-// checked out the default branch with a plain `actions/checkout` (no
-// `repository:` override) before importing `./src/resolve-run-context.js`.
-// Inside a reusable workflow invoked via `workflow_call`, that checkout
-// resolves to the *caller's* repository, not this one - so any consumer
-// (e.g. Archetipo95/storybook-vue-demo) hit
-// "Cannot find module '.../src/resolve-run-context.js'" because their own
-// repository has no such file.
+// The `gate` job of `pr-preview-publish.yml` imports the trusted pull-request-identity
+// resolver (src/resolve-run-context.js). Inside a reusable workflow a plain checkout is the
+// *caller's* repository (the storybook-github-pages v1.9.1 bug), and a private swiss-knife
+// repository cannot be checked out with the caller's token at all. So the resolver comes
+// from the pinned `actions/toolkit` action, which exports SWISS_KNIFE_ROOT.
 //
-// This test proves the fix two ways: (1) statically, that the checkout step
-// pins an explicit `repository:`/`ref:` to this action repo instead of
-// relying on the ambient checkout, and that the pinned ref actually contains
-// `src/resolve-run-context.js`; (2) functionally, by extracting the real
-// "Extract trusted pull request context" step script from the workflow file
-// and executing it from a directory that - like a consumer's checkout -
-// has no top-level `src/`, only the pinned resolver checked out at its own
-// path, and confirming it still resolves the trusted PR context.
+// These tests prove it statically (pinned toolkit, no checkout of this repository, import
+// from SWISS_KNIFE_ROOT) and functionally, by running the real step script from a directory
+// that, like a consumer's checkout, has no top-level `src/`.
 
 const repoRoot = process.cwd();
 const workflowPath = path.join(repoRoot, '.github/workflows/pr-preview-publish.yml');
-
-function gitCommitExists(sha) {
-  try {
-    execFileSync('git', ['cat-file', '-e', sha], { cwd: repoRoot, stdio: ['ignore', 'ignore', 'ignore'] });
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 function gitShowExists(sha, relPath) {
   try {
@@ -48,66 +31,60 @@ function gitShowExists(sha, relPath) {
   }
 }
 
+function gateJob() {
+  const content = fs.readFileSync(workflowPath, 'utf8');
+  const match = content.match(/\n {2}gate:\n([\s\S]*?)\n {2}[a-z-]+:\n/);
+  assert.ok(match, 'could not locate the gate job in pr-preview-publish.yml');
+  return match[1];
+}
+
 function extractGateResolverStep() {
   const content = fs.readFileSync(workflowPath, 'utf8');
   const stepMatch = content.match(
-    /- name: Extract trusted pull request context[\s\S]*?run: \|\n([\s\S]*?)\n\n      - name: Fetch current pull request head SHA/
+    /- name: Extract trusted pull request context[\s\S]*?run: \|\n([\s\S]*?)\n\n {6}- name: Fetch current pull request head SHA/
   );
-  assert.ok(
-    stepMatch,
-    'could not locate the "Extract trusted pull request context" step script in pr-preview-publish.yml'
-  );
+  assert.ok(stepMatch, 'could not locate the "Extract trusted pull request context" step script');
   return stepMatch[1];
 }
 
-function extractCheckoutStep() {
-  const content = fs.readFileSync(workflowPath, 'utf8');
-  const stepMatch = content.match(
-    /- name: Checkout resolver source \(storybook-github-swiss-knife, pinned\)[\s\S]*?\n\n      - name: Extract trusted pull request context/
-  );
-  assert.ok(stepMatch, 'could not locate the resolver checkout step in pr-preview-publish.yml');
-  return stepMatch[0];
+function runStep({ cwd, env }) {
+  const outputFile = path.join(cwd, 'github_output');
+  fs.writeFileSync(outputFile, '');
+  const result = spawnSync('bash', ['-c', extractGateResolverStep()], {
+    cwd,
+    env: {
+      ...process.env,
+      INPUT_ARTIFACT_NAME: '',
+      GITHUB_TOKEN: 'test-token',
+      REPOSITORY: 'Archetipo95/storybook-vue-demo',
+      GITHUB_OUTPUT: outputFile,
+      ...env
+    },
+    encoding: 'utf8'
+  });
+  return { result, output: fs.readFileSync(outputFile, 'utf8') };
 }
 
-test('gate job pins an explicit repository/ref checkout for the resolver instead of the ambient (caller) checkout', () => {
-  const step = extractCheckoutStep();
+test('gate job loads the resolver through the pinned toolkit action, never a checkout of this repository', () => {
+  const job = gateJob();
+  const toolkit = job.match(/uses: Archetipo95\/storybook-github-swiss-knife\/actions\/toolkit@([a-f0-9]{40})/);
+  assert.ok(toolkit, 'gate job must use actions/toolkit pinned to a full commit SHA');
+  assert.ok(job.indexOf('actions/toolkit@') < job.indexOf('Extract trusted pull request context'));
+  assert.doesNotMatch(job, /repository:\s*Archetipo95\/storybook-github-swiss-knife/);
 
-  assert.match(
-    step,
-    /repository:\s*Archetipo95\/storybook-github-swiss-knife/,
-    'checkout must explicitly target this action repo, not the caller'
-  );
-  const refMatch = step.match(/ref:\s*([a-f0-9]{40})/);
-  assert.ok(refMatch, 'checkout must pin an explicit full-length commit SHA ref');
-  assert.match(
-    step,
-    /path:\s*\.storybook-github-swiss-knife-resolver/,
-    'checkout must land in a dedicated path, not the job workspace root'
-  );
-  assert.match(step, /persist-credentials:\s*false/, 'resolver checkout must never persist credentials');
-
-  const sha = refMatch[1];
-  assert.ok(gitCommitExists(sha), `pinned commit ${sha} does not exist in this repository's history`);
-  assert.ok(
-    gitShowExists(sha, 'src/resolve-run-context.js'),
-    `pinned commit ${sha} is missing src/resolve-run-context.js required by the gate job`
-  );
+  const sha = toolkit[1];
+  assert.ok(gitShowExists(sha, 'actions/toolkit/action.yml'), `pinned commit ${sha} has no actions/toolkit`);
+  assert.ok(gitShowExists(sha, 'src/resolve-run-context.js'), `pinned commit ${sha} has no resolver`);
 });
 
-test('extract-context step imports the resolver from the pinned checkout path, not the job workspace root', () => {
+test('extract-context step imports the resolver from SWISS_KNIFE_ROOT, not the job workspace', () => {
   const script = extractGateResolverStep();
-  assert.match(script, /import\("\.\/\.storybook-github-swiss-knife-resolver\/src\/resolve-run-context\.js"\)/);
-  assert.doesNotMatch(script, /import\("\.\/src\/resolve-run-context\.js"\)/);
+  assert.match(script, /import\(process\.env\.SWISS_KNIFE_ROOT \+ "\/src\/resolve-run-context\.js"\)/);
+  assert.doesNotMatch(script, /import\("\.\/[^"]*resolve-run-context\.js"\)/);
 });
 
-test('extract-context step resolves the trusted PR context even when the job workspace has no top-level src/ (consumer checkout simulation)', () => {
-  // Simulate exactly what breaks in a consumer repo: cwd (the ambient
-  // checkout of the *caller*) has no `src/` at all. Only the pinned
-  // resolver checkout subdirectory is populated, as the fixed workflow does.
+test('extract-context step resolves the trusted PR context when the workspace has no src/ (consumer checkout)', () => {
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-resolver-consumer-checkout-'));
-  const resolverDir = path.join(workDir, '.storybook-github-swiss-knife-resolver', 'src');
-  fs.mkdirSync(resolverDir, { recursive: true });
-  fs.copyFileSync(path.join(repoRoot, 'src/resolve-run-context.js'), path.join(resolverDir, 'resolve-run-context.js'));
   assert.ok(!fs.existsSync(path.join(workDir, 'src')), 'sanity check: consumer checkout has no top-level src/');
 
   const runId = 987654321;
@@ -120,9 +97,7 @@ test('extract-context step resolves the trusted PR context even when the job wor
     head_sha: 'a'.repeat(40),
     pull_requests: [{ number: 42, base: { ref: 'main' } }]
   };
-
-  // Stub global fetch (used by the script for the artifacts-listing call)
-  // before the extracted script runs, so this test never hits the network.
+  // Stub fetch (artifacts listing) so the test never hits the network.
   const stubPath = path.join(workDir, 'fetch-stub.cjs');
   fs.writeFileSync(
     stubPath,
@@ -134,55 +109,29 @@ test('extract-context step resolves the trusted PR context even when the job wor
     };`
   );
 
-  const outputFile = path.join(workDir, 'github_output');
-  fs.writeFileSync(outputFile, '');
-
-  const script = extractGateResolverStep();
-  const result = spawnSync('bash', ['-c', script], {
+  const { result, output } = runStep({
     cwd: workDir,
     env: {
-      ...process.env,
+      SWISS_KNIFE_ROOT: repoRoot,
       NODE_OPTIONS: `--require ${stubPath}`,
       WORKFLOW_RUN_EVENT: JSON.stringify(runData),
-      INPUT_RUN_ID: '',
-      INPUT_ARTIFACT_NAME: '',
-      GITHUB_TOKEN: 'test-token',
-      REPOSITORY: 'Archetipo95/storybook-vue-demo',
-      GITHUB_OUTPUT: outputFile
-    },
-    encoding: 'utf8'
+      INPUT_RUN_ID: ''
+    }
   });
 
   assert.equal(result.status, 0, `expected script to succeed, got stderr: ${result.stderr}`);
-  assert.doesNotMatch(result.stderr, /Cannot find module/);
-
-  const output = fs.readFileSync(outputFile, 'utf8');
   assert.match(output, /run_id=987654321/);
   assert.match(output, /pr_number=42/);
   assert.match(output, /base_ref=main/);
   assert.match(output, new RegExp(`head_sha=${'a'.repeat(40)}`));
 });
 
-test('extract-context step fails with the reported "Cannot find module" error when the resolver is missing (proves the test reproduces the regression)', () => {
+test('extract-context step fails loudly when SWISS_KNIFE_ROOT does not hold the resolver', () => {
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-resolver-missing-'));
-  const outputFile = path.join(workDir, 'github_output');
-  fs.writeFileSync(outputFile, '');
-
-  const script = extractGateResolverStep();
-  const result = spawnSync('bash', ['-c', script], {
+  const { result } = runStep({
     cwd: workDir,
-    env: {
-      ...process.env,
-      WORKFLOW_RUN_EVENT: '',
-      INPUT_RUN_ID: '999',
-      INPUT_ARTIFACT_NAME: '',
-      GITHUB_TOKEN: 'test-token',
-      REPOSITORY: 'Archetipo95/storybook-vue-demo',
-      GITHUB_OUTPUT: outputFile
-    },
-    encoding: 'utf8'
+    env: { SWISS_KNIFE_ROOT: workDir, WORKFLOW_RUN_EVENT: '', INPUT_RUN_ID: '999' }
   });
-
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /Cannot find module/);
 });

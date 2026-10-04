@@ -157,7 +157,7 @@ test('artifact mode warns about cname while directory mode wires it to the publi
   assert.doesNotMatch(action, /src\/cname\.js/, 'artifact mode must not write a CNAME GitHub ignores');
   assert.match(action, /::warning title=cname ignored in artifact mode::/);
 
-  const publisher = await fs.readFile(path.join(process.cwd(), 'publisher/action.yml'), 'utf8');
+  const publisher = await fs.readFile(path.join(process.cwd(), 'actions/publisher/action.yml'), 'utf8');
   assert.match(publisher, /CNAME: \$\{\{ inputs\.cname \}\}/);
   assert.match(publisher, /PRESERVE_CNAME: \$\{\{ inputs\.preserve_cname \}\}/);
 

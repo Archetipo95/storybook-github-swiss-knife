@@ -226,7 +226,7 @@ test("publishPreview merges trusted base Pages history with the artifact's own c
   );
   fs.mkdirSync(path.join(contentDir, 'stats'), { recursive: true });
   // This is the artifact's own one-point snapshot the untrusted build wrote
-  // from the real PR source tree (see preview-build/action.yml): 6 covered
+  // from the real PR source tree (see actions/preview-build/action.yml): 6 covered
   // components out of 7 total (86%), 26 stories, 6 docs.
   fs.writeFileSync(
     path.join(contentDir, 'stats', 'history.json'),

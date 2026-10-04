@@ -74,6 +74,11 @@ jobs:
           persist-credentials: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      # Trusted swiss-knife source for the steps below (exports SWISS_KNIFE_ROOT). Never
+      # import ./src from the checked-out repository: that is the caller's code.
+      - name: Load swiss-knife toolkit
+        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@91ad0c913ab2f6caee99c7e6c99abc723c22bf88
+
       - name: Resolve preview configuration
         id: config
         env:
@@ -83,69 +88,17 @@ jobs:
           INPUT_WARNING_DAYS: ${{ inputs.warning_days_before_cleanup || github.event.inputs.warning_days_before_cleanup }}
         run: |
           node -e '
-            import("node:fs").then(async ({existsSync}) => {
-              if (existsSync("./src/config.js")) {
-                const {resolveConfiguration} = await import("./src/config.js");
-                const c = resolveConfiguration({inputs: {
-                  preview_root: process.env.INPUT_PREVIEW_ROOT,
-                  pages_branch: process.env.INPUT_PAGES_BRANCH,
-                  preview_retention_days: process.env.INPUT_RETENTION_DAYS,
-                  warning_days_before_cleanup: process.env.INPUT_WARNING_DAYS
-                }});
-                console.log(`preview_root=${c.preview_root}`);
-                console.log(`pages_branch=${c.pages_branch}`);
-                console.log(`retention_days=${c.preview_retention_days}`);
-                console.log(`warning_days_before_cleanup=${c.warning_days_before_cleanup}`);
-              } else {
-                let file_preview_root = undefined;
-                let file_pages_branch = undefined;
-                let file_retention_days = undefined;
-                let file_warning_days = undefined;
-                if (existsSync(".storybook-pages.yml")) {
-                  const {readFileSync} = await import("node:fs");
-                  const content = readFileSync(".storybook-pages.yml", "utf8");
-                  for (const line of content.split("\n")) {
-                    const trimmed = line.trim();
-                    if (file_preview_root === undefined && trimmed.startsWith("preview_root:")) {
-                      file_preview_root = trimmed.slice("preview_root:".length).trim().replace(/^["'\''"]|["'\''"]$/g, "");
-                    }
-                    if (file_pages_branch === undefined && trimmed.startsWith("pages_branch:")) {
-                      file_pages_branch = trimmed.slice("pages_branch:".length).trim().replace(/^["'\''"]|["'\''"]$/g, "");
-                    }
-                    if (file_retention_days === undefined && trimmed.startsWith("preview_retention_days:")) {
-                      file_retention_days = trimmed.slice("preview_retention_days:".length).trim().replace(/^["'\''"]|["'\''"]$/g, "");
-                    }
-                    if (file_warning_days === undefined && trimmed.startsWith("warning_days_before_cleanup:")) {
-                      file_warning_days = trimmed.slice("warning_days_before_cleanup:".length).trim().replace(/^["'\''"]|["'\''"]$/g, "");
-                    }
-                  }
-                }
-                const rawPreviewRoot = process.env.INPUT_PREVIEW_ROOT;
-                let preview_root;
-                if (rawPreviewRoot !== undefined && rawPreviewRoot !== "") {
-                  preview_root = (rawPreviewRoot === "." || rawPreviewRoot === "./") ? "" : rawPreviewRoot;
-                } else if (file_preview_root !== undefined) {
-                  preview_root = (file_preview_root === "." || file_preview_root === "./") ? "" : file_preview_root;
-                } else {
-                  preview_root = "pr-preview";
-                }
-                const rawPagesBranch = process.env.INPUT_PAGES_BRANCH;
-                const pages_branch = (rawPagesBranch !== undefined && rawPagesBranch !== "")
-                  ? rawPagesBranch
-                  : (file_pages_branch !== undefined ? file_pages_branch : "gh-pages");
-                const rawRetentionDays = process.env.INPUT_RETENTION_DAYS;
-                const retention_days = (rawRetentionDays !== undefined && rawRetentionDays !== "")
-                  ? rawRetentionDays
-                  : (file_retention_days !== undefined ? file_retention_days : "30");
-                const rawWarningDays = process.env.INPUT_WARNING_DAYS;
-                const warning_days_before_cleanup = (rawWarningDays !== undefined && rawWarningDays !== "")
-                  ? rawWarningDays
-                  : (file_warning_days !== undefined ? file_warning_days : "3");
-                console.log(`preview_root=${preview_root}`);
-                console.log(`pages_branch=${pages_branch}`);
-                console.log(`retention_days=${retention_days}`);
-                console.log(`warning_days_before_cleanup=${warning_days_before_cleanup}`);
-              }
+            import(process.env.SWISS_KNIFE_ROOT + "/src/config.js").then(({resolveConfiguration}) => {
+              const c = resolveConfiguration({inputs: {
+                preview_root: process.env.INPUT_PREVIEW_ROOT,
+                pages_branch: process.env.INPUT_PAGES_BRANCH,
+                preview_retention_days: process.env.INPUT_RETENTION_DAYS,
+                warning_days_before_cleanup: process.env.INPUT_WARNING_DAYS
+              }});
+              console.log(`preview_root=${c.preview_root}`);
+              console.log(`pages_branch=${c.pages_branch}`);
+              console.log(`retention_days=${c.preview_retention_days}`);
+              console.log(`warning_days_before_cleanup=${c.warning_days_before_cleanup}`);
             });
           ' >> "$GITHUB_OUTPUT"
 
@@ -175,7 +128,7 @@ jobs:
 
       - name: Prune stale preview directories
         if: steps.branch_check.outputs.exists == 'true'
-        uses: Archetipo95/storybook-github-swiss-knife/preview-janitor@dd8d1052f7759a95bafd7f44a06d1df196e5c849
+        uses: Archetipo95/storybook-github-swiss-knife/actions/preview-janitor@91ad0c913ab2f6caee99c7e6c99abc723c22bf88
         with:
           pages_repo: ${{ github.workspace }}/pages-repo
           pages_branch: ${{ steps.config.outputs.pages_branch || inputs.pages_branch || 'gh-pages' }}

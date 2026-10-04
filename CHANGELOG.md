@@ -14,9 +14,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `actions/toolkit`: exposes this repository's source to later steps of a job (`SWISS_KNIFE_ROOT`), so trusted scripts never need a checkout of this repository.
+
 - `.storybook/swiss-knife.json` configuration with a JSON schema (`schema/swiss-knife.schema.json`): `pages` (the storybook-github-pages keys), plus validated `visual`, `a11y` and `passcode` sections with defaults. `.storybook-pages.yml` still works for `pages` and logs a deprecation warning; when both files exist the JSON file wins.
 
 ### Changed
+
+- Composite actions moved under `actions/` (`actions/preview-build`, `actions/preview-publisher`, `actions/publisher`, `actions/preview-cleanup`, `actions/preview-janitor`). The root action stays at the repository root.
+
+### Fixed
+
+- Reusable workflows ran `./src/*.js` of the checked-out repository, which in a consumer is the consumer's own code: `deploy-storybook.yml` failed outright, and the publish, cleanup and janitor configuration steps imported a consumer's `src/config.js` when one existed, or fell back to a minimal line parser that ignored most settings. They now always run this repository's scripts through `actions/toolkit` and read the full configuration.
+- The publish gate no longer checks out this repository to load the run-context resolver; it uses the pinned toolkit, which also works while the repository is private.
 
 - Imported `storybook-github-pages` 1.11.0 as the starting point and renamed every reference to `Archetipo95/storybook-github-swiss-knife`. Internal action pins point at this repository.
 
