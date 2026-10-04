@@ -1,0 +1,110 @@
+{
+  "suites": [
+    {
+      "title": "stories.visual.js",
+      "specs": [
+        {
+          "title": "Button › Primary",
+          "tests": [
+            {
+              "status": "unexpected",
+              "annotations": [{ "type": "story", "description": "button--primary" }],
+              "results": [
+                {
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22mpage\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22mexpected\u001b[2m)\u001b[22m failed\n\n  1234 pixels (ratio 0.01 of all image pixels) are different.\n\nCall log:\n  - waiting for screenshot"
+                  },
+                  "attachments": [{ "name": "button--primary-diff.png", "path": "/tmp/diff.png" }]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Button › Large",
+          "tests": [
+            {
+              "status": "expected",
+              "annotations": [
+                { "type": "story", "description": "button--large" },
+                { "type": "new" }
+              ],
+              "results": [{ "attachments": [] }]
+            }
+          ]
+        },
+        {
+          "title": "Form › Interaction flow submit",
+          "tests": [
+            {
+              "status": "flaky",
+              "annotations": [{ "type": "story", "description": "form--interaction-flow-submit" }],
+              "results": [
+                {
+                  "error": {
+                    "message": "Error: Story render or play function failed\nexpected button to be enabled\n    at play (form.stories.ts:12)"
+                  }
+                },
+                {}
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Card › Broken",
+          "tests": [
+            {
+              "status": "unexpected",
+              "annotations": [{ "type": "story", "description": "card--broken" }],
+              "results": [{ "error": { "message": "Error: page.goto: net::ERR_ABORTED" } }]
+            }
+          ]
+        },
+        {
+          "title": "Card › Slow",
+          "tests": [
+            {
+              "status": "unexpected",
+              "annotations": [{ "type": "story", "description": "card--slow" }],
+              "results": [
+                {
+                  "error": {
+                    "message": "Error: expect(page).toHaveScreenshot(expected) failed\n\n  Timeout 15000ms exceeded.\n  12 pixels (ratio 0.01 of all image pixels) are different."
+                  },
+                  "attachments": [{ "name": "card--slow-diff.png", "path": "/tmp/slow-diff.png" }]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Card › Wobbly",
+          "tests": [
+            {
+              "status": "flaky",
+              "annotations": [{ "type": "story", "description": "card--wobbly" }],
+              "results": [{ "error": { "message": "Error: timeout" } }, {}]
+            }
+          ]
+        }
+      ],
+      "suites": [
+        {
+          "title": "nested",
+          "specs": [
+            {
+              "title": "Card › Default",
+              "tests": [
+                {
+                  "status": "expected",
+                  "annotations": [{ "type": "story", "description": "card--default" }],
+                  "results": [{}]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

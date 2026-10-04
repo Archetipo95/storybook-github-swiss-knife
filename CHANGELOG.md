@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Visual regression and accessibility result processing, ported from kinboo2.0 as zero-dependency modules: `src/visual/results.js` (classifies merged Playwright results), `src/visual/gate.js` (gate decision and summary, with a configurable approval label), `src/visual/manifest.js` (Storybook gallery manifest), `src/visual/shard.js` (story sharding, same assignment as kinboo2.0) and `src/a11y/report.js` (axe report evaluation against the node-count baseline, baseline builder and summary). The accessibility gate recomputes which violations are new from raw node counts instead of trusting the runner.
+
 - `actions/toolkit`: exposes this repository's source to later steps of a job (`SWISS_KNIFE_ROOT`), so trusted scripts never need a checkout of this repository.
 
 - `.storybook/swiss-knife.json` configuration with a JSON schema (`schema/swiss-knife.schema.json`): `pages` (the storybook-github-pages keys), plus validated `visual`, `a11y` and `passcode` sections with defaults. `.storybook-pages.yml` still works for `pages` and logs a deprecation warning; when both files exist the JSON file wins.
