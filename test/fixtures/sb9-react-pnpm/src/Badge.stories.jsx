@@ -10,4 +10,4 @@ const Badge = ({ labels }) => (
 
 export default { title: 'Fixture/Badge', component: Badge };
 
-export const LowContrast = { args: { labels: ['Known issue'] } };
+export const LowContrast = { args: { labels: ['Known issue', 'One more'] } };
