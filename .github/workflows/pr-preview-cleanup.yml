@@ -39,6 +39,7 @@ jobs:
     concurrency:
       group: storybook-pages-${{ github.repository }}
       cancel-in-progress: false
+      queue: max
     runs-on: ubuntu-24.04
     permissions:
       contents: write

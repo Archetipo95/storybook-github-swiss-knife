@@ -24,9 +24,13 @@ name: PR Preview Publish
 #
 # `publish` re-validates the build artifact's bundled metadata against this
 # trusted context (repository, run id, PR number, base ref, head repo,
-# head SHA, artifact name) before touching the filesystem, and again
-# compares the metadata head SHA against the freshly-fetched current head
-# SHA so an older completed run can never overwrite a newer preview.
+# head SHA, artifact name) before touching the filesystem, then compares
+# the metadata head SHA against the current head SHA the gate fetched
+# (`needs.gate.outputs.current_head_sha`). `publish` does not fetch it
+# again: the gate reads it before `publish` waits in the Pages concurrency
+# queue, so a run already superseded at that point is skipped as
+# `skip-stale`, while a commit pushed during the wait is published by its
+# own run, which normally queues behind this one.
 
 on:
   workflow_run:
@@ -271,6 +275,7 @@ jobs:
     concurrency:
       group: storybook-pages-${{ github.repository }}
       cancel-in-progress: false
+      queue: max
     runs-on: ubuntu-24.04
     permissions:
       contents: write

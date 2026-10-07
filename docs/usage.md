@@ -74,6 +74,7 @@ on:
 concurrency:
   group: storybook-pages-${{ github.repository }}
   cancel-in-progress: false
+  queue: max
 
 jobs:
   build:
@@ -243,7 +244,7 @@ build:
 
 ### Trusted directory mode
 
-Set `mode: directory` to publish to a shared Pages branch. The build job remains untrusted (`contents: read`) and transfers its validated output to a separate publisher job with `contents: write`. Writes are serialized per repository and branch, conflicts receive bounded fetch/rebase retries, and the configured target is staged and replaced atomically. GitHub Pages normally rebuilds automatically after a branch push; set `trigger_pages_rebuild: 'true'` only when an explicit rebuild request is needed for a non-standard Pages configuration.
+Set `mode: directory` to publish to a shared Pages branch. The build job remains untrusted (`contents: read`) and transfers its validated output to a separate publisher job with `contents: write`. Writes are serialized by the `storybook-pages-<owner>/<repo>` concurrency group with `queue: max`: up to 100 runs wait instead of replacing each other and run first in, first out by when each run started waiting (not by when it was triggered; GitHub notes that ordering is not guaranteed; see [PR previews → Concurrency](pr-previews.md#concurrency)). A rejected push is retried on the fresh branch tip, and the configured target is staged and replaced atomically. GitHub Pages normally rebuilds automatically after a branch push; set `trigger_pages_rebuild: 'true'` only when an explicit rebuild request is needed for a non-standard Pages configuration.
 
 Use an empty `target_directory` for the production root and a name such as `staging` for a named environment; both can coexist. Targets must be relative and cannot traverse or address `.git` or `.github`. Unrelated directories are preserved. GitHub Pages has one site/custom-domain configuration, so named environments are URL subpaths (for example `/staging`) and publication is eventually visible after the rebuild.
 
