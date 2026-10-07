@@ -276,3 +276,11 @@ test('publish compares against the pull request head and state read after the qu
   assert.match(publish, /current_pr_state: \$\{\{ steps\.live\.outputs\.state \}\}/);
   assert.doesNotMatch(publish, /needs\.gate\.outputs\.current_head_sha/);
 });
+
+test('fork pull request cleanups are skipped before they join the Pages queue', () => {
+  const cleanup = extractJobBlock(read('.github/workflows/pr-preview-cleanup.yml'), 'cleanup');
+  assert.match(
+    cleanup,
+    /if: github\.event\.pull_request == null \|\| github\.event\.pull_request\.head\.repo\.full_name == github\.repository\n\s+concurrency:/
+  );
+});

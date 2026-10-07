@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Closing a fork pull request queued a full cleanup in the Pages group although forks never get a preview; the cleanup job now skips them.
 - A publish that waited in the Pages queue compared against the PR head read before the wait, so it could overwrite a newer preview or, for a PR closed meanwhile, bring back a removed one. The publish job now re-reads the PR head and state after the wait (`skip-stale`, new `skip-closed`); re-running only the publish job is safe again.
 - PR preview publishes, cleanups and janitor runs were dropped when several queued at once: the shared `storybook-pages-<owner>/<repo>` group kept only one pending run and cancelled it when another arrived. Every Pages writer now sets `queue: max`, so up to 100 runs wait their turn (ported from storybook-github-pages PR 180).
 - Re-running a visual run failed both checks with "no results": each attempt uploads the results bundle under the same name, and the gate required exactly one. It now uses the latest attempt's bundle.
