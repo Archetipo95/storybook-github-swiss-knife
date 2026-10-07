@@ -60,7 +60,8 @@ function fakeGitHub({
   runPath = '.github/workflows/visual-caller.yml',
   callerAtHead = 'caller workflow',
   prHead = HEAD,
-  comments = []
+  comments = [],
+  readBack = []
 } = {}) {
   const calls = [];
   const request = async (apiPath, { method = 'GET', body } = {}) => {
@@ -103,6 +104,7 @@ function fakeGitHub({
     if (route === `/repos/${REPO}/actions/workflows/99/runs`) return { workflow_runs: [{ created_at: firstRunAt }] };
     if (route === `/repos/${REPO}/commits/${HEAD}/check-runs`) return { total_count: existingChecks };
     if (route === `/repos/${REPO}/issues/7/comments` && method === 'GET') return comments;
+    if (route.startsWith(`/repos/${REPO}/issues/comments/`) && method === 'GET') return readBack.shift() ?? null;
     if (method === 'POST' || method === 'DELETE' || method === 'PATCH') return {};
     throw new Error(`unexpected ${method} ${apiPath}`);
   };
@@ -113,6 +115,7 @@ const checkRuns = calls =>
   calls.filter(call => call.method === 'POST' && call.apiPath.endsWith('/check-runs')).map(call => call.body);
 
 async function run({
+  commentVerifyMs = 0,
   github = fakeGitHub(),
   bundleDir = bundle(),
   pagesRepo = tmp({ '.nojekyll': '' }),
@@ -137,7 +140,8 @@ async function run({
       });
       return {};
     },
-    log: () => {}
+    log: () => {},
+    commentVerifyMs
   });
   return { output, calls: github.calls, published };
 }
@@ -369,4 +373,29 @@ test('a marker in a comment the bot did not write is left alone and the checks s
 test('results for a commit that is no longer the head do not touch the comment', async () => {
   const { calls } = await run({ github: fakeGitHub({ prHead: 'c'.repeat(40) }) });
   assert.equal(commentWrites(calls).length, 0);
+});
+
+test('the results block is written again when the preview publisher put an older one back', async () => {
+  const preview = '<!-- swiss-knife:pr-7 -->\n## Storybook preview\n<sub>footer</sub>';
+  const stale =
+    '<!-- swiss-knife:pr-7 -->\n## Storybook preview\n\n<!-- swiss-knife-checks -->\nold\n<!-- /swiss-knife-checks -->\n<sub>footer</sub>';
+  const bot = { user: { login: 'github-actions[bot]', type: 'Bot' } };
+  const github = fakeGitHub({ comments: [{ id: 9, body: preview, ...bot }] });
+  const { calls } = await run({
+    commentVerifyMs: 1,
+    github: {
+      ...github,
+      request: async (apiPath, options = {}) => {
+        if ((options.method ?? 'GET') === 'GET' && apiPath === `/repos/${REPO}/issues/comments/9`) {
+          const writes = commentWrites(github.calls);
+          // First read-back: the publisher overwrote the block; second: the gate's block stuck.
+          return { id: 9, body: writes.length === 1 ? stale : writes.at(-1).body.body };
+        }
+        return github.request(apiPath, options);
+      }
+    }
+  });
+  const writes = commentWrites(calls);
+  assert.equal(writes.length, 2);
+  assert.ok(writes.every(write => write.method === 'PATCH' && write.body.body.includes('swiss-knife / visual')));
 });

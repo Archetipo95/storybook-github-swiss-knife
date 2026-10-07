@@ -27,13 +27,21 @@ export function galleryUrl() {
 }
 
 let manifestRequest;
-// Pages caches files for minutes; the timestamp makes a reload see a newer run.
+let requestedAt = 0;
+let found = false;
+// Pages caches files for minutes; the timestamp makes a reload see a newer run. A missing report
+// is asked for again after 30 s: the gate may publish it while the preview is open.
 export function loadManifest(refresh = false) {
-  if (refresh || !manifestRequest) {
-    manifestRequest = fetch(`${galleryUrl()}manifest.json?t=${Date.now()}`, { cache: 'no-store' })
+  if (refresh || !manifestRequest || (!found && Date.now() - requestedAt > 30_000)) {
+    requestedAt = Date.now();
+    manifestRequest = fetch(`${galleryUrl()}manifest.json?t=${requestedAt}`, { cache: 'no-store' })
       .then(response => (response.ok ? response.json() : null))
       .then(manifest => (manifest && typeof manifest.stories === 'object' ? manifest : null))
-      .catch(() => null);
+      .catch(() => null)
+      .then(manifest => {
+        found = Boolean(manifest);
+        return manifest;
+      });
   }
   return manifestRequest;
 }
@@ -57,7 +65,12 @@ function useChangedPixels(src, enabled) {
       const context = canvas.getContext('2d');
       if (!context) return;
       context.drawImage(image, 0, 0);
-      const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+      let pixels;
+      try {
+        pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+      } catch {
+        return; // A gallery on another origin without CORS headers cannot be read.
+      }
       const { data } = pixels;
       for (let index = 0; index < data.length; index += 4) {
         const changed = data[index] > 200 && data[index + 1] < 90 && data[index + 2] < 90;

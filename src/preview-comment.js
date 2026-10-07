@@ -68,6 +68,13 @@ export function extractChecksSection(body) {
   return match ? match[0] : null;
 }
 
+const withoutChecksSection = body => {
+  const block = extractChecksSection(body);
+  return block ? String(body).replace(block, '') : String(body ?? '');
+};
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
 /** The body with the visual gate's block (markdown) set; the rest of the comment is kept. */
 export function withChecksSection(body, markdown) {
   return replaceBlock(body, `${CHECKS_MARKER}\n${markdown}\n${CHECKS_END_MARKER}`, [
@@ -294,7 +301,7 @@ export async function findExistingComment({ token, repository, prNumber, marker 
  * one (found via the stable marker) on subsequent publishes. Never creates a
  * second comment for the same PR.
  */
-export async function upsertPreviewComment({ token, repository, prNumber, body }) {
+export async function upsertPreviewComment({ token, repository, prNumber, body, verifyAfterMs = 0 }) {
   if (!token) throw new Error('upsertPreviewComment requires a token');
   if (!repository) throw new Error('upsertPreviewComment requires a repository');
   const number = Number(prNumber);
@@ -314,14 +321,19 @@ export async function upsertPreviewComment({ token, repository, prNumber, body }
     marker: previewCommentMarkers(number)
   });
   if (existing) {
-    // The visual gate may have written its results first: keep them.
-    const checks = extractChecksSection(existing.body);
-    const merged = checks && !extractChecksSection(body) ? replaceBlock(body, checks, []) : body;
-    await githubRequest(`https://api.github.com/repos/${repository}/issues/comments/${existing.id}`, {
-      token,
-      method: 'PATCH',
-      body: { body: merged }
-    });
+    const url = `https://api.github.com/repos/${repository}/issues/comments/${existing.id}`;
+    let current = existing.body;
+    // The visual gate writes its block into the same comment. Keep it, and when verifying, check
+    // that the gate did not write its older copy of the preview part over this one meanwhile.
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const checks = extractChecksSection(current);
+      const merged = checks && !extractChecksSection(body) ? replaceBlock(body, checks, []) : body;
+      await githubRequest(url, { token, method: 'PATCH', body: { body: merged } });
+      if (verifyAfterMs <= 0) break;
+      await sleep(verifyAfterMs);
+      current = (await githubRequest(url, { token })).body;
+      if (withoutChecksSection(current) === withoutChecksSection(merged)) break;
+    }
     return { action: 'updated', commentId: existing.id };
   }
 

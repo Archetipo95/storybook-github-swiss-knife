@@ -346,7 +346,13 @@ export async function publishPreview({
         hasStatsGraph,
         ...audits
       });
-      commentResult = await upsertPreviewComment({ token, repository, prNumber: metadata.prNumber, body });
+      commentResult = await upsertPreviewComment({
+        token,
+        repository,
+        prNumber: metadata.prNumber,
+        body,
+        verifyAfterMs: 5000
+      });
     } catch (error) {
       // The publish already succeeded and must not be rolled back; a comment
       // failure is surfaced independently so it is visible without masking a

@@ -403,3 +403,37 @@ test('upsertPreviewComment keeps the block the visual gate wrote first', async (
     mock.restore();
   }
 });
+
+test('upsertPreviewComment writes again when the gate put an older preview part back', async () => {
+  const marker = buildMarker(7);
+  const bot = { user: { login: 'github-actions[bot]', type: 'Bot' } };
+  const gateBlock = withChecksSection(`${marker}\nold preview`, 'results');
+  const written = [];
+  const mock = mockFetchSequence([
+    () => jsonResponse(200, [{ id: 42, body: gateBlock, ...bot }]),
+    (url, options) => {
+      written.push(JSON.parse(options.body).body);
+      return jsonResponse(200, { id: 42 });
+    },
+    () => jsonResponse(200, { id: 42, body: gateBlock }),
+    (url, options) => {
+      written.push(JSON.parse(options.body).body);
+      return jsonResponse(200, { id: 42 });
+    },
+    () => jsonResponse(200, { id: 42, body: written.at(-1) })
+  ]);
+  try {
+    await upsertPreviewComment({
+      token: 't',
+      repository: 'octo/widgets',
+      prNumber: 7,
+      body: `${marker}\nnew preview`,
+      verifyAfterMs: 1
+    });
+    assert.equal(written.length, 2);
+    assert.ok(written.every(body => body.includes('new preview') && extractChecksSection(body)));
+    assert.equal(mock.calls.length, 5);
+  } finally {
+    mock.restore();
+  }
+});
