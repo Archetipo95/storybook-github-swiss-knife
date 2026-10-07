@@ -171,6 +171,7 @@ on:
 concurrency:
   group: storybook-pages-${{ github.repository }}
   cancel-in-progress: false
+  queue: max
 
 permissions:
   contents: read
