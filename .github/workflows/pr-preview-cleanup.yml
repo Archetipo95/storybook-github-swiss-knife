@@ -9,9 +9,9 @@ name: PR Preview Cleanup
 # documented-safe usage of `pull_request_target`: no PR-controlled code is
 # ever executed in this privileged context.
 #
-# Removal is idempotent: if the directory does not exist (e.g. the PR's
-# preview was never published, such as for a fork PR), this is a no-op and
-# no rebuild is requested.
+# Removal is idempotent: if the directory does not exist (the PR's preview
+# was never published), this is a no-op and no rebuild is requested. Fork pull
+# requests, which never get a preview, skip the job entirely.
 
 on:
   pull_request_target:
@@ -36,6 +36,8 @@ on:
 jobs:
   cleanup:
     name: Remove closed PR preview (trusted, metadata-only)
+    # Fork pull requests never get a preview: skip them before they wait in the Pages queue.
+    if: github.event.pull_request == null || github.event.pull_request.head.repo.full_name == github.repository
     concurrency:
       group: storybook-pages-${{ github.repository }}
       cancel-in-progress: false
