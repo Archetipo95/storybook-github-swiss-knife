@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "status": "published • bae2750",
+  "build": "passed • bae2750",
+  "commit": "bae2750",
+  "storybookVersion": "deployed",
+  "storiesCount": 1,
+  "componentsCount": 1,
+  "totalComponents": 12,
+  "coveragePercent": 8,
+  "docsCount": 0,
+  "hasStoriesData": true,
+  "tests": null,
+  "generatedAt": "2026-10-07T08:56:46.701Z"
+}
