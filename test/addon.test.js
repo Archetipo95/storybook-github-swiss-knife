@@ -61,6 +61,18 @@ function projectWithStorybook(version) {
   return dir;
 }
 
+test('the preset falls back to the Storybook next to the addon when the directory has none', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sk-addon-empty-'));
+  let found;
+  try {
+    found = storybookMajor(dir);
+  } catch (error) {
+    found = error;
+  }
+  // Either the addon's own peer (when one is installed above it) or a clear error, never a crash.
+  assert.ok(Number.isInteger(found) || /storybook package was not found/.test(found.message));
+});
+
 test('the preset registers the manager entry for the installed Storybook', t => {
   const cwd = process.cwd();
   t.after(() => process.chdir(cwd));

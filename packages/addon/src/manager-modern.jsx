@@ -8,33 +8,38 @@ import { ADDON_ID, applyVisualTags, loadManifest, registerVisualAddon, statusEnt
 const VALUES = { warn: 'status-value:warning', error: 'status-value:error' };
 
 // Statuses are keyed by story id and need no index; the sidebar's status filter lists them.
-// Storybook 10 also exposes the index, so the stories get the `visual:*` tags too.
+// Storybook 10 also exposes the index, so the stories get the `visual:*` tags too. The index
+// arrives after registration and is replaced when stories change, so the tags are re-checked;
+// Storybook 9 stops once the statuses are set.
 function registerResults(api) {
-  loadManifest().then(manifest => {
-    if (!manifest) return;
-    experimental_getStatusStore(ADDON_ID).set(
-      statusEntries(manifest).map(({ storyId, level, title, description }) => ({
-        storyId,
-        typeId: ADDON_ID,
-        value: VALUES[level],
-        title,
-        description
-      }))
-    );
-  });
-  if (typeof api.getIndex !== 'function') return;
-  let applying = false;
-  const tag = async () => {
-    if (applying) return;
-    applying = true;
+  let statusesSet = false;
+  let busy = false;
+  const tick = async () => {
+    if (busy) return;
+    busy = true;
     try {
-      await applyVisualTags(api, api.getIndex());
+      const manifest = await loadManifest();
+      if (!manifest) return;
+      if (!statusesSet) {
+        experimental_getStatusStore(ADDON_ID).set(
+          statusEntries(manifest).map(({ storyId, level, title, description }) => ({
+            storyId,
+            typeId: ADDON_ID,
+            value: VALUES[level],
+            title,
+            description
+          }))
+        );
+        statusesSet = true;
+      }
+      if (typeof api.getIndex === 'function') await applyVisualTags(api, api.getIndex());
+      else clearInterval(timer);
     } finally {
-      applying = false;
+      busy = false;
     }
   };
-  // The index arrives after registration and is replaced when stories change: keep checking.
-  setInterval(tag, 1000);
+  const timer = setInterval(tick, 2000);
+  tick();
 }
 
 registerVisualAddon({ addons, types, AddonPanel, useStorybookState, useTheme, registerResults });

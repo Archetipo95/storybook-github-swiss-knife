@@ -14,7 +14,13 @@ import path from 'node:path';
 import { resolveConfiguration } from '../config.js';
 import { injectAuthGate } from '../inject-auth-gate.js';
 import { publishDirectory } from '../publish-directory.js';
-import { buildMarker, pickPreviewComment, previewCommentMarkers, withChecksSection } from '../preview-comment.js';
+import {
+  buildMarker,
+  extractChecksSection,
+  pickPreviewComment,
+  previewCommentMarkers,
+  withChecksSection
+} from '../preview-comment.js';
 import { loadSwissKnifeConfig } from '../swiss-knife-config.js';
 import { evaluateApproval } from './approval.js';
 import { evaluateGate, renderChecksComment } from './core.js';
@@ -160,7 +166,21 @@ async function verifyCaller(request, { repository, run, env, baseSha }) {
  * Sets the gate's block in the pull request's preview comment, creating the comment when the
  * preview has not posted one yet (the preview publisher keeps the block when it rewrites it).
  */
-async function upsertChecksComment(request, { repository, prNumber, markdown }) {
+async function upsertChecksComment(request, { repository, prNumber, markdown, verifyAfterMs }) {
+  // The preview publisher rewrites the same comment and may put an older copy of this block back:
+  // read it again after a moment and write again if so.
+  const block = extractChecksSection(withChecksSection('', markdown));
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const id = await writeChecksComment(request, { repository, prNumber, markdown });
+    if (!id || verifyAfterMs <= 0) return id;
+    await new Promise(resolve => setTimeout(resolve, verifyAfterMs));
+    const current = await request(`/repos/${repository}/issues/comments/${id}`);
+    if (!current || extractChecksSection(current.body) === block) return id;
+  }
+  return undefined;
+}
+
+async function writeChecksComment(request, { repository, prNumber, markdown }) {
   const comments = await paginate(request, `/repos/${repository}/issues/${prNumber}/comments`);
   const existing = pickPreviewComment(comments, previewCommentMarkers(prNumber));
   if (existing) {
@@ -181,7 +201,13 @@ async function upsertChecksComment(request, { repository, prNumber, markdown }) 
  * @param {{ env: NodeJS.ProcessEnv, request: ReturnType<typeof githubClient>,
  *   publish?: typeof publishDirectory, log?: (line: string) => void }} options
  */
-export async function runVisualGate({ env, request, publish = publishDirectory, log = console.log }) {
+export async function runVisualGate({
+  env,
+  request,
+  publish = publishDirectory,
+  log = console.log,
+  commentVerifyMs = 5000
+}) {
   const repository = env.REPOSITORY;
   const runId = Number(env.RUN_ID);
   const projectDir = path.resolve(env.PROJECT_DIR || process.cwd());
@@ -313,7 +339,8 @@ export async function runVisualGate({ env, request, publish = publishDirectory, 
       await upsertChecksComment(request, {
         repository,
         prNumber,
-        markdown: renderChecksComment(result, { headSha, reportUrl, runUrl: run.html_url })
+        markdown: renderChecksComment(result, { headSha, reportUrl, runUrl: run.html_url }),
+        verifyAfterMs: commentVerifyMs
       });
     } catch (error) {
       log(`::warning::The pull request comment was not updated: ${error.message}`);

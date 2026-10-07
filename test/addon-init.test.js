@@ -100,7 +100,10 @@ test('registerAddon adds the addon once, and reports a main file without an addo
 
 test('detectPackageManager reads the lockfile, falling back to the repository root and npm', () => {
   const dir = project({ 'yarn.lock': '', 'apps/ui/package.json': '{}' });
-  assert.equal(detectPackageManager(path.join(dir, 'apps/ui'), dir), 'yarn');
+  assert.equal(detectPackageManager(path.join(dir, 'apps/ui'), dir), 'yarn-classic');
+  const berry = project({ 'yarn.lock': '', 'package.json': '{"packageManager":"yarn@4.18.1"}' });
+  assert.equal(detectPackageManager(berry), 'yarn');
+  assert.equal(detectPackageManager(project({ 'yarn.lock': '', '.yarnrc.yml': '' })), 'yarn');
   assert.equal(detectPackageManager(project({})), 'npm');
 });
 
@@ -146,4 +149,17 @@ test('runInit refuses a directory without package.json', () => {
     () => runInit({ argv: ['--no-label'], cwd: project({}), version: '0.1.0', log: () => {} }),
     /No package\.json/
   );
+});
+
+test('runInit never overwrites the configuration, even with --force', () => {
+  const config = '{ "visual": { "fixedTime": "2026-01-15T10:00:00Z" } }\n';
+  const dir = project({ 'package.json': '{}', '.storybook/swiss-knife.json': config });
+  runInit({ argv: ['--no-label', '--force', '--ref', REF], cwd: dir, version: '0.1.0', log: () => {} });
+  assert.equal(fs.readFileSync(path.join(dir, '.storybook/swiss-knife.json'), 'utf8'), config);
+  assert.ok(fs.existsSync(path.join(dir, '.github/workflows/visual.yml')));
+});
+
+test('planInit installs Yarn 1 projects with a frozen lockfile', () => {
+  const { files } = planInit({ ...defaults, packageManager: 'yarn-classic' });
+  assert.match(files['.github/workflows/preview-build.yml'], /yarn install --frozen-lockfile/);
 });

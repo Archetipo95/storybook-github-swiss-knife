@@ -17,6 +17,7 @@ const COMMANDS = {
     add: 'pnpm add --save-dev'
   },
   yarn: { install: 'corepack yarn install --immutable', build: 'corepack yarn storybook build', add: 'yarn add --dev' },
+  'yarn-classic': { install: 'yarn install --frozen-lockfile', build: 'yarn storybook build', add: 'yarn add --dev' },
   bun: { install: 'bun install --frozen-lockfile', build: 'bunx storybook build', add: 'bun add --dev' }
 };
 
@@ -31,9 +32,20 @@ export function detectPackageManager(projectDir, rootDir = projectDir) {
   ];
   for (const dir of new Set([projectDir, rootDir])) {
     const found = locks.find(([file]) => fs.existsSync(path.join(dir, file)));
-    if (found) return found[1];
+    if (found) return found[1] === 'yarn' && isYarnClassic(dir) ? 'yarn-classic' : found[1];
   }
   return 'npm';
+}
+
+// Yarn 2+ has .yarnrc.yml or declares itself in packageManager; a bare yarn.lock is Yarn 1.
+function isYarnClassic(dir) {
+  if (fs.existsSync(path.join(dir, '.yarnrc.yml'))) return false;
+  try {
+    const { packageManager = '' } = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+    return !/^yarn@[2-9]/.test(packageManager) && !/^yarn@\d{2,}/.test(packageManager);
+  } catch {
+    return true;
+  }
 }
 
 const yamlString = value => `'${String(value).replaceAll("'", "''")}'`;
@@ -320,6 +332,11 @@ export function runInit({ argv, cwd = process.cwd(), version, log = console.log 
     const target = path.join(root, file);
     const exists = fs.existsSync(target);
     const isMain = file === plan.mainPath;
+    // The configuration holds the project's own settings: never replaced, even with --force.
+    if (exists && file.endsWith('.storybook/swiss-knife.json')) {
+      log(`kept     ${file} (the configuration is never overwritten)`);
+      continue;
+    }
     if (exists && !isMain && !options.force) {
       log(`kept     ${file} (exists; --force overwrites it)`);
       continue;
@@ -335,28 +352,27 @@ export function runInit({ argv, cwd = process.cwd(), version, log = console.log 
 
   let labelCreated = false;
   if (options.label && !options.dryRun) {
+    const gh = args => execFileSync('gh', args, { cwd: root, stdio: 'ignore' });
     try {
-      execFileSync(
-        'gh',
-        [
+      gh(['api', `repos/{owner}/{repo}/labels/${encodeURIComponent(approvalLabel)}`]);
+      labelCreated = true;
+      log(`kept     label ${approvalLabel} (exists)`);
+    } catch {
+      try {
+        gh([
           'label',
           'create',
           approvalLabel,
           '--color',
           'FBCA04',
           '--description',
-          'Accepts the visual changes of this pull request',
-          '--force'
-        ],
-        {
-          cwd: root,
-          stdio: 'ignore'
-        }
-      );
-      labelCreated = true;
-      log(`created  label ${approvalLabel}`);
-    } catch {
-      log(`Could not create the "${approvalLabel}" label with the GitHub CLI.`);
+          'Accepts the visual changes of this pull request'
+        ]);
+        labelCreated = true;
+        log(`created  label ${approvalLabel}`);
+      } catch {
+        log(`Could not create the "${approvalLabel}" label with the GitHub CLI.`);
+      }
     }
   }
 
