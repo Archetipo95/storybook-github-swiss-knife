@@ -41,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Re-running a visual run failed both checks with "no results": each attempt uploads the results bundle under the same name, and the gate required exactly one. It now uses the latest attempt's bundle.
+- A screenshot shard on a different runner image version than the plan job (common during image rollouts) found no baselines and failed. Shards now fall back to the same commit's baselines from another image version, with a warning; the cache key puts the shard before the image version so that fallback stays per shard (existing caches are rebuilt once).
 - PR preview builds got a base URL without `preview_root` (`/<repo>/pr-<N>/`) while the publisher writes them to `<preview_root>/pr-<N>/`, so assets 404'd unless `preview_root` was `.`. `computeBaseUrl` now includes the preview root, passed from the resolved configuration by `deploy-storybook.yml` and the root action.
 - Reusable workflows ran `./src/*.js` of the checked-out repository, which in a consumer is the consumer's own code: `deploy-storybook.yml` failed outright, and the publish, cleanup and janitor configuration steps imported a consumer's `src/config.js` when one existed, or fell back to a minimal line parser that ignored most settings. They now always run this repository's scripts through `actions/toolkit` and read the full configuration.
 - The publish gate no longer checks out this repository to load the run-context resolver; it uses the pinned toolkit, which also works while the repository is private.
