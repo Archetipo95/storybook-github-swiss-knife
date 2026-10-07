@@ -161,3 +161,10 @@ test('validatePreviewMetadata rejects metadata targets that escape or overwrite 
     );
   }
 });
+
+test('decidePreviewAction skips a pull request closed while the publish waited', () => {
+  const metadata = sameRepoMetadata();
+  const decision = decidePreviewAction({ metadata, currentHeadSha: SHA_A, pullRequestState: 'closed' });
+  assert.equal(decision.action, 'skip-closed');
+  assert.equal(decidePreviewAction({ metadata, currentHeadSha: SHA_A }).action, 'publish');
+});
