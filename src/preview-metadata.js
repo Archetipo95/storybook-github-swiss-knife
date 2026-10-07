@@ -217,7 +217,7 @@ function normalize(value) {
  * which are reported as an explicit skip so callers can log a clear status
  * without failing the job.
  */
-export function decidePreviewAction({ metadata, trustedContext, currentHeadSha }) {
+export function decidePreviewAction({ metadata, trustedContext, currentHeadSha, pullRequestState = 'open' }) {
   validatePreviewMetadata(metadata, trustedContext);
 
   if (metadata.isFork) {
@@ -225,6 +225,14 @@ export function decidePreviewAction({ metadata, trustedContext, currentHeadSha }
       action: 'skip-fork',
       reason:
         'Pull request head repository differs from the base repository; forked PRs never receive a published preview.'
+    };
+  }
+
+  // Closed while the publish waited for its turn: the cleanup may already have run.
+  if (pullRequestState !== 'open') {
+    return {
+      action: 'skip-closed',
+      reason: `Pull request #${metadata.prNumber} is ${pullRequestState}; its preview is not published again.`
     };
   }
 

@@ -127,6 +127,7 @@ export async function publishPreview({
   pagesRepo,
   trustedContext,
   currentHeadSha,
+  pullRequestState = 'open',
   pagesBranch = 'gh-pages',
   managedDirectories = [],
   siteUrl = '',
@@ -142,7 +143,7 @@ export async function publishPreview({
   repository
 }) {
   const metadata = readBundleMetadata(bundleDir);
-  const decision = decidePreviewAction({ metadata, trustedContext, currentHeadSha });
+  const decision = decidePreviewAction({ metadata, trustedContext, currentHeadSha, pullRequestState });
 
   if (decision.action !== 'publish') {
     return { ...decision, metadata };
@@ -384,6 +385,7 @@ if (process.argv[1] && process.argv[1].endsWith('preview-publish.js')) {
     pagesRepo: process.env.PAGES_REPO,
     trustedContext,
     currentHeadSha: process.env.CURRENT_HEAD_SHA,
+    pullRequestState: process.env.CURRENT_PR_STATE || 'open',
     pagesBranch: process.env.PAGES_BRANCH || 'gh-pages',
     managedDirectories: process.env.MANAGED_DIRECTORIES
       ? process.env.MANAGED_DIRECTORIES.split(',')

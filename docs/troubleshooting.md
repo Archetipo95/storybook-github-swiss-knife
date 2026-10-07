@@ -24,7 +24,7 @@
 ### 4. Stale Run Skipped (`skip-stale`)
 
 - **Symptom**: `pr-preview-publish.yml` outputs `status: skipped` with a stale run notice.
-- **Explanation**: The publish workflow's `gate` job fetches the pull request's current head SHA, and the publish job compares it with the build artifact's head SHA. If a newer commit was pushed while an older run was building, the older run skips publishing to avoid overwriting newer code.
+- **Explanation**: Once it holds the Pages write queue, the publish job reads the pull request's current head SHA and compares it with the build artifact's. If a newer commit was pushed while an older run was building or waiting, the older run skips publishing to avoid overwriting newer code. A pull request closed meanwhile is skipped as `skip-closed`.
 
 ### 5. Artifact Validation Failures
 
@@ -85,8 +85,7 @@
 - **Solution**:
   - Update the `pr-preview-publish.yml`, `pr-preview-cleanup.yml`, `pr-preview-janitor.yml` and `deploy-storybook.yml` refs to a release that sets `queue: max` on the group (see [Concurrency](pr-previews.md#concurrency)).
   - Add `queue: max` to any workflow of your own that declares the `storybook-pages-${{ github.repository }}` group.
-  - To restore an open PR's missing preview, re-run the PR's latest `PR Preview Build` run, or open the cancelled publish run and choose **Re-run all jobs** (`gh run rerun <run-id>`) so the `gate` job re-reads the PR head. If the PR has moved on, that publish skips as `skip-stale`.
-  - Never use **Re-run failed jobs** (`gh run rerun <run-id> --failed`) on a publish run, and never re-run the `publish` job on its own (**Re-run job** on `publish`, or `gh run rerun --job <publish-job-id>`). Both reuse the head SHA the `gate` job fetched before the cancellation, so they can publish a stale commit over a newer preview.
+  - To restore an open PR's missing preview, re-run the PR's latest `PR Preview Build` run, or open the cancelled publish run and choose **Re-run all jobs** (`gh run rerun <run-id>`) (any re-run is safe: the publish job re-reads the PR head). If the PR has moved on, that publish skips as `skip-stale`.
   - For a cancelled cleanup, run the janitor manually (`workflow_dispatch`) instead of re-running the cleanup. The janitor removes previews of PRs that are no longer open (plus open-PR previews older than `preview_retention_days`), so it keeps a reopened PR's fresh preview, while a re-run cleanup also deletes the preview of a reopened PR.
 
 ---

@@ -236,31 +236,13 @@ function markdownSection(content, heading) {
   return content.slice(start, end === -1 ? undefined : end);
 }
 
-test('docs recover a cancelled preview publish without reusing the gate job head SHA snapshot', () => {
-  assert.match(
-    extractJobBlock(read('.github/workflows/pr-preview-publish.yml'), 'publish'),
-    /current_head_sha: \$\{\{ needs\.gate\.outputs\.current_head_sha \}\}/,
-    'the publish job compares against the head SHA the gate job fetched, so re-running publish alone reuses that snapshot'
-  );
-
+test('docs say a publish re-checks the pull request after the queue wait, so any re-run is safe', () => {
   const recovery = markdownSection(read('docs/troubleshooting.md'), '10. PR Preview Publish or Cleanup Cancelled');
-  assert.match(recovery, /Re-run all jobs/, 'recovery must re-run the gate job so it re-reads the PR head');
-  assert.match(
-    recovery,
-    /never use \*\*Re-run failed jobs\*\* \(`gh run rerun <run-id> --failed`\) on a publish run/i,
-    'recovery must warn that re-running only the failed publish job reuses the gate job head SHA'
-  );
-  assert.match(
-    recovery,
-    /never re-run the `publish` job on its own \(\*\*Re-run job\*\* on `publish`, or `gh run rerun --job <publish-job-id>`\)/i,
-    'recovery must warn against re-running publish alone; re-running the gate job also re-runs publish with a fresh head SHA'
-  );
-
-  assert.match(
-    markdownSection(read('docs/pr-previews.md'), 'Stale-run protection'),
-    /re-running only the publish job .*reuses the `gate` job's earlier head SHA snapshot/i,
-    'stale-run docs must say that a publish-only re-run reuses the gate head SHA'
-  );
+  assert.match(recovery, /any re-run is safe: the publish job re-reads the PR head/);
+  assert.doesNotMatch(recovery, /never use \*\*Re-run failed jobs\*\*/i);
+  const staleRun = markdownSection(read('docs/pr-previews.md'), 'Stale-run protection');
+  assert.match(staleRun, /after its wait in the Pages write queue/);
+  assert.match(staleRun, /`skip-closed`/);
 });
 
 test('preview target resolution and metadata modules are wired into the workflows and composite actions', () => {
@@ -286,4 +268,11 @@ test('preview target resolution and metadata modules are wired into the workflow
   assert.match(publisherAction, /preview-publish\.js/);
   assert.match(cleanupAction, /preview-cleanup\.js/);
   assert.match(janitorAction, /preview-janitor\.js/);
+});
+
+test('publish compares against the pull request head and state read after the queue wait', () => {
+  const publish = extractJobBlock(read('.github/workflows/pr-preview-publish.yml'), 'publish');
+  assert.match(publish, /queue: max[\s\S]*id: live[\s\S]*current_head_sha: \$\{\{ steps\.live\.outputs\.head_sha \}\}/);
+  assert.match(publish, /current_pr_state: \$\{\{ steps\.live\.outputs\.state \}\}/);
+  assert.doesNotMatch(publish, /needs\.gate\.outputs\.current_head_sha/);
 });

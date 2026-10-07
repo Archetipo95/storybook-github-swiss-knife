@@ -25,12 +25,11 @@ name: PR Preview Publish
 # `publish` re-validates the build artifact's bundled metadata against this
 # trusted context (repository, run id, PR number, base ref, head repo,
 # head SHA, artifact name) before touching the filesystem, then compares
-# the metadata head SHA against the current head SHA the gate fetched
-# (`needs.gate.outputs.current_head_sha`). `publish` does not fetch it
-# again: the gate reads it before `publish` waits in the Pages concurrency
-# queue, so a run already superseded at that point is skipped as
-# `skip-stale`, while a commit pushed during the wait is published by its
-# own run, which normally queues behind this one.
+# the metadata head SHA against the pull request's head SHA and state, read
+# again once `publish` holds the Pages concurrency group: a run superseded
+# while it waited is skipped as `skip-stale`, and one whose pull request was
+# closed meanwhile as `skip-closed`, so it cannot overwrite a newer preview
+# or bring back a removed one.
 
 on:
   workflow_run:
@@ -126,7 +125,7 @@ on:
         description: 'The URL of the published preview'
         value: ${{ jobs.publish.outputs.page_url }}
       action:
-        description: 'Publication action taken (published, skip-fork, skip-stale)'
+        description: 'Publication action taken (published, skip-fork, skip-stale, skip-closed)'
         value: ${{ jobs.publish.outputs.action }}
 
 jobs:
@@ -160,7 +159,7 @@ jobs:
       # is the caller's repository, and a private swiss-knife repository can't be
       # checked out with the caller's token.
       - name: Load swiss-knife toolkit
-        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@b3d62c33e7abdb9c3e10410937544dab7aff81ae
+        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@0aee9a955cd226d160b194385c61d8aefe28e926
 
       - name: Extract trusted pull request context
         id: context
@@ -303,7 +302,7 @@ jobs:
       # Trusted swiss-knife source for the steps below (exports SWISS_KNIFE_ROOT). Never
       # import ./src from the checked-out repository: that is the caller's code.
       - name: Load swiss-knife toolkit
-        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@b3d62c33e7abdb9c3e10410937544dab7aff81ae
+        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@0aee9a955cd226d160b194385c61d8aefe28e926
 
       - name: Resolve trusted base configuration
         id: config
@@ -341,6 +340,30 @@ jobs:
             });
           ' >> "$GITHUB_OUTPUT"
 
+      # Read after the queue wait, not taken from the gate: the pull request may have moved on or
+      # closed while this job waited for the Pages concurrency group.
+      - name: Re-read pull request head and state
+        id: live
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ needs.gate.outputs.pr_number }}
+        run: |
+          response=$(curl -sf \
+            -H "authorization: token $GITHUB_TOKEN" \
+            -H "accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPOSITORY/pulls/$PR_NUMBER")
+          node -e '
+            const data = JSON.parse(process.argv[1]);
+            const sha = data && data.head && data.head.sha;
+            if (typeof sha !== "string" || !/^[0-9a-f]{40}$/.test(sha) || typeof data.state !== "string") {
+              console.error("Pull request API response did not contain a valid head SHA and state");
+              process.exit(1);
+            }
+            console.log(`head_sha=${sha}`);
+            console.log(`state=${data.state}`);
+          ' "$response" >> "$GITHUB_OUTPUT"
+
       - name: Check Pages branch existence
         id: branch_check
         env:
@@ -377,7 +400,7 @@ jobs:
       - name: Validate provenance and publish
         id: publisher
         if: steps.branch_check.outputs.exists == 'true'
-        uses: Archetipo95/storybook-github-swiss-knife/actions/preview-publisher@b3d62c33e7abdb9c3e10410937544dab7aff81ae
+        uses: Archetipo95/storybook-github-swiss-knife/actions/preview-publisher@0aee9a955cd226d160b194385c61d8aefe28e926
         with:
           bundle_dir: ${{ runner.temp }}/preview-bundle
           pages_repo: ${{ github.workspace }}/pages-repo
@@ -403,4 +426,5 @@ jobs:
           trusted_head_repository: ${{ needs.gate.outputs.head_repository }}
           trusted_base_ref: ${{ needs.gate.outputs.base_ref }}
           expected_artifact_name: ${{ inputs.artifact_name || format('storybook-preview-pr-{0}-run-{1}', needs.gate.outputs.pr_number, needs.gate.outputs.run_id) }}
-          current_head_sha: ${{ needs.gate.outputs.current_head_sha }}
+          current_head_sha: ${{ steps.live.outputs.head_sha }}
+          current_pr_state: ${{ steps.live.outputs.state }}

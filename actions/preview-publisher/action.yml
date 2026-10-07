@@ -75,6 +75,10 @@ inputs:
     description: 'Current live pull request head commit SHA'
     required: false
     default: ''
+  current_pr_state:
+    description: 'Current pull request state (open, closed); a closed pull request is not published'
+    required: false
+    default: 'open'
   create_deployment:
     description: 'Whether to create a native GitHub deployment record for the preview'
     required: false
@@ -104,7 +108,7 @@ outputs:
     description: 'The URL of the published GitHub Pages site'
     value: ${{ steps.publish.outputs.page_url }}
   action:
-    description: 'Publication action taken (published, skip-fork, skip-stale)'
+    description: 'Publication action taken (published, skip-fork, skip-stale, skip-closed)'
     value: ${{ steps.publish.outputs.action }}
 runs:
   using: 'composite'
@@ -131,6 +135,7 @@ runs:
         TRUSTED_BASE_REF: ${{ inputs.trusted_base_ref }}
         EXPECTED_ARTIFACT_NAME: ${{ inputs.expected_artifact_name }}
         CURRENT_HEAD_SHA: ${{ inputs.current_head_sha }}
+        CURRENT_PR_STATE: ${{ inputs.current_pr_state }}
         CREATE_DEPLOYMENT: ${{ inputs.create_deployment }}
         DEPLOYMENT_ENVIRONMENT: ${{ inputs.environment_name }}
         ENVIRONMENT_URL: ${{ inputs.environment_url }}
