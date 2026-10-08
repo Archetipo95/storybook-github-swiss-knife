@@ -51,7 +51,7 @@ jobs:
 
 Need a custom pipeline or branch-backed directory deploy? See [Usage](docs/usage.md).
 
-> While this repository is private, only repositories owned by Archetipo95 can use it, after allowing them in its Settings → Actions → Access, and the addon is installed from an `npm pack` tarball.
+> The Storybook addon isn't on npm yet: run `npm pack` in `packages/addon` and install the tarball.
 
 ## What you get on your Pages site
 
