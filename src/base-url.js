@@ -47,28 +47,9 @@ export function computeBaseUrl({
   return path;
 }
 
-export function hasExplicitBaseUrl(command = '') {
-  return /(?:^|\s)(?:--base(?:-url)?|--public-path|--output-base|--output-dir|-o)(?:[=\s]|$)|(?:^|\s)(?:BASE_URL|PUBLIC_URL|STORYBOOK_BASE_HREF)=/i.test(
-    command
-  );
-}
-
-export function isStorybookBuildCommand(command = '') {
-  return /(?:^|\s)(?:build-storybook|storybook\s+build)(?:\s|$)/i.test(command);
-}
-
-export function augmentBuildCommand(command, baseUrl, { autoBaseUrl = true } = {}) {
-  if (!autoBaseUrl || !command || !baseUrl || hasExplicitBaseUrl(command)) return command;
-  // A multi-line command gets the flag on its last Storybook build line.
-  const lines = command.split('\n');
-  const index = lines.findLastIndex(line => isStorybookBuildCommand(line));
-  if (index === -1) return command;
-  const [, line, eol] = /^(.*?)(\r?)$/s.exec(lines[index]);
-  const separator = /^(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?/.test(line.trim()) ? ' -- ' : ' ';
-  lines[index] = `${line}${separator}--base-url ${shellQuote(baseUrl)}${eol}`;
-  return lines.join('\n');
-}
-
+// Storybook has no base URL option (`storybook build --base-url` fails as an unknown option), and
+// its builds use relative asset paths, so they load from any Pages path. auto_base_url only sets
+// these variables for build tooling that reads them.
 export function buildEnvironment(baseUrl) {
   return {
     BASE_URL: baseUrl,

@@ -41,10 +41,14 @@ function runStep(script, { cwd, env }) {
   return result;
 }
 
-/** A `build-storybook` on PATH that records its arguments. */
+/** A `build-storybook` on PATH that records its arguments and the base URL variables. */
 function fakeStorybook(t) {
   const bin = tempDir(t, 'sk-build-bin-');
-  fs.writeFileSync(path.join(bin, 'build-storybook'), '#!/bin/sh\nprintf "%s\\n" "$@" > args.txt\n', { mode: 0o755 });
+  fs.writeFileSync(
+    path.join(bin, 'build-storybook'),
+    '#!/bin/sh\necho "$# $*" > args.txt\necho "$BASE_URL $PUBLIC_URL $STORYBOOK_BASE_HREF" > env.txt\n',
+    { mode: 0o755 }
+  );
   return `${bin}${path.delimiter}${process.env.PATH}`;
 }
 
@@ -122,7 +126,7 @@ test('action.yml config step: an existing node_modules (installed by the caller)
   assert.equal(explicit.env.SB_INSTALL_COMMAND, 'npm ci');
 });
 
-test('deploy-storybook.yml build step runs a multi-line command line by line, with the base URL on the build line', t => {
+test('deploy-storybook.yml build step runs a multi-line command line by line, as written, with the base URL variables', t => {
   const dir = project(t);
   runStep(stepRun('.github/workflows/deploy-storybook.yml', 'Run custom build command'), {
     cwd: dir,
@@ -136,10 +140,12 @@ test('deploy-storybook.yml build step runs a multi-line command line by line, wi
     }
   });
   assert.equal(fs.readFileSync(path.join(dir, 'first.txt'), 'utf8'), "it's the first line\n");
-  assert.equal(fs.readFileSync(path.join(dir, 'args.txt'), 'utf8'), '--base-url\n/repo/\n');
+  // Storybook has no --base-url option: the command runs unchanged, the base URL is in the environment.
+  assert.equal(fs.readFileSync(path.join(dir, 'args.txt'), 'utf8'), '0 \n');
+  assert.equal(fs.readFileSync(path.join(dir, 'env.txt'), 'utf8'), '/repo/ /repo/ /repo/\n');
 });
 
-test('action.yml build step runs a multi-line command line by line, with the base URL on the build line', t => {
+test('action.yml build step runs a multi-line command line by line, as written, with the base URL variables', t => {
   const dir = project(t);
   runStep(stepRun('action.yml', 'Build Storybook'), {
     cwd: dir,
@@ -153,5 +159,33 @@ test('action.yml build step runs a multi-line command line by line, with the bas
     }
   });
   assert.equal(fs.readFileSync(path.join(dir, 'first.txt'), 'utf8'), "it's the first line\n");
-  assert.equal(fs.readFileSync(path.join(dir, 'args.txt'), 'utf8'), '--base-url\n/repo/\n');
+  // Storybook has no --base-url option: the command runs unchanged, the base URL is in the environment.
+  assert.equal(fs.readFileSync(path.join(dir, 'args.txt'), 'utf8'), '0 \n');
+  assert.equal(fs.readFileSync(path.join(dir, 'env.txt'), 'utf8'), '/repo/ /repo/ /repo/\n');
+});
+
+test('deploy-storybook.yml build step: with auto_base_url off, no base URL variables', t => {
+  const dir = project(t);
+  runStep(stepRun('.github/workflows/deploy-storybook.yml', 'Run custom build command'), {
+    cwd: dir,
+    env: {
+      BUILD_COMMAND: 'build-storybook --output-dir out',
+      AUTO_BASE_URL: 'false',
+      REPOSITORY: 'owner/repo',
+      SWISS_KNIFE_ROOT: process.cwd(),
+      BASE_URL: '',
+      PUBLIC_URL: '',
+      STORYBOOK_BASE_HREF: '',
+      PATH: fakeStorybook(t)
+    }
+  });
+  assert.equal(fs.readFileSync(path.join(dir, 'args.txt'), 'utf8'), '2 --output-dir out\n');
+  assert.equal(fs.readFileSync(path.join(dir, 'env.txt'), 'utf8'), '  \n');
+});
+
+test('no build step passes --base-url, which storybook build rejects as an unknown option', async () => {
+  for (const file of ['action.yml', '.github/workflows/deploy-storybook.yml']) {
+    assert.doesNotMatch(fs.readFileSync(path.join(process.cwd(), file), 'utf8'), /--base-url/, file);
+  }
+  assert.equal((await import('../src/base-url.js')).augmentBuildCommand, undefined);
 });

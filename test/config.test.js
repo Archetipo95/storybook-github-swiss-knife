@@ -12,7 +12,7 @@ import {
   resolveBaseDirectoryForRef,
   validateRelativeDirectory
 } from '../src/config.js';
-import { augmentBuildCommand, computeBaseUrl, hasExplicitBaseUrl } from '../src/base-url.js';
+import { computeBaseUrl } from '../src/base-url.js';
 
 test('automatic base URL computation handles repository, custom-domain, and PR preview paths', () => {
   assert.equal(computeBaseUrl({ repository: 'acme/design-system' }), '/design-system/');
@@ -30,42 +30,6 @@ test('automatic base URL computation handles repository, custom-domain, and PR p
       prNumber: 123
     }),
     '/pr-123/'
-  );
-});
-
-test('automatic base URL augmentation preserves explicit base configuration', () => {
-  assert.equal(hasExplicitBaseUrl('npm run build-storybook -- --base /custom/'), true);
-  assert.equal(hasExplicitBaseUrl('storybook build -o dist'), true);
-  assert.equal(hasExplicitBaseUrl('storybook build --output-dir=dist'), true);
-  assert.equal(
-    augmentBuildCommand('npm run build-storybook -- --base /custom/', '/repo/'),
-    'npm run build-storybook -- --base /custom/'
-  );
-  assert.equal(
-    augmentBuildCommand('npm run build-storybook', '/repo/'),
-    "npm run build-storybook -- --base-url '/repo/'"
-  );
-  assert.equal(augmentBuildCommand('npm run build', '/repo/'), 'npm run build');
-  assert.equal(augmentBuildCommand('vite build', '/repo/'), 'vite build');
-  assert.equal(
-    augmentBuildCommand('npm run build-storybook', '/repo/', { autoBaseUrl: false }),
-    'npm run build-storybook'
-  );
-});
-
-test('augmentBuildCommand puts the base URL on the last Storybook build line of a multi-line command', () => {
-  assert.equal(
-    augmentBuildCommand('npm run lint\nnpm run build-storybook\necho done', '/repo/'),
-    "npm run lint\nnpm run build-storybook -- --base-url '/repo/'\necho done"
-  );
-  assert.equal(
-    augmentBuildCommand('cd docs\r\nnpx storybook build\r\n', '/repo/'),
-    "cd docs\r\nnpx storybook build --base-url '/repo/'\r\n"
-  );
-  assert.equal(augmentBuildCommand('npm run lint\nnpm run build', '/repo/'), 'npm run lint\nnpm run build');
-  assert.equal(
-    augmentBuildCommand('npm run lint\nstorybook build -o out', '/repo/'),
-    'npm run lint\nstorybook build -o out'
   );
 });
 

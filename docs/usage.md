@@ -196,7 +196,7 @@ jobs:
 | `smoke_test`                  | `boolean` | `false`              | Run a local Playwright smoke test against the built Storybook before validation and publishing                                            |
 | `smoke_test_stories`          | `string`  | `all`                | Comma-separated story id globs to exercise after the manager and canvas checks                                                            |
 | `smoke_test_timeout_ms`       | `number`  | `30000`              | Per-page browser navigation timeout in milliseconds                                                                                       |
-| `auto_base_url`               | `boolean` | `true`               | Automatically inject the repository or preview base URL into Storybook builds unless an explicit base option is provided                  |
+| `auto_base_url`               | `boolean` | `true`               | Set `BASE_URL`, `PUBLIC_URL` and `STORYBOOK_BASE_HREF` to the repository or preview base URL for the build command                        |
 | `audit_bundle_size`           | `boolean` | `false`              | Report total, gzip-estimated and per-type asset sizes in the job summary ([Bundle size](bundle-size.md))                                  |
 | `bundle_size_max_mb`          | `string`  | `''`                 | Optional total static output budget in megabytes; the build fails when exceeded                                                           |
 
