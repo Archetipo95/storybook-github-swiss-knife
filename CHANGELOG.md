@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The reusable workflow's directory-mode deploys now get correct badges and history: the build job, which has the source, makes the badges and the stats snapshot, and passes `generate_badges`, `badges_directory`, `generate_stats_graph` and `stats_directory` to the publisher, which used to regenerate them without the source and ignored `generate_badges: false`. The build job's badges also apply `coverage_include_paths` and `coverage_ignore_paths` now.
 - The `publisher` action regenerated badges and the stats point wherever it ran. Without the source (a publish job that only has the static output) that gives coverage 100% and the Storybook version "deployed", overwrites the build's correct badges, and adds such a point to `stats/history.json`. It now keeps badges the build already made (`badges/overview.json` in the output) and adds the build's stats snapshot (`stats/history.json` in the output) to the Pages history instead of recounting, when they are for the commit being published (a leftover from another commit, such as a `badges/` or `stats/` folder in `public/`, is ignored with a warning). When it does make badges without a `package.json` in the workspace, it warns. The usage docs' two-job example now checks the source out in the publish job.
 
 ## [0.3.0] - 2026-10-10

@@ -4,14 +4,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-/** The `run: |` script of the step named `name` in a workflow or action file (repo-relative). */
+/** The `run:` script (a `|` block or a single line) of the step named `name` in a workflow or action file. */
 export function stepRun(file, name) {
   const lines = fs.readFileSync(path.join(process.cwd(), file), 'utf8').split('\n');
   const start = lines.findIndex(line => line.trim() === `- name: ${name}`);
   assert.notEqual(start, -1, `${file} has no step "${name}"`);
   const next = lines.findIndex((line, index) => index > start && line.trim().startsWith('- name: '));
-  const run = lines.findIndex((line, index) => index > start && /^\s*run: \|$/.test(line));
-  assert.ok(run !== -1 && (next === -1 || run < next), `${file}: "${name}" has no run: | block`);
+  const run = lines.findIndex((line, index) => index > start && /^\s*run: /.test(line));
+  assert.ok(run !== -1 && (next === -1 || run < next), `${file}: "${name}" has no run:`);
+  const single = /^\s*run: (?!\|$)(.*)$/.exec(lines[run]);
+  if (single) return `${single[1]}\n`;
   const indent = lines[run].search(/\S/);
   const body = [];
   for (const line of lines.slice(run + 1)) {
