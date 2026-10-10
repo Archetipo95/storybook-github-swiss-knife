@@ -166,8 +166,8 @@ jobs:
 | `cache`                       | `boolean` | `true`               | Reusable workflow only: restore and save dependency plus Storybook compilation caches in its read-only build job                          |
 | `cache_key_prefix`            | `string`  | `storybook-gh-pages` | Reusable workflow only: prefix for Bun and Storybook compilation cache keys                                                               |
 | `checkout`                    | `string`  | `'true'`             | Whether to check out the repository automatically (Action only)                                                                           |
-| `install_command`             | `string`  | `''`                 | Bitovi compatibility / custom dependency installation command                                                                             |
-| `build_command`               | `string`  | `''`                 | Bitovi compatibility / custom Storybook build command                                                                                     |
+| `install_command`             | `string`  | `''`                 | Dependency install command; empty installs from the lockfile before a build ([details](#install-and-build-commands))                      |
+| `build_command`               | `string`  | `''`                 | Storybook build command; may span several lines ([details](#install-and-build-commands))                                                  |
 | `custom_install_command`      | `string`  | `''`                 | Alias for `install_command`                                                                                                               |
 | `custom_build_command`        | `string`  | `''`                 | Alias for `build_command`                                                                                                                 |
 | `publish`                     | `string`  | `'true'`             | Whether to upload and deploy the Pages artifact                                                                                           |
@@ -217,6 +217,39 @@ missing Storybook sidebar. It uses an installed `playwright` package when
 available; otherwise it downloads Playwright and Chromium into a temporary
 directory for the run. Story globs are matched against `stories.json` or
 `index.json` entry ids.
+
+### Install and build commands
+
+`build_command` runs your Storybook build. When `install_command` is empty, the
+dependencies are installed first, with the command for `package_manager` and
+the project's lockfile:
+
+| `package_manager`                                                  | With a lockfile                           | Without one                                  |
+| ------------------------------------------------------------------ | ----------------------------------------- | -------------------------------------------- |
+| `npm`                                                              | `npm ci`                                  | `npm install`                                |
+| `pnpm`                                                             | `corepack pnpm install --frozen-lockfile` | `corepack pnpm install --no-frozen-lockfile` |
+| `yarn`, Yarn 2+ (`.yarnrc.yml` or `packageManager: yarn@2` and up) | `corepack yarn install --immutable`       | `corepack yarn install --no-immutable`       |
+| `yarn`, Yarn 1                                                     | `yarn install --frozen-lockfile`          | `yarn install`                               |
+
+Without a lockfile the run also warns: commit one for reproducible builds, or
+set `install_command`. With no `build_command`, nothing is installed and the
+output already at `path` is published. Bun keeps its own defaults,
+`bun install --frozen-lockfile` and `bun run build-storybook`.
+
+The composite action runs after your job's own steps, so it skips the default
+install when `node_modules` already exists; set `install_command` to install
+anyway. The reusable workflow enables corepack for pnpm and Yarn, at the version
+in `package.json` `packageManager`, so `pnpm` and `yarn` also work in your
+commands.
+
+Both commands can span several lines, for example a YAML `|` block. The lines
+run in order in one shell:
+
+```yaml
+build_command: |
+  npm run build:tokens
+  npm run build-storybook
+```
 
 ### Build caching
 
