@@ -200,6 +200,8 @@ jobs:
       artifact_name: ${{ steps.config.outputs.artifact_name }}
       generate_badges: ${{ steps.config.outputs.generate_badges }}
       badges_directory: ${{ steps.config.outputs.badges_directory }}
+      generate_stats_graph: ${{ steps.config.outputs.generate_stats_graph }}
+      stats_directory: ${{ steps.config.outputs.stats_directory }}
       test_results_path: ${{ steps.config.outputs.test_results_path }}
       enable_passcode_gate: ${{ steps.config.outputs.enable_passcode_gate }}
       passcode_session_hours: ${{ steps.config.outputs.passcode_session_hours }}
@@ -211,7 +213,7 @@ jobs:
       # The steps below run swiss-knife's own scripts (SWISS_KNIFE_ROOT), never ./src of the
       # checked-out caller repository.
       - name: Load swiss-knife toolkit
-        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@89e1e9300108b2ecef21f8f156cd8e4a96e17991
+        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@c96f2b7bb57f43a2295bf794e4b1c9df8c0724c5
 
       - name: Resolve and validate configuration
         id: config
@@ -327,27 +329,28 @@ jobs:
 
       - name: Generate Storybook badges
         if: ${{ steps.config.outputs.generate_badges == 'true' }}
-        run: |
-          node -e '
-            import(process.env.SWISS_KNIFE_ROOT + "/src/generate-badges.js").then(m => {
-              m.generateBadges({
-                staticDir: process.env.TARGET_PATH,
-                workspaceRoot: process.env.WORKSPACE_ROOT,
-                badgesDirectory: process.env.BADGES_DIRECTORY,
-                testResultsPath: process.env.TEST_RESULTS_PATH,
-                siteUrl: process.env.SITE_URL,
-                basePath: process.env.BASE_PATH
-              });
-              console.log("Badge generation successful");
-            });
-          '
         env:
           TARGET_PATH: ${{ steps.config.outputs.path }}
           WORKSPACE_ROOT: ${{ github.workspace }}
-          BADGES_DIRECTORY: ${{ steps.config.outputs.badges_directory }}
-          TEST_RESULTS_PATH: ${{ steps.config.outputs.test_results_path }}
-          SITE_URL: ${{ steps.config.outputs.site_url }}
-          BASE_PATH: ${{ steps.config.outputs.base_path }}
+          SB_BADGES_DIRECTORY: ${{ steps.config.outputs.badges_directory }}
+          SB_TEST_RESULTS_PATH: ${{ steps.config.outputs.test_results_path }}
+          SB_COVERAGE_INCLUDE_PATHS: ${{ steps.config.outputs.coverage_include_paths }}
+          SB_COVERAGE_IGNORE_PATHS: ${{ steps.config.outputs.coverage_ignore_paths }}
+          SB_SITE_URL: ${{ steps.config.outputs.site_url }}
+          SB_BASE_PATH: ${{ steps.config.outputs.base_path }}
+        run: node "$SWISS_KNIFE_ROOT/src/generate-badges.js" "$TARGET_PATH" "$WORKSPACE_ROOT"
+
+      # Directory mode: the publisher adds this snapshot to the Pages branch's history. It is
+      # computed here because the publish job has no source, so it cannot count coverage.
+      - name: Generate Storybook stats snapshot
+        if: ${{ steps.config.outputs.generate_stats_graph == 'true' && steps.config.outputs.mode == 'directory' }}
+        env:
+          TARGET_PATH: ${{ steps.config.outputs.path }}
+          WORKSPACE_ROOT: ${{ github.workspace }}
+          SB_STATS_DIRECTORY: ${{ steps.config.outputs.stats_directory }}
+          SB_COVERAGE_INCLUDE_PATHS: ${{ steps.config.outputs.coverage_include_paths }}
+          SB_COVERAGE_IGNORE_PATHS: ${{ steps.config.outputs.coverage_ignore_paths }}
+        run: node "$SWISS_KNIFE_ROOT/src/generate-stats.js" "$TARGET_PATH" "$WORKSPACE_ROOT"
 
       - name: Run Storybook smoke test
         if: ${{ steps.config.outputs.smoke_test == 'true' }}
@@ -428,7 +431,7 @@ jobs:
     steps:
       - name: Load swiss-knife toolkit
         if: ${{ needs.build-and-upload.outputs.create_deployment == 'true' }}
-        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@89e1e9300108b2ecef21f8f156cd8e4a96e17991
+        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@c96f2b7bb57f43a2295bf794e4b1c9df8c0724c5
 
       - name: Create GitHub deployment (pending)
         id: create-deployment
@@ -511,7 +514,7 @@ jobs:
           BASE_PATH: ${{ needs.build-and-upload.outputs.base_path }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        uses: Archetipo95/storybook-github-swiss-knife/actions/publisher@89e1e9300108b2ecef21f8f156cd8e4a96e17991
+        uses: Archetipo95/storybook-github-swiss-knife/actions/publisher@c96f2b7bb57f43a2295bf794e4b1c9df8c0724c5
         with:
           pages_repo: ${{ github.workspace }}/pages-repo
           source_directory: ${{ github.workspace }}/storybook-static
@@ -524,3 +527,9 @@ jobs:
           base_path: ${{ needs.build-and-upload.outputs.base_path }}
           cname: ${{ needs.build-and-upload.outputs.cname }}
           preserve_cname: ${{ needs.build-and-upload.outputs.preserve_cname }}
+          # The build job made the badges and the stats snapshot with the source; the publisher
+          # keeps those badges and adds the snapshot to the Pages history.
+          generate_badges: ${{ needs.build-and-upload.outputs.generate_badges }}
+          badges_directory: ${{ needs.build-and-upload.outputs.badges_directory }}
+          generate_stats_graph: ${{ needs.build-and-upload.outputs.generate_stats_graph }}
+          stats_directory: ${{ needs.build-and-upload.outputs.stats_directory }}

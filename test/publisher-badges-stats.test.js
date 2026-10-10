@@ -172,3 +172,42 @@ test('stats without a build snapshot are computed as before', t => {
   const { result } = stats(t, { staticFiles: STATIC, pagesFiles: {} });
   assert.doesNotMatch(result.stdout, /Using the snapshot the build wrote/);
 });
+
+test('deploy-storybook.yml: the build job makes badges and the stats snapshot, the publisher gets the settings', () => {
+  const workflow = fs.readFileSync(path.join(process.cwd(), '.github/workflows/deploy-storybook.yml'), 'utf8');
+  const badges = stepRun('.github/workflows/deploy-storybook.yml', 'Generate Storybook badges');
+  assert.match(badges, /node "\$SWISS_KNIFE_ROOT\/src\/generate-badges\.js" "\$TARGET_PATH" "\$WORKSPACE_ROOT"/);
+  assert.match(workflow, /SB_COVERAGE_INCLUDE_PATHS: \$\{\{ steps\.config\.outputs\.coverage_include_paths \}\}/);
+  assert.match(
+    workflow,
+    /- name: Generate Storybook stats snapshot\n\s+if: \$\{\{ steps\.config\.outputs\.generate_stats_graph == 'true' && steps\.config\.outputs\.mode == 'directory' \}\}/
+  );
+  for (const name of ['generate_badges', 'badges_directory', 'generate_stats_graph', 'stats_directory']) {
+    assert.match(workflow, new RegExp(`\\n {6}${name}: \\$\\{\\{ steps\\.config\\.outputs\\.${name} \\}\\}\\n`), name);
+    assert.match(
+      workflow,
+      new RegExp(`\\n {10}${name}: \\$\\{\\{ needs\\.build-and-upload\\.outputs\\.${name} \\}\\}\\n`),
+      name
+    );
+  }
+});
+
+test('deploy-storybook.yml: the build job stats step writes the snapshot with the source', t => {
+  const staticDir = tempDir(t, STATIC);
+  const workspaceRoot = tempDir(t, WORKSPACE);
+  runStep(stepRun('.github/workflows/deploy-storybook.yml', 'Generate Storybook stats snapshot'), {
+    cwd: workspaceRoot,
+    env: {
+      SWISS_KNIFE_ROOT: process.cwd(),
+      TARGET_PATH: staticDir,
+      WORKSPACE_ROOT: workspaceRoot,
+      SB_STATS_DIRECTORY: 'stats',
+      GITHUB_SHA: 'abc1234def'
+    }
+  });
+  const [snapshot, ...rest] = readJson(path.join(staticDir, 'stats/history.json'));
+  assert.equal(rest.length, 0);
+  assert.equal(snapshot.coveragePercent, 50);
+  assert.equal(snapshot.version, 'v9.1.20');
+  assert.equal(snapshot.commit, 'abc1234');
+});
