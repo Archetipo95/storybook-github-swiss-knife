@@ -30,7 +30,8 @@ Coverage and the Storybook version come from the source, so badges and the stats
 computed where the source is checked out:
 
 - **`publisher` action:** it keeps badges the build already made (`badges/overview.json` in the
-  output) and uses the build's stats snapshot when there is one. Otherwise it computes them
+  output) and uses the build's stats snapshot when there is one, if they are for the commit
+  being published (a leftover for another commit is ignored with a warning). Otherwise it computes them
   where it runs, which needs the source checked out in that job. Without a `package.json` there
   it warns.
 - **PR previews:** the untrusted build makes both, and the trusted publisher adds the snapshot

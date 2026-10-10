@@ -667,7 +667,14 @@ if (process.argv[1] && process.argv[1].endsWith('generate-stats.js')) {
     // Publishing (with the Pages history): when the build already wrote its snapshot where the
     // source was checked out, use it. Recounting here would miss the source (coverage 100%,
     // version "deployed") and add a wrong point to the history.
-    const currentSnapshot = pagesRepo ? readArtifactCurrentSnapshot(staticDir, statsDir) : null;
+    let currentSnapshot = pagesRepo ? readArtifactCurrentSnapshot(staticDir, statsDir) : null;
+    // A snapshot for another commit is not this build's (e.g. a stats/ folder shipped in public/).
+    if (currentSnapshot?.commit && commitSha && !commitSha.startsWith(currentSnapshot.commit)) {
+      console.log(
+        `::warning::Ignoring the stats snapshot in the output: it is for commit ${currentSnapshot.commit}, not ${commitSha.slice(0, 7)}.`
+      );
+      currentSnapshot = null;
+    }
     if (currentSnapshot) console.log('Using the snapshot the build wrote with the source checked out.');
     const result = generateStatsGraph({
       staticDir,

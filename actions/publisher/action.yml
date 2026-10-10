@@ -95,9 +95,14 @@ runs:
       # are kept: this job may only have the static output, where coverage and the Storybook
       # version cannot be computed.
       run: |
-        if [ -f "$SOURCE_PATH/$SB_BADGES_DIRECTORY/overview.json" ]; then
-          echo "Keeping the badges the build generated."
-          exit 0
+        overview="$SOURCE_PATH/$SB_BADGES_DIRECTORY/overview.json"
+        if [ -f "$overview" ]; then
+          # Only this commit's badges: an overview.json for another commit is a leftover (e.g. shipped in public/).
+          if node -e 'const { commit = "" } = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")); process.exit(!commit || (process.env.GITHUB_SHA || "").startsWith(commit) ? 0 : 1)' "$overview"; then
+            echo "Keeping the badges the build generated."
+            exit 0
+          fi
+          echo "::warning::Regenerating the badges: $overview is for another commit."
         fi
         if [ ! -f "$WORKSPACE_ROOT/package.json" ]; then
           echo "::warning::No package.json in $WORKSPACE_ROOT: the coverage and Storybook version badges need the source. Check it out in this job, or generate the badges where it is checked out."

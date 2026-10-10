@@ -68,15 +68,28 @@ function publisherBadges(t, { staticFiles = STATIC, workspace = WORKSPACE } = {}
 }
 
 test('publisher: badges the build already made are kept', t => {
-  const built = { ...STATIC, 'badges/overview.json': { coveragePercent: 50, storybookVersion: 'v9.1.20' } };
+  const built = {
+    ...STATIC,
+    'badges/overview.json': { commit: 'abc1234', coveragePercent: 50, storybookVersion: 'v9.1.20' }
+  };
   // No source in this job: regenerating would give 100% and "deployed".
   const { result, staticDir } = publisherBadges(t, { staticFiles: built, workspace: {} });
   assert.match(result.stdout, /Keeping the badges the build generated/);
   assert.deepEqual(readJson(path.join(staticDir, 'badges/overview.json')), {
+    commit: 'abc1234',
     coveragePercent: 50,
     storybookVersion: 'v9.1.20'
   });
   assert.equal(fs.existsSync(path.join(staticDir, 'badges/coverage.svg')), false);
+});
+
+test('publisher: badges for another commit (a leftover, e.g. from public/) are regenerated', t => {
+  const stale = { ...STATIC, 'badges/overview.json': { commit: '1111111', coveragePercent: 10 } };
+  const { result, staticDir } = publisherBadges(t, { staticFiles: stale });
+  assert.match(result.stdout, /::warning::Regenerating the badges: .*overview\.json is for another commit/);
+  const overview = readJson(path.join(staticDir, 'badges/overview.json'));
+  assert.equal(overview.commit, 'abc1234');
+  assert.equal(overview.coveragePercent, 50);
 });
 
 test('publisher: with the source checked out (one job), it makes the badges itself', t => {
@@ -92,9 +105,10 @@ test('publisher: without the source and without the build badges, it warns', t =
   assert.match(result.stdout, /::warning::No package\.json in .*coverage and Storybook version badges need the source/);
 });
 
-function stats(t, { staticFiles, pagesFiles = null }) {
+// The build and publish jobs of one run see the same commit.
+function stats(t, { staticFiles, pagesFiles = null, sha = 'abc1234def' }) {
   const staticDir = tempDir(t, staticFiles);
-  const env = { GITHUB_SHA: 'fff9999aaa', SB_STATS_DIRECTORY: 'stats' };
+  const env = { GITHUB_SHA: sha, SB_STATS_DIRECTORY: 'stats' };
   const args = [path.join(process.cwd(), 'src/generate-stats.js'), staticDir, tempDir(t, {})];
   if (pagesFiles) env.PAGES_REPO = tempDir(t, pagesFiles);
   const fullEnv = { ...process.env, ...env };
@@ -126,7 +140,7 @@ test('stats at publish time use the snapshot the build wrote, not a recount', t 
   assert.match(result.stdout, /Using the snapshot the build wrote/);
   assert.equal(history.length, 2);
   assert.equal(history[0].commit, '0000001');
-  // A recount here (no source) would say 100% and "deployed" for commit fff9999.
+  // A recount here (no source) would say 100% and "deployed".
   assert.equal(history[1].commit, 'abc1234');
   assert.equal(history[1].coveragePercent, 50);
   assert.equal(history[1].version, 'v9.1.20');
@@ -139,6 +153,19 @@ test('stats on a first publish (no Pages history yet) keep the build snapshot on
   });
   assert.equal(history.length, 1);
   assert.equal(history[0].coveragePercent, 50);
+});
+
+test('stats ignore a snapshot for another commit (a leftover) and compute instead', t => {
+  const { result, history } = stats(t, {
+    staticFiles: { ...STATIC, 'stats/history.json': [{ ...BUILD_SNAPSHOT, commit: '1111111' }] },
+    pagesFiles: { 'stats/history.json': [{ ...BUILD_SNAPSHOT, commit: '0000001' }] }
+  });
+  assert.match(
+    result.stdout,
+    /::warning::Ignoring the stats snapshot in the output: it is for commit 1111111, not abc1234/
+  );
+  assert.doesNotMatch(result.stdout, /Using the snapshot the build wrote/);
+  assert.equal(history.at(-1).commit, 'abc1234');
 });
 
 test('stats without a build snapshot are computed as before', t => {
