@@ -102,3 +102,38 @@ test('prepare-release refuses when the branch changes code its pins would not ru
   assert.match(prepared.stderr, /run `git fetch origin main` and try again/);
   assert.equal(git(['status', '--porcelain'], worktree), '', 'nothing may be written before refusing');
 });
+
+const bumpPins = (worktree, base) =>
+  spawnSync('node', [path.join(repoRoot, 'scripts/bump-pins.js')], {
+    cwd: worktree,
+    encoding: 'utf8',
+    env: { ...process.env, SWISS_KNIFE_RELEASE_BASE: base }
+  });
+
+test('bump-pins moves only the internal action pins', t => {
+  const worktree = worktreeOfHead(t);
+  const base = git(['rev-parse', 'HEAD'], worktree);
+  const bumped = bumpPins(worktree, base);
+  assert.equal(bumped.status, 0, bumped.stderr);
+  assert.match(bumped.stdout, new RegExp(`Moved internal action pins -> ${base}`));
+  assert.deepEqual([...internalPins(worktree)], [base]);
+  // No version, changelog or doc change: only workflow files.
+  const changed = git(['diff', '--name-only'], worktree).split('\n').filter(Boolean);
+  assert.ok(changed.length > 0, 'the pins moved');
+  assert.ok(
+    changed.every(file => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(file)),
+    changed.join('\n')
+  );
+});
+
+test('bump-pins refuses when the branch changes code its pins would not run', t => {
+  const worktree = worktreeOfHead(t);
+  const base = git(['rev-parse', 'HEAD'], worktree);
+  fs.appendFileSync(path.join(worktree, 'src/config.js'), '\n// A change on the pin-bump branch.\n');
+  git([...IDENTITY, 'commit', '-qam', 'code on the pin-bump branch'], worktree);
+
+  const bumped = bumpPins(worktree, base);
+  assert.notEqual(bumped.status, 0);
+  assert.match(bumped.stderr, /change code the internal pins would not run:\nsrc\/config\.js/);
+  assert.equal(git(['status', '--porcelain'], worktree), '', 'nothing may be written before refusing');
+});
