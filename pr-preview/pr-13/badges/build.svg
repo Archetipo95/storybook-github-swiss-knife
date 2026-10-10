@@ -1,21 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="192" height="20" role="img" aria-label="build: passed • 2c822bb">
-  <title>build: passed • 2c822bb</title>
+<svg xmlns="http://www.w3.org/2000/svg" width="189" height="20" role="img" aria-label="build: passed • 1b43c9e">
+  <title>build: passed • 1b43c9e</title>
   <linearGradient id="s" x2="0" y2="100%">
     <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
     <stop offset="1" stop-opacity=".1"/>
   </linearGradient>
   <clipPath id="r">
-    <rect width="192" height="20" rx="3" fill="#fff"/>
+    <rect width="189" height="20" rx="3" fill="#fff"/>
   </clipPath>
   <g clip-path="url(#r)">
     <rect width="55" height="20" fill="#555555"/>
-    <rect x="55" width="137" height="20" fill="#4caf50"/>
-    <rect width="192" height="20" fill="url(#s)"/>
+    <rect x="55" width="134" height="20" fill="#4caf50"/>
+    <rect width="189" height="20" fill="url(#s)"/>
   </g>
   <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="110">
     <text aria-hidden="true" x="275" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="310">build</text>
     <text x="275" y="140" transform="scale(.1)" fill="#fff" textLength="310">build</text>
-    <text aria-hidden="true" x="1235" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="1130">passed • 2c822bb</text>
-    <text x="1235" y="140" transform="scale(.1)" fill="#fff" textLength="1130">passed • 2c822bb</text>
+    <text aria-hidden="true" x="1220" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="1100">passed • 1b43c9e</text>
+    <text x="1220" y="140" transform="scale(.1)" fill="#fff" textLength="1100">passed • 1b43c9e</text>
   </g>
 </svg>
