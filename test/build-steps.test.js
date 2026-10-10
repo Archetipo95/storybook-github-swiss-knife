@@ -78,6 +78,7 @@ test('deploy-storybook.yml config step: a multi-line build command from the conf
   assert.equal(outputs.build_command, MULTI_LINE_BUILD);
   assert.equal(outputs.install_command, 'npm ci');
   assert.equal(outputs.package_manager, 'npm');
+  assert.equal(outputs.dependency_lockfile, 'package-lock.json');
 });
 
 test('deploy-storybook.yml config step: no lockfile installs with npm install and warns', t => {
@@ -85,6 +86,8 @@ test('deploy-storybook.yml config step: no lockfile installs with npm install an
   const { outputs, stderr } = deployConfig(t, dir, { build_command: 'npm run build-storybook' });
   assert.equal(outputs.install_command, 'npm install');
   assert.match(stderr, /::warning::No npm lockfile found/);
+  // setup-node's dependency cache needs a lockfile, so it is skipped.
+  assert.equal(outputs.dependency_lockfile, '');
   // An explicit install command is kept; no build command means no install.
   assert.equal(
     deployConfig(t, dir, { build_command: 'x', install_command: 'make deps' }).outputs.install_command,

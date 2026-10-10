@@ -95,7 +95,7 @@ test('reusable workflow caches dependencies and Storybook output only in its rea
   // The npm, pnpm and Yarn cache is a second setup-node, after corepack provides pnpm and Yarn.
   assert.match(
     buildJob,
-    /- name: Enable corepack\n[\s\S]*?run: corepack enable\n\n\s*- name: Restore dependency cache\n\s*if: \$\{\{ inputs\.cache && \(/
+    /- name: Enable corepack\n[\s\S]*?run: corepack enable\n\n\s*- name: Restore dependency cache\n\s*if: \$\{\{ inputs\.cache && steps\.config\.outputs\.dependency_lockfile != '' && \(/
   );
   assert.match(buildJob, /\n\s*cache: \$\{\{ steps\.config\.outputs\.package_manager \}\}\n/);
   assert.equal(buildJob.match(/^\s*cache: /gm).length, 1, 'only the cache step sets setup-node cache');

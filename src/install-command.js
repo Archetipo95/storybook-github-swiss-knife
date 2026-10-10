@@ -8,6 +8,8 @@ import path from 'node:path';
 
 import { findLockfile, isYarnClassic } from '../packages/addon/cli/package-manager.js';
 
+export { findLockfile };
+
 const COMMANDS = {
   npm: { frozen: 'npm ci', plain: 'npm install' },
   pnpm: { frozen: 'corepack pnpm install --frozen-lockfile', plain: 'corepack pnpm install --no-frozen-lockfile' },
