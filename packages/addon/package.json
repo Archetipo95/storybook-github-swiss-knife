@@ -1,6 +1,6 @@
 {
   "name": "storybook-swiss-knife",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Storybook addon: visual regression results (Visual panel, sidebar statuses) from storybook-github-swiss-knife",
   "type": "module",
   "license": "MIT",

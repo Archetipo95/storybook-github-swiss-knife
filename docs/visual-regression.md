@@ -30,7 +30,7 @@ permissions:
   contents: read
 jobs:
   visual:
-    uses: Archetipo95/storybook-github-swiss-knife/.github/workflows/visual.yml@v0.1.0
+    uses: Archetipo95/storybook-github-swiss-knife/.github/workflows/visual.yml@v0.1.1
     permissions:
       contents: read
       actions: read
@@ -50,7 +50,7 @@ permissions:
 jobs:
   gate:
     if: github.event.workflow_run.event == 'pull_request'
-    uses: Archetipo95/storybook-github-swiss-knife/.github/workflows/visual-gate.yml@v0.1.0
+    uses: Archetipo95/storybook-github-swiss-knife/.github/workflows/visual-gate.yml@v0.1.1
     permissions:
       actions: read
       checks: write
@@ -83,6 +83,12 @@ parameters (`a11y.disable` / `a11y.test: 'off'`, `a11y.config.rules`, `a11y.opti
 
 ```bash
 npm install --save-dev storybook-swiss-knife
+```
+
+Every release also carries the addon as an npm tarball, built from the release's commit:
+
+```bash
+npm install --save-dev https://github.com/Archetipo95/storybook-github-swiss-knife/releases/download/v<version>/storybook-swiss-knife-<version>.tgz
 ```
 
 ```js
