@@ -1,10 +1,18 @@
 // Visual regression results inside a pull request's Storybook preview: a "Visual" panel with the
-// base and PR screenshots of the selected story, and sidebar statuses and tags for changed and
-// failed stories. Reads gallery/manifest.json published next to the preview by the swiss-knife
-// visual gate (<preview>/visual/gallery/). Shared by the Storybook 8 and 9/10 manager entries.
+// base and PR screenshots of the selected story and a sidebar filter, and sidebar statuses and
+// tags for changed, new and failed stories. Reads gallery/manifest.json published next to the
+// preview by the swiss-knife visual gate (<preview>/visual/gallery/). Shared by the Storybook 8
+// and 9/10 manager entries.
 import React, { useEffect, useRef, useState } from 'react';
 
-import { isTagged, STATUS_LABELS, statusEntries, withVisualTags } from './results.js';
+import {
+  isTagged,
+  matchesSidebarFilter,
+  SIDEBAR_FILTERS,
+  STATUS_LABELS,
+  statusEntries,
+  withVisualTags
+} from './results.js';
 
 export { statusEntries } from './results.js';
 
@@ -27,23 +35,86 @@ export function galleryUrl() {
 }
 
 let manifestRequest;
-let requestedAt = 0;
-let found = false;
-// Pages caches files for minutes; the timestamp makes a reload see a newer run. A missing report
-// is asked for again after 30 s: the gate may publish it while the preview is open.
+// Pages caches files for minutes; the timestamp makes every request see the latest run.
 export function loadManifest(refresh = false) {
-  if (refresh || !manifestRequest || (!found && Date.now() - requestedAt > 30_000)) {
-    requestedAt = Date.now();
-    manifestRequest = fetch(`${galleryUrl()}manifest.json?t=${requestedAt}`, { cache: 'no-store' })
+  if (refresh || !manifestRequest) {
+    manifestRequest = fetch(`${galleryUrl()}manifest.json?t=${Date.now()}`, { cache: 'no-store' })
       .then(response => (response.ok ? response.json() : null))
       .then(manifest => (manifest && typeof manifest.stories === 'object' ? manifest : null))
-      .catch(() => null)
-      .then(manifest => {
-        found = Boolean(manifest);
-        return manifest;
-      });
+      .catch(() => null);
   }
   return manifestRequest;
+}
+
+// The preview is published minutes before the gate publishes its report. While the report is
+// missing, ask again every 30 s for 20 minutes, then every 5 minutes; when it appears, every
+// listener (the sidebar statuses, an open Visual panel) gets it without a reload.
+const RETRY_MS = 30_000;
+const FAST_RETRIES = 40;
+const SLOW_RETRY_MS = 300_000;
+const manifestListeners = new Set();
+let currentManifest = null;
+let watching = false;
+
+/** Hands a report to every listener: the watcher's, or one the user fetched with "Check again". */
+export function publishManifest(manifest) {
+  currentManifest = manifest;
+  manifestListeners.forEach(listener => listener(manifest));
+}
+
+function watchManifest(attempt = 0) {
+  loadManifest(attempt > 0).then(manifest => {
+    if (manifest) publishManifest(manifest);
+    else setTimeout(() => watchManifest(attempt + 1), attempt < FAST_RETRIES ? RETRY_MS : SLOW_RETRY_MS);
+  });
+}
+
+/** Calls `listener` with the report now when it is loaded, and whenever one is found. */
+export function onManifest(listener) {
+  manifestListeners.add(listener);
+  if (currentManifest) listener(currentManifest);
+  if (!watching) {
+    watching = true;
+    watchManifest();
+  }
+  return () => manifestListeners.delete(listener);
+}
+
+// Storybook 8.6, 9 and 10 can filter the sidebar from an addon; 10.6 adds a plural form.
+const canFilterSidebar = api =>
+  typeof api?.experimental_setFilter === 'function' || typeof api?.experimental_setFilters === 'function';
+const setSidebarFilter = (api, filterFunction) =>
+  typeof api.experimental_setFilter === 'function'
+    ? api.experimental_setFilter(ADDON_ID, filterFunction)
+    : api.experimental_setFilters({ [ADDON_ID]: filterFunction });
+
+// Module state, so the selection survives the panel unmounting when another tab is opened.
+let sidebarFilter = 'all';
+
+function SidebarFilterSelect({ api, manifest }) {
+  const [selected, setSelected] = useState(sidebarFilter);
+  const apply = filter => setSidebarFilter(api, item => matchesSidebarFilter(filter, manifest, item));
+  // A newer report (after "Check again") changes which stories match.
+  useEffect(() => {
+    if (sidebarFilter !== 'all') apply(sidebarFilter);
+  }, [manifest]);
+  const select = filter => {
+    sidebarFilter = filter;
+    setSelected(filter);
+    apply(filter);
+  };
+  return (
+    <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+      Sidebar:
+      <select value={selected} onChange={event => select(event.target.value)}>
+        {Object.entries(SIDEBAR_FILTERS).map(([value, { label }]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 }
 
 const imageUrl = (manifest, storyId, image) =>
@@ -208,20 +279,28 @@ function Comparison({ manifest, storyId, theme }) {
   );
 }
 
-/** The panel body; `useStorybookState` and `useTheme` come from the version's manager API. */
-export function createVisualPanel({ useStorybookState, useTheme }) {
+/** The panel body; the hooks come from the version's manager API. */
+export function createVisualPanel({ useStorybookState, useStorybookApi, useTheme }) {
   return function VisualPanel() {
     const { storyId } = useStorybookState();
+    const api = useStorybookApi();
     const theme = useTheme();
     const [manifest, setManifest] = useState();
 
     useEffect(() => {
-      loadManifest().then(setManifest);
+      let mounted = true;
+      // null ("not published yet") only until the watcher finds the report.
+      loadManifest().then(found => mounted && setManifest(previous => previous ?? found));
+      const unsubscribe = onManifest(setManifest);
+      return () => {
+        mounted = false;
+        unsubscribe();
+      };
     }, []);
 
     const reload = () => {
       setManifest(undefined);
-      loadManifest(true).then(setManifest);
+      loadManifest(true).then(found => (found ? publishManifest(found) : setManifest(null)));
     };
 
     if (manifest === undefined) return <p style={{ padding: 16 }}>Loading the visual report…</p>;
@@ -229,7 +308,8 @@ export function createVisualPanel({ useStorybookState, useTheme }) {
       return (
         <div style={{ padding: 16 }}>
           <p>
-            No visual report for this Storybook yet. It is published when the visual check of the pull request finishes.
+            No visual report for this Storybook yet. It is published when the visual check of the pull request finishes;
+            this panel and the sidebar update by themselves when it does.
           </p>
           <button type="button" onClick={reload}>
             Check again
@@ -259,6 +339,12 @@ export function createVisualPanel({ useStorybookState, useTheme }) {
               <a href={manifest.runUrl} target="_blank" rel="noreferrer" style={linkStyle}>
                 CI run
               </a>
+            </>
+          )}
+          {canFilterSidebar(api) && (
+            <>
+              {' · '}
+              <SidebarFilterSelect api={api} manifest={manifest} />
             </>
           )}
         </p>
@@ -311,9 +397,17 @@ export function createResultsApplier({ setStatuses }) {
  * Registers the addon. Automated browsers (smoke tests, the visual runner) skip it: the report
  * never exists while a preview is being built and checked.
  */
-export function registerVisualAddon({ addons, types, AddonPanel, useStorybookState, useTheme, registerResults }) {
+export function registerVisualAddon({
+  addons,
+  types,
+  AddonPanel,
+  useStorybookState,
+  useStorybookApi,
+  useTheme,
+  registerResults
+}) {
   if (typeof navigator !== 'undefined' && navigator.webdriver) return;
-  const VisualPanel = createVisualPanel({ useStorybookState, useTheme });
+  const VisualPanel = createVisualPanel({ useStorybookState, useStorybookApi, useTheme });
   addons.register(ADDON_ID, api => {
     addons.add(PANEL_ID, {
       type: types.PANEL,

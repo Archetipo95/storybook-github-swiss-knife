@@ -5,7 +5,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { isTagged, statusEntries, withVisualTags } from '../packages/addon/src/results.js';
+import {
+  isTagged,
+  matchesSidebarFilter,
+  SIDEBAR_FILTERS,
+  statusEntries,
+  withVisualTags
+} from '../packages/addon/src/results.js';
 
 const { managerEntries, storybookMajor } = createRequire(import.meta.url)('../packages/addon/preset.cjs');
 
@@ -25,6 +31,37 @@ test('statusEntries flags changed stories as warnings and failures as errors', (
     { storyId: 'a--broken', level: 'error', title: 'Visual regression', description: 'Render error: boom' },
     { storyId: 'a--play', level: 'error', title: 'Visual regression', description: 'Interaction failed' }
   ]);
+});
+
+test("statusEntries with changeStatuses fills Storybook's New and Modified sidebar filter", () => {
+  assert.deepEqual(statusEntries(manifest, { changeStatuses: true }), [
+    { storyId: 'a--changed', level: 'modified', title: 'Visual regression', description: 'Visual change' },
+    { storyId: 'a--broken', level: 'error', title: 'Visual regression', description: 'Render error: boom' },
+    { storyId: 'a--play', level: 'error', title: 'Visual regression', description: 'Interaction failed' },
+    { storyId: 'a--new', level: 'new', title: 'Visual regression', description: 'New story' }
+  ]);
+});
+
+test('matchesSidebarFilter keeps only the matching stories while filtering', () => {
+  const story = id => ({ type: 'story', id });
+  const docs = { type: 'docs', id: 'a--docs' };
+  const visible = filter =>
+    Object.keys(manifest.stories).filter(id => matchesSidebarFilter(filter, manifest, story(id)));
+
+  assert.deepEqual(visible('all'), Object.keys(manifest.stories));
+  assert.equal(matchesSidebarFilter('all', manifest, docs), true);
+  assert.equal(matchesSidebarFilter('all', manifest, story('a--not-in-report')), true);
+
+  assert.deepEqual(visible('changed'), ['a--changed']);
+  assert.deepEqual(visible('new'), ['a--new']);
+  assert.deepEqual(visible('failed'), ['a--broken', 'a--play']);
+  assert.deepEqual(visible('report'), ['a--changed', 'a--broken', 'a--play', 'a--new']);
+  // Autodocs pages would keep every component listed, and unknown stories are not in the report.
+  assert.equal(matchesSidebarFilter('report', manifest, docs), false);
+  assert.equal(matchesSidebarFilter('report', manifest, story('a--not-in-report')), false);
+  // An unknown filter shows everything rather than an empty sidebar.
+  assert.equal(matchesSidebarFilter('nope', manifest, story('a--same')), true);
+  assert.deepEqual(Object.keys(SIDEBAR_FILTERS), ['all', 'report', 'changed', 'new', 'failed']);
 });
 
 test('withVisualTags tags the stories in the report once and keeps the others', () => {

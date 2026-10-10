@@ -8,12 +8,15 @@ import {
   STORY_FAILURE_PREFIX,
   clearStorage,
   imagesComplete,
+  keepRendering,
   noLoadingIndicators,
   prepareAssets,
   readStoryContext,
+  recordSettledElements,
   recordStoryOutcome,
   storyErrors,
-  storyHasSettled
+  storyHasSettled,
+  stylesheetsSettled
 } from '../lib/browser.js';
 import { runnerSettings } from '../lib/settings.js';
 import { resolveViewport } from '../lib/viewport.js';
@@ -73,7 +76,14 @@ const test = base.extend({
       });
       const page = await context.newPage();
       await page.addInitScript(recordStoryOutcome, visual.ciMarkerAttribute);
-      if (visual.fixedTime) await page.clock.setFixedTime(new Date(visual.fixedTime));
+      await page.addInitScript(recordSettledElements);
+      if (visual.fixedTime) {
+        // Before the clock: it replaces requestAnimationFrame.
+        await page.addInitScript(keepRendering);
+        // Time starts at fixedTime and runs. A frozen Date.now() (setFixedTime) makes Vue drop the
+        // outer handlers of every click (its event timestamp check), so play functions break.
+        await page.clock.install({ time: new Date(visual.fixedTime) });
+      }
       await use(page);
       await context.close();
     },
@@ -106,6 +116,8 @@ for (const story of stories) {
     const overrides = context.parameters?.swissKnife?.visual ?? {};
     test.skip(Boolean(overrides.skip), 'parameters.swissKnife.visual.skip');
 
+    // Best effort: it only avoids capturing a fallback font while a stylesheet is still loading.
+    await page.waitForFunction(stylesheetsSettled, undefined, { polling: 100, timeout: 15_000 }).catch(() => undefined);
     await page.evaluate(prepareAssets);
     await page.waitForFunction(imagesComplete, undefined, { polling: 100, timeout: 15_000 });
     // A visible spinner means the story is still loading: wait for it, up to the cap. Stories

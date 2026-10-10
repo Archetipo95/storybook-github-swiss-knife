@@ -63,6 +63,49 @@ export function recordStoryOutcome(markerAttribute) {
   }
 }
 
+/**
+ * Init script. document.fonts.ready does not wait for a stylesheet that is still loading, such as
+ * a web font stylesheet a component adds at runtime, so a capture could show the fallback font.
+ * Record every element that finished loading or failed, from the first script on.
+ */
+export function recordSettledElements() {
+  const settled = new WeakSet();
+  window.__swissKnifeSettled = settled;
+  const markSettled = ({ target }) => {
+    if (target) settled.add(target);
+  };
+  document.addEventListener('load', markSettled, true);
+  document.addEventListener('error', markSettled, true);
+}
+
+/**
+ * True once every stylesheet link on the page has loaded or failed. Links that never fire either
+ * event count as settled: disabled ones (a theme switcher's), ones without an href, and ones of a
+ * non-CSS type.
+ */
+export function stylesheetsSettled() {
+  return [...document.querySelectorAll('link[rel="stylesheet"]')].every(
+    link =>
+      window.__swissKnifeSettled?.has(link) ||
+      Boolean(link.sheet) ||
+      link.disabled ||
+      !link.getAttribute('href') ||
+      (Boolean(link.type) && !/^text\/css$/i.test(link.type))
+  );
+}
+
+/**
+ * Init script, registered before the fake clock replaces requestAnimationFrame. A full-page
+ * screenshot of a page taller than the viewport briefly shrinks it to 1x1, and a page that has
+ * drawn no frame for a while sees that: breakpoints flip and, for example, an open date picker
+ * closes. Keep it drawing with the native requestAnimationFrame.
+ */
+export function keepRendering() {
+  const requestFrame = window.requestAnimationFrame.bind(window);
+  const loop = () => requestFrame(loop);
+  loop();
+}
+
 /** True once the story finished rendering (including its play function) or showed an error. */
 export function storyHasSettled() {
   const outcome = window.__swissKnifeStoryOutcome;
