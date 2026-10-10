@@ -273,7 +273,7 @@
           "minimum": 0,
           "maximum": 1,
           "default": 0.2,
-          "description": "Per-pixel colour difference tolerance."
+          "description": "Per-pixel colour difference tolerance (0 to 1). Brightness weighs most, so colour swaps of similar brightness can pass at 0.2; use 0.1 to catch them."
         },
         "fullPage": {
           "type": "boolean",
