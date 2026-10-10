@@ -117,6 +117,13 @@ jobs:
       contents: write
       pages: write
     steps:
+      # The badges and the growth chart count components against the source (nothing from it
+      # runs here). Check it out first: checkout cleans the workspace.
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
       - name: Download build output
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
         with:
@@ -138,6 +145,8 @@ jobs:
           pages_branch: gh-pages
           target_directory: preprod
 ```
+
+Without the source in the publish job, the publisher warns and can't compute the coverage or Storybook version badges.
 
 ---
 
