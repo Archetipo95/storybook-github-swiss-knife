@@ -196,6 +196,7 @@ jobs:
       cname: ${{ steps.config.outputs.cname }}
       preserve_cname: ${{ steps.config.outputs.preserve_cname }}
       managed_directories: ${{ steps.config.outputs.managed_directories }}
+      preview_root: ${{ steps.config.outputs.preview_root }}
       artifact_name: ${{ steps.config.outputs.artifact_name }}
       generate_badges: ${{ steps.config.outputs.generate_badges }}
       badges_directory: ${{ steps.config.outputs.badges_directory }}
@@ -517,6 +518,8 @@ jobs:
           pages_branch: ${{ needs.build-and-upload.outputs.pages_branch }}
           target_directory: ${{ needs.build-and-upload.outputs.target_directory }}
           managed_directories: ${{ needs.build-and-upload.outputs.managed_directories }}
+          # An empty preview root keeps the pr-<N> directories at the root.
+          preview_root: ${{ needs.build-and-upload.outputs.preview_root }}
           site_url: ${{ needs.build-and-upload.outputs.site_url }}
           base_path: ${{ needs.build-and-upload.outputs.base_path }}
           cname: ${{ needs.build-and-upload.outputs.cname }}
