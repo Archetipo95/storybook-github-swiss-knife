@@ -1,3 +1,8 @@
 # Dependencies and build outputs
 node_modules
 .playwright-mcp
+
+# Local runner output (Playwright)
+runner/blob-report/
+runner/test-results/
+runner/playwright-report/

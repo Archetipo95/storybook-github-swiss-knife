@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A baseline capture that failed without writing any screenshot (the browser did not start, the Storybook build was missing) passed: every story was reported as new, which never blocks, and on a baseline branch the empty baselines were cached for later pull requests. The capture step now fails, so nothing is compared against or cached. A story that fails to render is still reported as new.
+- Adding the approval label together with another label could lose the approval: the second label event cancelled the run for the first, the cancelled run failed the checks, and a run for an unrelated label kept them. Every label event now re-gates the commit's results with the approval read live, and a cancelled run that a newer run of the same commit replaced leaves the checks to that run.
 - Pages branch writes (PR previews, cleanups, the janitor, visual reports) retry up to 5 times instead of 3, with a growing, randomized pause, so writers that collided in a burst no longer retry in lockstep and fail together.
 - The visual gate re-reads the pull request right before publishing its report and skips it when the pull request closed (its cleanup may already have run) or moved to a newer commit since the gate started. The checks are posted as before.
 

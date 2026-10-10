@@ -43,10 +43,17 @@ export function planMode(config, { eventName, eventAction = '', labelName = '', 
       : { mode: 'skip', reason: `${refName} is not in visual.baselineBranches` };
   }
   if (eventName !== 'pull_request') return { mode: 'skip', reason: `unsupported event ${eventName}` };
+  // Every label event re-gates the commit's results, with the approval label read live by the
+  // gate: when two label events arrive together, the concurrency group cancels the first run, and
+  // the run that remains must still see the approval whichever label it was for.
   if (eventAction === 'labeled' || eventAction === 'unlabeled') {
-    return labelName === config.visual.approvalLabel
-      ? { mode: 'reuse', reason: 'approval label changed: reuse the results of this commit' }
-      : { mode: 'skip', reason: `label ${labelName} does not affect the visual check` };
+    return {
+      mode: 'reuse',
+      reason:
+        labelName === config.visual.approvalLabel
+          ? 'approval label changed: reuse the results of this commit'
+          : `label ${labelName} changed: re-gate the results of this commit`
+    };
   }
   return { mode: 'compare', reason: 'compare against the base branch' };
 }

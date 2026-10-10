@@ -16,7 +16,7 @@ test('planMode: pull requests compare, baseline branches capture, others skip', 
   assert.equal(planMode({ visual: { ...config.visual, enabled: false } }, { eventName: 'pull_request' }).mode, 'skip');
 });
 
-test('planMode: only the approval label reuses results; other labels do nothing', () => {
+test('planMode: every label event re-gates the results of the commit', () => {
   assert.equal(
     planMode(config, { eventName: 'pull_request', eventAction: 'labeled', labelName: 'visual-approved' }).mode,
     'reuse'
@@ -25,7 +25,10 @@ test('planMode: only the approval label reuses results; other labels do nothing'
     planMode(config, { eventName: 'pull_request', eventAction: 'unlabeled', labelName: 'visual-approved' }).mode,
     'reuse'
   );
-  assert.equal(planMode(config, { eventName: 'pull_request', eventAction: 'labeled', labelName: 'bug' }).mode, 'skip');
+  // Another label re-gates too: if it cancelled a run for the approval label, it must still see it.
+  const other = planMode(config, { eventName: 'pull_request', eventAction: 'labeled', labelName: 'bug' });
+  assert.equal(other.mode, 'reuse');
+  assert.match(other.reason, /label bug changed/);
 });
 
 test('captureFingerprint changes with the runner code and the visual config', () => {

@@ -219,6 +219,23 @@ export async function runVisualGate({
   if (!run) throw new Error(`Workflow run ${runId} not found`);
   const headSha = run.head_sha;
 
+  // A cancelled run that a newer run of the same commit replaced (the caller's concurrency cancels
+  // a label run when another label event arrives) leaves the checks to that run, whose gate
+  // follows: failing them here would only flash red until then. A cancelled run nothing replaced
+  // still fails below.
+  if (run.conclusion === 'cancelled') {
+    const runs = await paginate(
+      request,
+      `/repos/${repository}/actions/workflows/${run.workflow_id}/runs?head_sha=${headSha}`,
+      'workflow_runs'
+    );
+    const newer = runs.find(item => Number(item.id) > runId && item.event === run.event);
+    if (newer) {
+      log(`Run ${runId} was cancelled and run ${newer.id} of the same commit replaces it; its gate posts the checks.`);
+      return { skipped: true, supersededBy: newer.id };
+    }
+  }
+
   const config = loadSwissKnifeConfig({ cwd: projectDir });
   const { pr, found, problem: prProblem } = await resolvePullRequest(request, repository, run);
   // A successful run without results did nothing on purpose (an unrelated label event): keep
