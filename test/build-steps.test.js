@@ -189,3 +189,14 @@ test('no build step passes --base-url, which storybook build rejects as an unkno
   }
   assert.equal((await import('../src/base-url.js')).augmentBuildCommand, undefined);
 });
+
+test('deploy-storybook.yml hands the resolved preview root to the directory publisher', t => {
+  const workflow = fs.readFileSync(path.join(process.cwd(), '.github/workflows/deploy-storybook.yml'), 'utf8');
+  assert.match(workflow, /\n {6}preview_root: \$\{\{ steps\.config\.outputs\.preview_root \}\}\n/);
+  assert.match(workflow, /\n {10}preview_root: \$\{\{ needs\.build-and-upload\.outputs\.preview_root \}\}\n/);
+  const publisher = fs.readFileSync(path.join(process.cwd(), 'actions/publisher/action.yml'), 'utf8');
+  assert.match(publisher, /\n {2}preview_root:\n/);
+  // Previews at the root (`preview_root: .`) reach the publisher as '', which keeps pr-<N>.
+  assert.equal(deployConfig(t, project(t, { '.storybook-pages.yml': 'preview_root: .\n' })).outputs.preview_root, '');
+  assert.equal(deployConfig(t, project(t)).outputs.preview_root, 'pr-preview');
+});
