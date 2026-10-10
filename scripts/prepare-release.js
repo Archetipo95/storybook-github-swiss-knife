@@ -86,7 +86,8 @@ const unpinned = git('diff', '--name-only', pinSha, 'HEAD', '--', 'src', 'action
 if (unpinned) {
   console.error(
     `Commits since ${pinSha.slice(0, 7)} change code the internal pins would not run:\n${unpinned}\n` +
-      'Merge them to main first, then prepare the release from main.'
+      'Merge them to main first, then prepare the release from main. If they are already on main, ' +
+      'origin/main is out of date here: run `git fetch origin main` and try again.'
   );
   process.exit(1);
 }
