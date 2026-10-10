@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "status": "published • 96908bf",
-  "build": "passed • 96908bf",
-  "commit": "96908bf",
+  "status": "published • 85acbc7",
+  "build": "passed • 85acbc7",
+  "commit": "85acbc7",
   "storybookVersion": "deployed",
   "storiesCount": 1,
   "componentsCount": 1,
@@ -11,5 +11,5 @@
   "docsCount": 0,
   "hasStoriesData": true,
   "tests": null,
-  "generatedAt": "2026-10-10T20:39:41.344Z"
+  "generatedAt": "2026-10-10T20:43:22.937Z"
 }
