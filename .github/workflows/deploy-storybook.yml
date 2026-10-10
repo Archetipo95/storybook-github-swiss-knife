@@ -221,6 +221,7 @@ jobs:
             const c = resolveConfiguration({inputs: JSON.parse(process.env.CONFIG_INPUTS), defaults: {create_deployment: true}});
             const install = resolveInstallCommand({installCommand: c.build.install_command, buildCommand: c.build.build_command, packageManager: c.package_manager});
             if (install.warning) console.error(`::warning::${install.warning}`);
+            if (install.notice) console.error(`::notice::${install.notice}`);
             const outputs = {};
             for (const [key, value] of Object.entries(c)) {
               if (typeof value !== "object") outputs[key] = value ?? "";

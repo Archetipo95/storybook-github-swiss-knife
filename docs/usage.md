@@ -233,7 +233,10 @@ the project's lockfile:
 
 Without a lockfile the run also warns: commit one for reproducible builds, or
 set `install_command`. With no `build_command`, nothing is installed and the
-output already at `path` is published. Bun keeps its own defaults,
+output already at `path` is published. Without a `package.json` at the
+repository root (a monorepo whose build command installs in a subfolder, such
+as `cd apps/ui && npm ci && npm run build-storybook`), nothing is installed
+either, and the run notes it. Bun keeps its own defaults,
 `bun install --frozen-lockfile` and `bun run build-storybook`.
 
 The composite action runs after your job's own steps, so it skips the default

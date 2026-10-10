@@ -31,8 +31,10 @@ export function defaultInstallCommand(packageManager, dir = process.cwd()) {
  * The install command to run before `buildCommand`: `installCommand` when set, otherwise the
  * default, and nothing when no build runs. With `skipWhenInstalled` (the composite action, which
  * runs after the caller's own steps) an existing node_modules means the caller already installed,
- * so the default is skipped rather than reinstalling over it.
- * Returns `{ command, warning }`; warning is set when the default ran without a lockfile.
+ * so the default is skipped rather than reinstalling over it. Without a package.json in `dir` (a
+ * monorepo whose build command installs in a subfolder) there is nothing to install there.
+ * Returns `{ command, warning, notice }`: warning when the default runs without a lockfile, notice
+ * when no package.json means no default.
  */
 export function resolveInstallCommand({
   installCommand,
@@ -41,12 +43,20 @@ export function resolveInstallCommand({
   dir = process.cwd(),
   skipWhenInstalled = false
 }) {
-  if (installCommand) return { command: installCommand, warning: '' };
-  if (!buildCommand) return { command: '', warning: '' };
-  if (skipWhenInstalled && fs.existsSync(path.join(dir, 'node_modules'))) return { command: '', warning: '' };
+  const none = { command: '', warning: '', notice: '' };
+  if (installCommand) return { ...none, command: installCommand };
+  if (!buildCommand) return none;
+  if (skipWhenInstalled && fs.existsSync(path.join(dir, 'node_modules'))) return none;
+  if (!fs.existsSync(path.join(dir, 'package.json'))) {
+    return {
+      ...none,
+      notice:
+        'No package.json at the repository root, so no dependencies are installed before the build. Set install_command if the build needs them.'
+    };
+  }
   const { command, lockfile } = defaultInstallCommand(packageManager, dir);
   const warning = lockfile
     ? ''
     : `No ${packageManager} lockfile found, so dependencies are installed with "${command}". Commit a lockfile for reproducible builds, or set install_command.`;
-  return { command, warning };
+  return { ...none, command, warning };
 }

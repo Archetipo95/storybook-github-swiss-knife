@@ -73,7 +73,7 @@ const CONFIG_FILE = `build:\n  build_command: |\n${MULTI_LINE_BUILD.split('\n')
   .join('\n')}\n`;
 
 test('deploy-storybook.yml config step: a multi-line build command from the config file, and npm ci before it', t => {
-  const dir = project(t, { 'package-lock.json': '{}', '.storybook-pages.yml': CONFIG_FILE });
+  const dir = project(t, { 'package.json': '{}', 'package-lock.json': '{}', '.storybook-pages.yml': CONFIG_FILE });
   const { outputs } = deployConfig(t, dir);
   assert.equal(outputs.build_command, MULTI_LINE_BUILD);
   assert.equal(outputs.install_command, 'npm ci');
@@ -82,7 +82,7 @@ test('deploy-storybook.yml config step: a multi-line build command from the conf
 });
 
 test('deploy-storybook.yml config step: no lockfile installs with npm install and warns', t => {
-  const dir = project(t);
+  const dir = project(t, { 'package.json': '{}' });
   const { outputs, stderr } = deployConfig(t, dir, { build_command: 'npm run build-storybook' });
   assert.equal(outputs.install_command, 'npm install');
   assert.match(stderr, /::warning::No npm lockfile found/);
@@ -96,8 +96,19 @@ test('deploy-storybook.yml config step: no lockfile installs with npm install an
   assert.equal(deployConfig(t, dir).outputs.install_command, '');
 });
 
+test('config steps: a monorepo without a root package.json gets no default install, and a notice', t => {
+  const dir = project(t, { 'apps/ui/package.json': '{}', 'apps/ui/package-lock.json': '{}' });
+  const inputs = { build_command: 'cd apps/ui && npm ci && npm run build-storybook' };
+  const deploy = deployConfig(t, dir, inputs);
+  assert.equal(deploy.outputs.install_command, '');
+  assert.match(deploy.stderr, /::notice::No package\.json at the repository root/);
+  const action = actionConfig(t, dir, inputs);
+  assert.equal(action.env.SB_INSTALL_COMMAND, '');
+  assert.match(action.stdout, /::notice::No package\.json at the repository root/);
+});
+
 test('action.yml config step: a multi-line build input reaches GITHUB_ENV intact', t => {
-  const dir = project(t, { 'pnpm-lock.yaml': '' });
+  const dir = project(t, { 'package.json': '{}', 'pnpm-lock.yaml': '' });
   const { env } = actionConfig(t, dir, { build_command: MULTI_LINE_BUILD, package_manager: 'pnpm' });
   assert.equal(env.SB_BUILD_COMMAND, MULTI_LINE_BUILD);
   assert.equal(env.SB_INSTALL_COMMAND, 'corepack pnpm install --frozen-lockfile');
@@ -105,7 +116,7 @@ test('action.yml config step: a multi-line build input reaches GITHUB_ENV intact
 });
 
 test('action.yml config step: an existing node_modules (installed by the caller) skips the default install', t => {
-  const dir = project(t, { 'package-lock.json': '{}', 'node_modules/.package-lock.json': '{}' });
+  const dir = project(t, { 'package.json': '{}', 'package-lock.json': '{}', 'node_modules/.package-lock.json': '{}' });
   assert.equal(actionConfig(t, dir, { build_command: 'npm run build-storybook' }).env.SB_INSTALL_COMMAND, '');
   const explicit = actionConfig(t, dir, { build_command: 'npm run build-storybook', install_command: 'npm ci' });
   assert.equal(explicit.env.SB_INSTALL_COMMAND, 'npm ci');

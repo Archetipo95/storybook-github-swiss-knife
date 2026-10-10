@@ -56,24 +56,25 @@ test('defaultInstallCommand: without a lockfile, a plain install', t => {
   assert.throws(() => defaultInstallCommand('deno', project(t, {})), /No default install command/);
 });
 
+const PACKAGE = { 'package.json': '{}' };
+
 test('resolveInstallCommand: the configured command, else the default before a build', t => {
-  const dir = project(t, { 'package-lock.json': '{}' });
+  const dir = project(t, { ...PACKAGE, 'package-lock.json': '{}' });
   const build = 'npm run build-storybook';
   assert.deepEqual(
     resolveInstallCommand({ installCommand: 'make deps', buildCommand: build, packageManager: 'npm', dir }),
-    {
-      command: 'make deps',
-      warning: ''
-    }
+    { command: 'make deps', warning: '', notice: '' }
   );
   assert.deepEqual(resolveInstallCommand({ buildCommand: build, packageManager: 'npm', dir }), {
     command: 'npm ci',
-    warning: ''
+    warning: '',
+    notice: ''
   });
   // No build, no install.
   assert.deepEqual(resolveInstallCommand({ buildCommand: '', packageManager: 'npm', dir }), {
     command: '',
-    warning: ''
+    warning: '',
+    notice: ''
   });
 });
 
@@ -81,18 +82,33 @@ test('resolveInstallCommand warns when the default runs without a lockfile', t =
   const { command, warning } = resolveInstallCommand({
     buildCommand: 'npm run build-storybook',
     packageManager: 'npm',
-    dir: project(t, {})
+    dir: project(t, PACKAGE)
   });
   assert.equal(command, 'npm install');
   assert.match(warning, /No npm lockfile found.*"npm install".*install_command/);
 });
 
 test('resolveInstallCommand skipWhenInstalled: an existing node_modules skips the default only', t => {
-  const dir = project(t, { 'package-lock.json': '{}', 'node_modules/.package-lock.json': '{}' });
+  const dir = project(t, { ...PACKAGE, 'package-lock.json': '{}', 'node_modules/.package-lock.json': '{}' });
   const options = { buildCommand: 'npm run build-storybook', packageManager: 'npm', dir, skipWhenInstalled: true };
   assert.equal(resolveInstallCommand(options).command, '');
   assert.equal(resolveInstallCommand({ ...options, installCommand: 'npm ci' }).command, 'npm ci');
   assert.equal(resolveInstallCommand({ ...options, skipWhenInstalled: false }).command, 'npm ci');
-  const fresh = project(t, { 'package-lock.json': '{}' });
+  const fresh = project(t, { ...PACKAGE, 'package-lock.json': '{}' });
   assert.equal(resolveInstallCommand({ ...options, dir: fresh }).command, 'npm ci');
+});
+
+test('resolveInstallCommand: no package.json (a monorepo building in a subfolder) means no default', t => {
+  // The build command installs in apps/ui itself; npm install at the root would exit 254.
+  const dir = project(t, { 'apps/ui/package.json': '{}', 'apps/ui/package-lock.json': '{}' });
+  const build = 'cd apps/ui && npm ci && npm run build-storybook';
+  for (const skipWhenInstalled of [false, true]) {
+    const result = resolveInstallCommand({ buildCommand: build, packageManager: 'npm', dir, skipWhenInstalled });
+    assert.equal(result.command, '');
+    assert.equal(result.warning, '');
+    assert.match(result.notice, /No package\.json at the repository root.*install_command/);
+  }
+  // An explicit install command still runs.
+  const explicit = resolveInstallCommand({ installCommand: 'npm ci --prefix apps/ui', buildCommand: build, dir });
+  assert.deepEqual(explicit, { command: 'npm ci --prefix apps/ui', warning: '', notice: '' });
 });

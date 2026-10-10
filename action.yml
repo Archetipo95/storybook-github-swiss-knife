@@ -174,6 +174,7 @@ runs:
           // Runs after the caller steps: an existing node_modules means they installed already.
           const install = resolveInstallCommand({installCommand: c.build.install_command, buildCommand: c.build.build_command, packageManager: c.package_manager, skipWhenInstalled: true});
           if (install.warning) console.log(`::warning::${install.warning}`);
+          if (install.notice) console.log(`::notice::${install.notice}`);
           appendCommandFile(process.env.GITHUB_ENV, {
             SB_MODE: c.mode, SB_PATH: c.path, SB_PACKAGE_MANAGER: c.package_manager,
             SB_INSTALL_COMMAND: install.command, SB_BUILD_COMMAND: c.build.build_command || "",
