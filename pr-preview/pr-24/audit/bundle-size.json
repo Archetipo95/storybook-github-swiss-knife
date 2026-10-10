@@ -2,7 +2,7 @@
   "version": 1,
   "totalFiles": 20,
   "totalBytes": 20016,
-  "totalGzipBytes": 8468,
+  "totalGzipBytes": 8467,
   "categories": {
     "js": {
       "files": 0,
@@ -22,7 +22,7 @@
     "image": {
       "files": 7,
       "bytes": 17811,
-      "gzipBytes": 6689
+      "gzipBytes": 6686
     },
     "html": {
       "files": 2,
@@ -32,7 +32,7 @@
     "data": {
       "files": 9,
       "bytes": 1375,
-      "gzipBytes": 1139
+      "gzipBytes": 1141
     },
     "sourcemap": {
       "files": 0,
@@ -56,7 +56,7 @@
       "path": "badges/status.svg",
       "category": "image",
       "bytes": 1256,
-      "gzipBytes": 517
+      "gzipBytes": 514
     },
     {
       "path": "badges/build.svg",
@@ -98,13 +98,13 @@
       "path": "badges/overview.json",
       "category": "data",
       "bytes": 351,
-      "gzipBytes": 228
+      "gzipBytes": 229
     },
     {
       "path": "stats/history.json",
       "category": "data",
       "bytes": 240,
-      "gzipBytes": 166
+      "gzipBytes": 167
     }
   ],
   "budget": null
