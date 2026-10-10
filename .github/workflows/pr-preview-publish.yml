@@ -62,10 +62,10 @@ on:
         type: string
         default: ''
       generate_stats_graph:
-        description: 'Whether to regenerate preview stats from trusted Pages history before publishing'
+        description: 'Whether to regenerate preview stats from trusted Pages history before publishing (default: true; empty uses the config file, then the default)'
         required: false
-        type: boolean
-        default: true
+        type: string
+        default: ''
       stats_directory:
         description: 'Directory within the static build output to store stats graph and ledger'
         required: false
@@ -87,10 +87,10 @@ on:
         type: string
         default: ''
       create_deployment:
-        description: 'Whether to create a native GitHub deployment record for the preview'
+        description: 'Whether to create a native GitHub deployment record for the preview (default: true; empty uses the config file, then the default)'
         required: false
-        type: boolean
-        default: true
+        type: string
+        default: ''
       trigger_pages_rebuild:
         description: 'Explicitly request a GitHub Pages rebuild after publishing the preview; normally only needed for branch-based/legacy Pages setups'
         required: false
@@ -107,10 +107,10 @@ on:
         type: string
         default: ''
       enable_passcode_gate:
-        description: 'Whether to inject a client-side passcode gate into the published Storybook'
+        description: 'Whether to inject a client-side passcode gate into the published Storybook (default: false; empty uses the config file, then the default)'
         required: false
-        type: boolean
-        default: false
+        type: string
+        default: ''
       passcode_session_hours:
         description: 'Hours before the browser session expires'
         required: false
@@ -312,6 +312,8 @@ jobs:
           INPUT_SITE_URL: ${{ inputs.site_url }}
           INPUT_BASE_PATH: ${{ inputs.base_path }}
           INPUT_GENERATE_STATS_GRAPH: ${{ inputs.generate_stats_graph }}
+          INPUT_CREATE_DEPLOYMENT: ${{ inputs.create_deployment }}
+          INPUT_ENABLE_PASSCODE_GATE: ${{ inputs.enable_passcode_gate }}
           INPUT_STATS_DIRECTORY: ${{ inputs.stats_directory }}
           INPUT_BADGES_DIRECTORY: ${{ inputs.badges_directory }}
           INPUT_MANAGED_DIRECTORIES: ${{ inputs.managed_directories }}
@@ -325,15 +327,21 @@ jobs:
                 site_url: process.env.INPUT_SITE_URL,
                 base_path: process.env.INPUT_BASE_PATH,
                 generate_stats_graph: process.env.INPUT_GENERATE_STATS_GRAPH,
+                create_deployment: process.env.INPUT_CREATE_DEPLOYMENT,
+                enable_passcode_gate: process.env.INPUT_ENABLE_PASSCODE_GATE,
                 stats_directory: process.env.INPUT_STATS_DIRECTORY,
                 badges_directory: process.env.INPUT_BADGES_DIRECTORY,
                 managed_directories: process.env.INPUT_MANAGED_DIRECTORIES
-              }});
+              }, defaults: {create_deployment: true}});
               console.log(`preview_root=${c.preview_root}`);
               console.log(`pages_branch=${c.pages_branch}`);
               console.log(`site_url=${c.site_url}`);
               console.log(`base_path=${c.base_path}`);
               console.log(`generate_stats_graph=${c.generate_stats_graph}`);
+              // Resolved here (input, then the config file, then the default) so the publisher
+              // never receives an empty value: an explicit "" does not fall back to its default.
+              console.log(`create_deployment=${Boolean(c.create_deployment)}`);
+              console.log(`enable_passcode_gate=${Boolean(c.enable_passcode_gate)}`);
               console.log(`stats_directory=${c.stats_directory}`);
               console.log(`badges_directory=${c.badges_directory}`);
               console.log(`managed_directories=${Array.isArray(c.managed_directories) ? c.managed_directories.join(",") : c.managed_directories || ""}`);
@@ -412,11 +420,11 @@ jobs:
           stats_directory: ${{ steps.config.outputs.stats_directory }}
           badges_directory: ${{ steps.config.outputs.badges_directory }}
           managed_directories: ${{ steps.config.outputs.managed_directories }}
-          create_deployment: ${{ inputs.create_deployment }}
+          create_deployment: ${{ steps.config.outputs.create_deployment }}
           trigger_pages_rebuild: ${{ inputs.trigger_pages_rebuild }}
           environment_name: ${{ inputs.environment_name || format('pr-preview-{0}', needs.gate.outputs.pr_number) }}
           environment_url: ${{ inputs.environment_url }}
-          enable_passcode_gate: ${{ inputs.enable_passcode_gate }}
+          enable_passcode_gate: ${{ steps.config.outputs.enable_passcode_gate }}
           passcode_hash: ${{ secrets.passcode_hash }}
           passcode_session_hours: ${{ inputs.passcode_session_hours }}
           trusted_repository: ${{ github.repository }}

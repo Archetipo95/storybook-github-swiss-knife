@@ -40,9 +40,9 @@ inputs:
     required: false
     default: ''
   create_deployment:
-    description: 'Whether to create a native GitHub deployment record and status lifecycle for the deployment'
+    description: 'Whether to create a native GitHub deployment record and status lifecycle for the deployment (default: false; empty uses the config file, then the default)'
     required: false
-    default: 'false'
+    default: ''
   environment_name:
     description: 'GitHub deployment environment name for the Pages deployment'
     required: false
@@ -80,9 +80,9 @@ inputs:
     required: false
     default: ''
   generate_badges:
-    description: 'Whether to auto-generate dynamic SVG badges for components and stories'
+    description: 'Whether to auto-generate dynamic SVG badges for components and stories (default: true; empty uses the config file, then the default)'
     required: false
-    default: 'true'
+    default: ''
   badges_directory:
     description: 'Directory within the static build output to store generated badges'
     required: false
@@ -100,17 +100,17 @@ inputs:
     required: false
     default: ''
   generate_stats_graph:
-    description: 'Whether to auto-generate hand-drawn growth chart (history.svg) and update metrics ledger (history.json)'
+    description: 'Whether to auto-generate hand-drawn growth chart (history.svg) and update metrics ledger (history.json) (default: true; empty uses the config file, then the default)'
     required: false
-    default: 'true'
+    default: ''
   stats_directory:
     description: 'Directory within the static build output to store stats graph and ledger'
     required: false
     default: 'stats'
   enable_passcode_gate:
-    description: 'Whether to inject a client-side passcode gate into the published Storybook'
+    description: 'Whether to inject a client-side passcode gate into the published Storybook (default: false; empty uses the config file, then the default)'
     required: false
-    default: 'false'
+    default: ''
   passcode_hash:
     description: 'SHA-256 hash of the passcode; keep this value in a workflow secret'
     required: false
@@ -120,9 +120,9 @@ inputs:
     required: false
     default: '24'
   smoke_test:
-    description: 'Whether to run an opt-in Playwright smoke test before publishing'
+    description: 'Whether to run an opt-in Playwright smoke test before publishing (default: false; empty uses the config file, then the default)'
     required: false
-    default: 'false'
+    default: ''
   smoke_test_stories:
     description: 'Comma-separated story id globs to smoke test, or all'
     required: false
@@ -132,13 +132,13 @@ inputs:
     required: false
     default: '30000'
   auto_base_url:
-    description: 'Whether to compute and inject the Storybook base URL for the deployment target'
+    description: 'Whether to compute and inject the Storybook base URL for the deployment target (default: true; empty uses the config file, then the default)'
     required: false
-    default: 'true'
+    default: ''
   audit_bundle_size:
-    description: 'Whether to audit static asset sizes and append a bundle size scorecard to the job summary'
+    description: 'Whether to audit static asset sizes and append a bundle size scorecard to the job summary (default: false; empty uses the config file, then the default)'
     required: false
-    default: 'false'
+    default: ''
   bundle_size_max_mb:
     description: 'Optional total static output budget in megabytes; the job fails when the audit exceeds it'
     required: false

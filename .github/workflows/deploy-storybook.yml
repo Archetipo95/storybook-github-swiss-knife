@@ -44,10 +44,10 @@ on:
         type: string
         default: 'github-pages'
       create_deployment:
-        description: 'Whether to create a native GitHub deployment record and status lifecycle for the Pages deployment'
+        description: 'Whether to create a native GitHub deployment record and status lifecycle for the Pages deployment (default: true; empty uses the config file, then the default)'
         required: false
-        type: boolean
-        default: true
+        type: string
+        default: ''
       environment_name:
         description: 'GitHub deployment environment name for Pages/native deployment records'
         required: false
@@ -89,25 +89,25 @@ on:
         type: string
         default: ''
       preserve_cname:
-        description: 'Directory mode: whether to keep the existing root CNAME when a root publish does not provide one'
+        description: 'Directory mode: whether to keep the existing root CNAME when a root publish does not provide one (default: true; empty uses the config file, then the default)'
         required: false
-        type: boolean
-        default: true
+        type: string
+        default: ''
       auto_base_url:
-        description: 'Whether to compute and inject the Storybook base URL for the deployment target'
+        description: 'Whether to compute and inject the Storybook base URL for the deployment target (default: true; empty uses the config file, then the default)'
         required: false
-        type: boolean
-        default: true
+        type: string
+        default: ''
       managed_directories:
         description: 'Comma-separated managed directories preserved at the root'
         required: false
         type: string
         default: ''
       generate_badges:
-        description: 'Whether to auto-generate dynamic SVG badges for components and stories'
+        description: 'Whether to auto-generate dynamic SVG badges for components and stories (default: true; empty uses the config file, then the default)'
         required: false
-        type: boolean
-        default: true
+        type: string
+        default: ''
       badges_directory:
         description: 'Directory within the static build output to store generated badges'
         required: false
@@ -119,20 +119,20 @@ on:
         type: string
         default: ''
       enable_passcode_gate:
-        description: 'Whether to inject a client-side passcode gate into the published Storybook'
+        description: 'Whether to inject a client-side passcode gate into the published Storybook (default: false; empty uses the config file, then the default)'
         required: false
-        type: boolean
-        default: false
+        type: string
+        default: ''
       passcode_session_hours:
         description: 'Hours before the browser session expires'
         required: false
         type: number
         default: 24
       smoke_test:
-        description: 'Whether to run an opt-in Playwright smoke test before publishing'
+        description: 'Whether to run an opt-in Playwright smoke test before publishing (default: false; empty uses the config file, then the default)'
         required: false
-        type: boolean
-        default: false
+        type: string
+        default: ''
       smoke_test_stories:
         description: 'Comma-separated story id globs to smoke test, or all'
         required: false
@@ -144,10 +144,10 @@ on:
         type: number
         default: 30000
       audit_bundle_size:
-        description: 'Whether to audit static asset sizes and append a bundle size scorecard to the job summary'
+        description: 'Whether to audit static asset sizes and append a bundle size scorecard to the job summary (default: false; empty uses the config file, then the default)'
         required: false
-        type: boolean
-        default: false
+        type: string
+        default: ''
       bundle_size_max_mb:
         description: 'Optional total static output budget in megabytes; the build fails when the audit exceeds it'
         required: false
@@ -218,7 +218,7 @@ jobs:
           CONFIG_INPUTS: ${{ toJSON(inputs) }}
         run: |
           node -e 'import(process.env.SWISS_KNIFE_ROOT + "/src/config.js").then(({resolveConfiguration}) => {
-            const c = resolveConfiguration({inputs: JSON.parse(process.env.CONFIG_INPUTS)});
+            const c = resolveConfiguration({inputs: JSON.parse(process.env.CONFIG_INPUTS), defaults: {create_deployment: true}});
             for (const [key, value] of Object.entries(c)) {
               if (typeof value !== "object") console.log(`${key}=${value ?? ""}`);
             }
