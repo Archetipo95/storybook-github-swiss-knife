@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A PR preview opened before its visual report was published kept showing "No visual report" in the Visual panel until a reload. The addon now checks again every 30 seconds for 20 minutes, then every 5 minutes, and fills the sidebar and the panel when the report appears; "Check again" fills the sidebar too. Storybook 8.6 also picks up a late report now.
 - The runner waits (up to 15 seconds, then captures anyway) for stylesheet links to load before a screenshot: `document.fonts.ready` resolves while a web font stylesheet added at runtime is still loading, so a capture could show the fallback font.
 - `visual.fixedTime` starts the page clock at that instant and lets it run, instead of freezing `Date.now()`. A frozen clock made Vue drop the outer handlers of every click, so play functions that click nested components failed. Pages keep drawing frames under the fake clock, so full-page captures no longer flip breakpoints.
+- `npx storybook-swiss-knife init`: in a Storybook main file whose `addons` array spans several lines, the addon is now added on its own line, indented like the first entry; it used to land on the bracket line with a trailing space. An empty array (`[ ]`, or `[` and `]` on separate lines) becomes `['storybook-swiss-knife']`.
 
 ## [0.1.0] - 2026-10-10
 
