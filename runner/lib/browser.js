@@ -78,9 +78,20 @@ export function recordSettledElements() {
   document.addEventListener('error', markSettled, true);
 }
 
-/** True once every stylesheet link on the page has loaded or failed. */
+/**
+ * True once every stylesheet link on the page has loaded or failed. Links that never fire either
+ * event count as settled: disabled ones (a theme switcher's), ones without an href, and ones of a
+ * non-CSS type.
+ */
 export function stylesheetsSettled() {
-  return [...document.querySelectorAll('link[rel="stylesheet"]')].every(link => window.__swissKnifeSettled?.has(link));
+  return [...document.querySelectorAll('link[rel="stylesheet"]')].every(
+    link =>
+      window.__swissKnifeSettled?.has(link) ||
+      Boolean(link.sheet) ||
+      link.disabled ||
+      !link.getAttribute('href') ||
+      (Boolean(link.type) && !/^text\/css$/i.test(link.type))
+  );
 }
 
 /**

@@ -116,7 +116,8 @@ for (const story of stories) {
     const overrides = context.parameters?.swissKnife?.visual ?? {};
     test.skip(Boolean(overrides.skip), 'parameters.swissKnife.visual.skip');
 
-    await page.waitForFunction(stylesheetsSettled, undefined, { polling: 100, timeout: 15_000 });
+    // Best effort: it only avoids capturing a fallback font while a stylesheet is still loading.
+    await page.waitForFunction(stylesheetsSettled, undefined, { polling: 100, timeout: 15_000 }).catch(() => undefined);
     await page.evaluate(prepareAssets);
     await page.waitForFunction(imagesComplete, undefined, { polling: 100, timeout: 15_000 });
     // A visible spinner means the story is still loading: wait for it, up to the cap. Stories

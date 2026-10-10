@@ -97,17 +97,19 @@ the preview; `STORYBOOK_SWISS_KNIFE_VISUAL_URL` at build time overrides it):
 
 - a **Visual** panel with the base and PR screenshots of the selected story, a toggle, and the
   changed pixels highlighted, plus a **Sidebar** select that narrows the sidebar to changed, new
-  or failed stories (Storybook 9 and 10);
+  or failed stories (Storybook 8.6, 9 and 10);
 - sidebar statuses. On Storybook 10.4+ (with change detection on, the default) changed stories
   are `modified` and new ones `new`, so Storybook's own sidebar filter (**New**, **Modified**)
   lists the pull request's visual changes against its base branch. On older versions changed
-  stories get a warning. Interaction and render failures are errors on every version;
+  stories get a warning. Interaction and render failures are errors on every version. Storybook
+  keeps stories with an error status in the sidebar under every filter, so failed stories stay
+  listed under "Visual changes" or "New stories" too;
 - `visual:changed`, `visual:new` and `visual:failed` tags in the tag filter (Storybook 8.6 and
   10; Storybook 9 does not expose the story index to addons).
 
 It stays off in automated browsers. The preview is usually published a few minutes before its
-report: until the report appears, the addon checks again every 30 seconds (for up to 20 minutes)
-and then fills the sidebar and the panel without a reload.
+report: until the report appears, the addon checks again every 30 seconds for 20 minutes, then every 5
+minutes, and fills the sidebar and the panel without a reload.
 
 ## How a pull request is checked
 

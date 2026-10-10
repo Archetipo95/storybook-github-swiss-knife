@@ -242,7 +242,7 @@
           "type": ["string", "null"],
           "format": "date-time",
           "default": null,
-          "description": "Start the page clock at this instant (time keeps running from it); null keeps the real clock."
+          "description": "Start the page clock at this instant; null keeps the real clock. Time keeps running from it (play functions need a moving clock), so anything showing seconds can differ between captures: only minute precision is stable."
         },
         "timezone": {
           "type": "string",

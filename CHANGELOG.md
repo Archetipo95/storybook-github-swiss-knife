@@ -12,13 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- The Visual panel has a **Sidebar** select that narrows the sidebar to changed, new or failed stories (Storybook 9 and 10). Storybook's own status filter has no entry for failures.
+- The Visual panel has a **Sidebar** select that narrows the sidebar to changed, new or failed stories (Storybook 8.6, 9 and 10). Storybook's own status filter has no entry for failures.
 
 ### Fixed
 
 - Storybook 10.4+: Storybook's sidebar filter showed **New 0 / Modified 0** in a PR preview. The addon marked changed stories with a warning, which that filter does not list, and gave new stories no status. With change detection on (the default), changed stories are now `modified` and new ones `new`, so the filter lists the pull request's visual changes. Older Storybook versions keep the warning.
-- A PR preview opened before its visual report was published kept showing "No visual report" in the Visual panel until a reload. The addon now checks again every 30 seconds for up to 20 minutes, then fills the sidebar and the panel; "Check again" fills the sidebar too. Storybook 8.6 also picks up a late report now.
-- The runner waits for every stylesheet link to load before a screenshot: `document.fonts.ready` resolves while a web font stylesheet added at runtime is still loading, so a capture could show the fallback font.
+- A PR preview opened before its visual report was published kept showing "No visual report" in the Visual panel until a reload. The addon now checks again every 30 seconds for 20 minutes, then every 5 minutes, and fills the sidebar and the panel when the report appears; "Check again" fills the sidebar too. Storybook 8.6 also picks up a late report now.
+- The runner waits (up to 15 seconds, then captures anyway) for stylesheet links to load before a screenshot: `document.fonts.ready` resolves while a web font stylesheet added at runtime is still loading, so a capture could show the fallback font.
 - `visual.fixedTime` starts the page clock at that instant and lets it run, instead of freezing `Date.now()`. A frozen clock made Vue drop the outer handlers of every click, so play functions that click nested components failed. Pages keep drawing frames under the fake clock, so full-page captures no longer flip breakpoints.
 
 ## [0.1.0] - 2026-10-10

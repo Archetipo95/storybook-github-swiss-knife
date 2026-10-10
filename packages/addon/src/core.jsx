@@ -47,10 +47,11 @@ export function loadManifest(refresh = false) {
 }
 
 // The preview is published minutes before the gate publishes its report. While the report is
-// missing, ask again every 30 s for up to 20 minutes; when it appears, every listener (the
-// sidebar statuses, an open Visual panel) gets it without a reload.
+// missing, ask again every 30 s for 20 minutes, then every 5 minutes; when it appears, every
+// listener (the sidebar statuses, an open Visual panel) gets it without a reload.
 const RETRY_MS = 30_000;
-const MAX_RETRIES = 40;
+const FAST_RETRIES = 40;
+const SLOW_RETRY_MS = 300_000;
 const manifestListeners = new Set();
 let currentManifest = null;
 let watching = false;
@@ -64,7 +65,7 @@ export function publishManifest(manifest) {
 function watchManifest(attempt = 0) {
   loadManifest(attempt > 0).then(manifest => {
     if (manifest) publishManifest(manifest);
-    else if (attempt < MAX_RETRIES) setTimeout(() => watchManifest(attempt + 1), RETRY_MS);
+    else setTimeout(() => watchManifest(attempt + 1), attempt < FAST_RETRIES ? RETRY_MS : SLOW_RETRY_MS);
   });
 }
 
@@ -79,7 +80,7 @@ export function onManifest(listener) {
   return () => manifestListeners.delete(listener);
 }
 
-// Storybook 9 and 10 can filter the sidebar from an addon; 10.6 adds a plural form.
+// Storybook 8.6, 9 and 10 can filter the sidebar from an addon; 10.6 adds a plural form.
 const canFilterSidebar = api =>
   typeof api?.experimental_setFilter === 'function' || typeof api?.experimental_setFilters === 'function';
 const setSidebarFilter = (api, filterFunction) =>
