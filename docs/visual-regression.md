@@ -30,7 +30,7 @@ permissions:
   contents: read
 jobs:
   visual:
-    uses: Archetipo95/storybook-github-swiss-knife/.github/workflows/visual.yml@v0.1.0
+    uses: Archetipo95/storybook-github-swiss-knife/.github/workflows/visual.yml@v0.1.1
     permissions:
       contents: read
       actions: read
@@ -50,7 +50,7 @@ permissions:
 jobs:
   gate:
     if: github.event.workflow_run.event == 'pull_request'
-    uses: Archetipo95/storybook-github-swiss-knife/.github/workflows/visual-gate.yml@v0.1.0
+    uses: Archetipo95/storybook-github-swiss-knife/.github/workflows/visual-gate.yml@v0.1.1
     permissions:
       actions: read
       checks: write

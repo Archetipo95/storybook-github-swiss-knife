@@ -10,9 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-10
+
 ### Added
 
 - The Visual panel has a **Sidebar** select that narrows the sidebar to changed, new or failed stories (Storybook 8.6, 9 and 10). Storybook's own status filter has no entry for failures.
+- Every release carries the addon as an npm tarball (`storybook-swiss-knife-X.Y.Z.tgz`), packed from the release's commit in a read-only job: `npm install --save-dev https://github.com/Archetipo95/storybook-github-swiss-knife/releases/download/vX.Y.Z/storybook-swiss-knife-X.Y.Z.tgz` works whether or not that version is on npm.
+
+### Changed
+
+- The release pin check also compares `runner/`: `visual-capture` and `visual-report` run the runner from their pinned commit, so a release could ship runner fixes that its own workflows did not use. `prepare-release` leaves `runner/`'s version alone, and `test/prepare-release.test.js` prepares a release in a throwaway worktree and runs that check on every pull request.
+- Release validation also requires `packages/addon`'s version to match the tag.
 
 ### Fixed
 

@@ -1,6 +1,6 @@
 {
   "name": "storybook-github-swiss-knife",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Storybook on GitHub: Pages deploys, PR previews, visual regression and accessibility checks",
   "main": "src/config.js",
   "type": "module",
