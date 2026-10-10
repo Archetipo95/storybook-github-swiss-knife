@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `npm run prepare-release` pins the internal actions to the release branch's merge base with `origin/main` instead of its tip, which a squash merge drops, and refuses when the branch's own commits change `src/`, `actions/` or `runner/`. The Unreleased notes become the release's notes; the "Release vX.Y.Z" placeholder is added only when there are none, instead of a second `### Changed` heading.
+
 ### Fixed
 
 - Pages branch writes (PR previews, cleanups, the janitor, visual reports) retry up to 5 times instead of 3, with a growing, randomized pause, so writers that collided in a burst no longer retry in lockstep and fail together.

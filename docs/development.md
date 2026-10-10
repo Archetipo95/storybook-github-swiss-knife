@@ -44,7 +44,7 @@ Do not add Jest or Vitest to this action repository unless native `node:test` st
 
 Release checklist:
 
-1. On a branch from the latest `main`, run `npm run prepare-release -- <version>`. It bumps the version (root and `packages/addon`) and release refs and moves the reusable workflows' internal action pins to that `main` commit. Review the generated changelog entry and move the Unreleased notes under it.
+1. On a branch from the latest `main`, run `npm run prepare-release -- <version>`. It bumps the version (root and `packages/addon`) and release refs, moves the Unreleased changelog notes under the new version, and moves the reusable workflows' internal action pins to the branch's merge base with `origin/main` (a squash merge drops the branch's own commits, so pins never point at them). It refuses when the branch's own commits change `src/`, `actions/` or `runner/`: merge those to `main` first. Review the changelog section.
 2. Confirm this repository's CI and CodeQL checks are green.
 3. Run the `storybook-vue-demo` Action Canary workflow against the candidate branch, tag, or SHA.
 4. Merge the release PR. The `Release Tags` workflow sees the new `package.json` version on `main`, re-runs the tests, checks `package-lock.json` and `CHANGELOG.md` agree, then creates `vX.Y.Z` and moves the major tag (`v1`) to it. Do not tag by hand. If the checks fail, `main` shows a failed `Release Tags` run and no tag is created. Every later push to `main` also moves `v1` back onto the newest release if it has drifted; it never moves it backwards.
