@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-10
+
 ### Changed
 
 - `npm run prepare-release` pins the internal actions to the release branch's merge base with `origin/main` instead of its tip, which a squash merge drops, and refuses when the branch's own commits change `src/`, `actions/` or `runner/`. The Unreleased notes become the release's notes; the "Release vX.Y.Z" placeholder is added only when there are none, instead of a second `### Changed` heading.
