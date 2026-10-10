@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Pages branch writes (PR previews, cleanups, the janitor, visual reports) retry up to 5 times instead of 3, with a growing, randomized pause, so writers that collided in a burst no longer retry in lockstep and fail together.
+- The visual gate re-reads the pull request right before publishing its report and skips it when the pull request closed (its cleanup may already have run) or moved to a newer commit since the gate started. The checks are posted as before.
+
 ## [0.2.0] - 2026-10-10
 
 ### Changed

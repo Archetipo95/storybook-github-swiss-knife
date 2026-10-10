@@ -366,17 +366,27 @@ export async function runVisualGate({
         sessionHours: pages.passcode_session_hours ?? 24
       });
     }
-    await publish({
-      repo: env.PAGES_REPO,
-      source: reportDir,
-      branch: pages.pages_branch,
-      targetDirectory: visualDir,
-      commitMessage: `Publish visual report for PR #${prNumber}`,
-      token: env.GITHUB_TOKEN,
-      repository
-    });
-    published = true;
-    log(`Published the visual report to ${reportUrl}`);
+    // Re-read the pull request right before writing: it may have closed (its cleanup already ran)
+    // or moved to a newer commit since the gate started, and the report would be orphaned or stale.
+    const current = await request(`/repos/${repository}/pulls/${prNumber}`);
+    if (current?.state === 'open' && current.head?.sha === headSha) {
+      await publish({
+        repo: env.PAGES_REPO,
+        source: reportDir,
+        branch: pages.pages_branch,
+        targetDirectory: visualDir,
+        commitMessage: `Publish visual report for PR #${prNumber}`,
+        token: env.GITHUB_TOKEN,
+        repository
+      });
+      published = true;
+      log(`Published the visual report to ${reportUrl}`);
+    } else {
+      log(
+        `Not publishing the visual report: pull request #${prNumber} is ${current?.state ?? 'gone'}` +
+          `${current?.head?.sha && current.head.sha !== headSha ? ` at ${current.head.sha.slice(0, 7)}` : ''}.`
+      );
+    }
   }
 
   if (env.GITHUB_STEP_SUMMARY) {

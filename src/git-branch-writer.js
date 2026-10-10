@@ -3,7 +3,14 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 
 export const WRITE_LOCK_NAME = '.storybook-pages-write.lock';
-const RETRIES = 3;
+const RETRIES = 5;
+
+/**
+ * Pause before attempt `attempt + 1` of a rejected write: growing, and randomized so concurrent
+ * writers (preview publishes, cleanups, the janitor, visual reports) that collided do not retry in
+ * lockstep and collide again.
+ */
+export const retryDelayMs = attempt => Math.round((attempt + 1) * (500 + Math.random() * 1500));
 const PAGES_BUILD_TIMEOUT_MS = 120000;
 const PAGES_BUILD_POLL_INTERVAL_MS = 2000;
 
@@ -125,12 +132,19 @@ export async function requestPagesRebuild({
  * janitor) never silently clobber each other's changes. `mutate` receives
  * the local repo path and must return `true` if it changed anything.
  */
-export async function withSerializedBranchWrite({ repo, branch, mutate, commitMessage }) {
+export async function withSerializedBranchWrite({
+  repo,
+  branch,
+  mutate,
+  commitMessage,
+  retries = RETRIES,
+  retryDelay = retryDelayMs
+}) {
   assertSafeBranchName(branch);
   const release = await acquireLock(repo);
   try {
     let lastError;
-    for (let attempt = 0; attempt < RETRIES; attempt += 1) {
+    for (let attempt = 0; attempt < retries; attempt += 1) {
       try {
         // `--` ends option parsing so the branch can never be read as a
         // `git fetch` option such as `--upload-pack`.
@@ -165,10 +179,13 @@ export async function withSerializedBranchWrite({ repo, branch, mutate, commitMe
         return { changed: true, commitSha };
       } catch (error) {
         lastError = error;
-        if (attempt + 1 < RETRIES) await run('git', ['rebase', `origin/${branch}`], repo).catch(() => {});
+        if (attempt + 1 < retries) {
+          await new Promise(resolve => setTimeout(resolve, retryDelay(attempt)));
+          await run('git', ['rebase', `origin/${branch}`], repo).catch(() => {});
+        }
       }
     }
-    throw new Error(`Pages branch write failed after ${RETRIES} attempts: ${lastError.message}`);
+    throw new Error(`Pages branch write failed after ${retries} attempts: ${lastError.message}`);
   } finally {
     await release();
   }
