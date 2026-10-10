@@ -212,8 +212,16 @@ jobs:
 /** Adds the addon to the `addons` array of a Storybook main file; null when it cannot. */
 export function registerAddon(source) {
   if (source.includes(`'${ADDON}'`) || source.includes(`"${ADDON}"`)) return source;
-  const withAddon = source.replace(/addons\s*:\s*\[/, match => `${match}'${ADDON}', `);
-  return withAddon === source ? null : withAddon.replace(`'${ADDON}', ]`, `'${ADDON}']`);
+  // An empty array becomes ['storybook-swiss-knife']; in an array that spans several lines the
+  // addon gets its own line, indented like the first entry, with the file's line ending.
+  const withAddon = source.replace(
+    /(addons\s*:\s*\[)(?:(?:[ \t]*(\r?\n))+([ \t]*))?(\s*\])?/,
+    (match, open, newline, indent, close) => {
+      if (close) return `${open}'${ADDON}']`;
+      return newline ? `${match}'${ADDON}',${newline}${indent}` : `${match}'${ADDON}', `;
+    }
+  );
+  return withAddon === source ? null : withAddon;
 }
 
 /**
