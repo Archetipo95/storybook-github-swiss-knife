@@ -6,6 +6,10 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { detectPackageManager } from './package-manager.js';
+
+export { detectPackageManager };
+
 export const REPOSITORY = 'Archetipo95/storybook-github-swiss-knife';
 export const ADDON = 'storybook-swiss-knife';
 
@@ -20,33 +24,6 @@ const COMMANDS = {
   'yarn-classic': { install: 'yarn install --frozen-lockfile', build: 'yarn storybook build', add: 'yarn add --dev' },
   bun: { install: 'bun install --frozen-lockfile', build: 'bunx storybook build', add: 'bun add --dev' }
 };
-
-/** The package manager from the project's lockfile (the repository root is checked too). */
-export function detectPackageManager(projectDir, rootDir = projectDir) {
-  const locks = [
-    ['pnpm-lock.yaml', 'pnpm'],
-    ['yarn.lock', 'yarn'],
-    ['bun.lock', 'bun'],
-    ['bun.lockb', 'bun'],
-    ['package-lock.json', 'npm']
-  ];
-  for (const dir of new Set([projectDir, rootDir])) {
-    const found = locks.find(([file]) => fs.existsSync(path.join(dir, file)));
-    if (found) return found[1] === 'yarn' && isYarnClassic(dir) ? 'yarn-classic' : found[1];
-  }
-  return 'npm';
-}
-
-// Yarn 2+ has .yarnrc.yml or declares itself in packageManager; a bare yarn.lock is Yarn 1.
-function isYarnClassic(dir) {
-  if (fs.existsSync(path.join(dir, '.yarnrc.yml'))) return false;
-  try {
-    const { packageManager = '' } = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
-    return !/^yarn@[2-9]/.test(packageManager) && !/^yarn@\d{2,}/.test(packageManager);
-  } catch {
-    return true;
-  }
-}
 
 const yamlString = value => `'${String(value).replaceAll("'", "''")}'`;
 

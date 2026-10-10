@@ -7,6 +7,7 @@ import {
   validateConfig,
   validateRelativeDirectory
 } from './config.js';
+import { appendCommandFile } from './command-file.js';
 import { CNAME_FILE, normalizeCname, readCnameFile, writeCnameFile } from './cname.js';
 import { requestPagesRebuild, withSerializedBranchWrite, WRITE_LOCK_NAME } from './git-branch-writer.js';
 
@@ -207,8 +208,7 @@ if (process.argv[1]?.endsWith('publish-directory.js')) {
     .then(result => {
       console.log(JSON.stringify(result));
       if (process.env.GITHUB_OUTPUT) {
-        const output = `page_url=${result.url}\nbase_path=${result.basePath}\n`;
-        return fs.appendFile(process.env.GITHUB_OUTPUT, output);
+        appendCommandFile(process.env.GITHUB_OUTPUT, { page_url: result.url, base_path: result.basePath });
       }
     })
     .catch(error => {

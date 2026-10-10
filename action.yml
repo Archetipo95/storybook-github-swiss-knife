@@ -169,29 +169,30 @@ runs:
         PUBLISH_INPUT: ${{ inputs.publish }}
         ARTIFACT_NAME_INPUT: ${{ inputs.artifact_name }}
       run: |
-        node -e 'import(process.env.GITHUB_ACTION_PATH + "/src/config.js").then(async ({resolveConfiguration, COMPOSITE_PACKAGE_MANAGERS}) => {
+        node -e 'Promise.all(["config.js", "install-command.js", "command-file.js"].map(file => import(process.env.GITHUB_ACTION_PATH + "/src/" + file))).then(([{resolveConfiguration, COMPOSITE_PACKAGE_MANAGERS}, {resolveInstallCommand}, {appendCommandFile}]) => {
           const c = resolveConfiguration({inputs: JSON.parse(process.env.CONFIG_INPUTS), allowedPackageManagers: COMPOSITE_PACKAGE_MANAGERS});
-          const lines = [
-            `SB_MODE=${c.mode}`, `SB_PATH=${c.path}`, `SB_PACKAGE_MANAGER=${c.package_manager}`,
-            `SB_INSTALL_COMMAND=${c.build.install_command || ""}`, `SB_BUILD_COMMAND=${c.build.build_command || ""}`,
-            `SB_PUBLISH=${process.env.PUBLISH_INPUT || "true"}`, `SB_ARTIFACT_NAME=${process.env.ARTIFACT_NAME_INPUT || "github-pages"}`,
-            `SB_CREATE_DEPLOYMENT=${String(c.create_deployment ?? false)}`,
-            `SB_ENVIRONMENT_NAME=${c.environment_name || c.environment || ""}`,
-            `SB_ENVIRONMENT_URL=${c.environment_url || ""}`,
-            `SB_GENERATE_BADGES=${c.generate_badges}`, `SB_BADGES_DIRECTORY=${c.badges_directory || "badges"}`,
-            `SB_TEST_RESULTS_PATH=${c.test_results_path || ""}`,
-            `SB_COVERAGE_INCLUDE_PATHS=${c.coverage_include_paths || ""}`,
-            `SB_COVERAGE_IGNORE_PATHS=${c.coverage_ignore_paths || ""}`,
-            `SB_GENERATE_STATS_GRAPH=${c.generate_stats_graph}`, `SB_STATS_DIRECTORY=${c.stats_directory || "stats"}`,
-            `SB_PREVIEW_ROOT=${c.preview_root ?? ""}`,
-            `SB_ENABLE_PASSCODE_GATE=${c.enable_passcode_gate}`, `SB_PASSCODE_SESSION_HOURS=${c.passcode_session_hours}`,
-            `SB_SMOKE_TEST=${c.smoke_test}`, `SB_SMOKE_TEST_STORIES=${c.smoke_test_stories}`, `SB_SMOKE_TEST_TIMEOUT_MS=${c.smoke_test_timeout_ms}`,
-            `SB_SITE_URL=${c.site_url || ""}`, `SB_BASE_PATH=${c.base_path || ""}`, `SB_AUTO_BASE_URL=${c.auto_base_url}`,
-            `SB_AUDIT_BUNDLE_SIZE=${c.audit_bundle_size}`, `SB_BUNDLE_SIZE_MAX_MB=${c.bundle_size_max_mb}`,
-            `SB_CNAME=${c.cname || ""}`
-          ];
-          const {appendFileSync} = await import("node:fs");
-          appendFileSync(process.env.GITHUB_ENV, `${lines.join("\n")}\n`);
+          // Runs after the caller steps: an existing node_modules means they installed already.
+          const install = resolveInstallCommand({installCommand: c.build.install_command, buildCommand: c.build.build_command, packageManager: c.package_manager, skipWhenInstalled: true});
+          if (install.warning) console.log(`::warning::${install.warning}`);
+          appendCommandFile(process.env.GITHUB_ENV, {
+            SB_MODE: c.mode, SB_PATH: c.path, SB_PACKAGE_MANAGER: c.package_manager,
+            SB_INSTALL_COMMAND: install.command, SB_BUILD_COMMAND: c.build.build_command || "",
+            SB_PUBLISH: process.env.PUBLISH_INPUT || "true", SB_ARTIFACT_NAME: process.env.ARTIFACT_NAME_INPUT || "github-pages",
+            SB_CREATE_DEPLOYMENT: String(c.create_deployment ?? false),
+            SB_ENVIRONMENT_NAME: c.environment_name || c.environment || "",
+            SB_ENVIRONMENT_URL: c.environment_url || "",
+            SB_GENERATE_BADGES: c.generate_badges, SB_BADGES_DIRECTORY: c.badges_directory || "badges",
+            SB_TEST_RESULTS_PATH: c.test_results_path || "",
+            SB_COVERAGE_INCLUDE_PATHS: c.coverage_include_paths || "",
+            SB_COVERAGE_IGNORE_PATHS: c.coverage_ignore_paths || "",
+            SB_GENERATE_STATS_GRAPH: c.generate_stats_graph, SB_STATS_DIRECTORY: c.stats_directory || "stats",
+            SB_PREVIEW_ROOT: c.preview_root ?? "",
+            SB_ENABLE_PASSCODE_GATE: c.enable_passcode_gate, SB_PASSCODE_SESSION_HOURS: c.passcode_session_hours,
+            SB_SMOKE_TEST: c.smoke_test, SB_SMOKE_TEST_STORIES: c.smoke_test_stories, SB_SMOKE_TEST_TIMEOUT_MS: c.smoke_test_timeout_ms,
+            SB_SITE_URL: c.site_url || "", SB_BASE_PATH: c.base_path || "", SB_AUTO_BASE_URL: c.auto_base_url,
+            SB_AUDIT_BUNDLE_SIZE: c.audit_bundle_size, SB_BUNDLE_SIZE_MAX_MB: c.bundle_size_max_mb,
+            SB_CNAME: c.cname || ""
+          });
         })'
 
     - name: Set up Node.js
@@ -224,7 +225,7 @@ runs:
       run: |
         CMD="$SB_BUILD_COMMAND"
         if [ "$SB_AUTO_BASE_URL" = "true" ]; then
-          eval "$(node -e 'import(process.env.GITHUB_ACTION_PATH + "/src/base-url.js").then(({computeBaseUrl, augmentBuildCommand, buildEnvironment}) => { const baseUrl = computeBaseUrl({repository: process.env.SB_REPOSITORY, siteUrl: process.env.SB_SITE_URL, basePath: process.env.SB_BASE_PATH, eventName: process.env.SB_EVENT_NAME, prNumber: process.env.SB_PR_NUMBER, previewRoot: process.env.SB_PREVIEW_ROOT}); const command = augmentBuildCommand(process.env.SB_BUILD_COMMAND, baseUrl); console.log(`CMD=${JSON.stringify(command)}`); for (const [key, value] of Object.entries(buildEnvironment(baseUrl))) console.log(`export ${key}=${JSON.stringify(value)}`); })')"
+          eval "$(node -e 'import(process.env.GITHUB_ACTION_PATH + "/src/base-url.js").then(({computeBaseUrl, augmentBuildCommand, buildEnvironment, shellQuote}) => { const baseUrl = computeBaseUrl({repository: process.env.SB_REPOSITORY, siteUrl: process.env.SB_SITE_URL, basePath: process.env.SB_BASE_PATH, eventName: process.env.SB_EVENT_NAME, prNumber: process.env.SB_PR_NUMBER, previewRoot: process.env.SB_PREVIEW_ROOT}); const command = augmentBuildCommand(process.env.SB_BUILD_COMMAND, baseUrl); console.log(`CMD=${shellQuote(command)}`); for (const [key, value] of Object.entries(buildEnvironment(baseUrl))) console.log(`export ${key}=${shellQuote(value)}`); })')"
         fi
         echo "Running custom build command: $CMD"
         eval "$CMD"

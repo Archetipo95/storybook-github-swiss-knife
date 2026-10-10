@@ -213,8 +213,8 @@ async function runCli() {
     if (deployment && deployment.id) {
       process.stdout.write(`deployment_id=${deployment.id}\n`);
       if (process.env.GITHUB_OUTPUT) {
-        const fs = await import('node:fs/promises');
-        await fs.appendFile(process.env.GITHUB_OUTPUT, `deployment_id=${deployment.id}\n`);
+        const { appendCommandFile } = await import('./command-file.js');
+        appendCommandFile(process.env.GITHUB_OUTPUT, { deployment_id: deployment.id });
       }
     }
     return;

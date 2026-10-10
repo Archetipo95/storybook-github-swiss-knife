@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { validateRelativeDirectory } from './config.js';
+import { appendCommandFile } from './command-file.js';
 
 export const PREVIEW_METADATA_SCHEMA_VERSION = 1;
 export const PREVIEW_METADATA_FILENAME = 'preview-metadata.json';
@@ -288,13 +289,12 @@ if (process.argv[1] && process.argv[1].endsWith('preview-metadata.js')) {
 
     const outputPath = process.env.GITHUB_OUTPUT;
     if (outputPath) {
-      const lines = [
-        `artifact_name=${metadata.artifactName}`,
-        `content_digest=${metadata.contentDigest}`,
-        `is_fork=${metadata.isFork}`,
-        `target=${metadata.target ?? ''}`
-      ];
-      fs.appendFileSync(outputPath, `${lines.join('\n')}\n`);
+      appendCommandFile(outputPath, {
+        artifact_name: metadata.artifactName,
+        content_digest: metadata.contentDigest,
+        is_fork: metadata.isFork,
+        target: metadata.target ?? ''
+      });
     }
 
     const summaryPath = process.env.GITHUB_STEP_SUMMARY;

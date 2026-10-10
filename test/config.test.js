@@ -53,6 +53,22 @@ test('automatic base URL augmentation preserves explicit base configuration', ()
   );
 });
 
+test('augmentBuildCommand puts the base URL on the last Storybook build line of a multi-line command', () => {
+  assert.equal(
+    augmentBuildCommand('npm run lint\nnpm run build-storybook\necho done', '/repo/'),
+    "npm run lint\nnpm run build-storybook -- --base-url '/repo/'\necho done"
+  );
+  assert.equal(
+    augmentBuildCommand('cd docs\r\nnpx storybook build\r\n', '/repo/'),
+    "cd docs\r\nnpx storybook build --base-url '/repo/'\r\n"
+  );
+  assert.equal(augmentBuildCommand('npm run lint\nnpm run build', '/repo/'), 'npm run lint\nnpm run build');
+  assert.equal(
+    augmentBuildCommand('npm run lint\nstorybook build -o out', '/repo/'),
+    'npm run lint\nstorybook build -o out'
+  );
+});
+
 test('resolveConfiguration - auto_base_url defaults on and honors false overrides', () => {
   const configFilePath = path.join(os.tmpdir(), 'missing-auto-base-url.yml');
   assert.equal(resolveConfiguration({ inputs: {}, configFilePath }).auto_base_url, true);
