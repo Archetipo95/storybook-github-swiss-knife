@@ -70,7 +70,7 @@ jobs:
           persist-credentials: false
 
       - name: Load swiss-knife toolkit
-        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@5ee468eba4dd9c2fa560a8ddeaed1f0ee149dc9a
+        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@615edb55a47eb23aa307d5232c06d5fb4cb68f95
 
       - name: Find the results bundle
         id: artifact

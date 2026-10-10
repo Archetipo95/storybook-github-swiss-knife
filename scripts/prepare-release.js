@@ -59,17 +59,7 @@ function releaseRefFiles() {
 // refuses to tag when they differ).
 const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
 const pinSha = git('rev-parse', 'HEAD');
-const uncommitted = git(
-  'status',
-  '--porcelain',
-  '--',
-  'src',
-  'publisher',
-  'preview-build',
-  'preview-publisher',
-  'preview-cleanup',
-  'preview-janitor'
-);
+const uncommitted = git('status', '--porcelain', '--', 'src', 'actions');
 if (uncommitted) {
   console.error(
     `Commit action and src changes before preparing ${tag}; internal pins must point at committed code:\n${uncommitted}`
@@ -86,14 +76,18 @@ for (const file of walkFiles('.github/workflows').filter(file => /\.ya?ml$/.test
   );
 }
 
-updateJson('package.json', pkg => {
-  pkg.version = version;
-});
+// The addon's version is also the default ref `npx storybook-swiss-knife init`
+// pins, so it moves with the release; the runner follows for consistency.
+for (const dir of ['.', 'packages/addon', 'runner']) {
+  updateJson(path.join(dir, 'package.json'), pkg => {
+    pkg.version = version;
+  });
 
-updateJson('package-lock.json', lock => {
-  lock.version = version;
-  if (lock.packages?.['']) lock.packages[''].version = version;
-});
+  updateJson(path.join(dir, 'package-lock.json'), lock => {
+    lock.version = version;
+    if (lock.packages?.['']) lock.packages[''].version = version;
+  });
+}
 
 for (const file of releaseRefFiles()) {
   replaceProjectTags(file);

@@ -385,8 +385,7 @@ export function runInit({ argv, cwd = process.cwd(), version, log = console.log 
     options.previews ? 'Settings → Pages: deploy from the gh-pages branch (it is created by the first preview).' : null,
     'Optional: a STORYBOOK_PREVIEW_PASSCODE_HASH secret puts previews and reports behind a passcode.',
     `Push to ${branch} once, so the baseline screenshots are cached.`,
-    'Make "swiss-knife / visual" and "swiss-knife / accessibility" required status checks.',
-    'While storybook-github-swiss-knife is private: in its Settings → Actions → Access, allow repositories owned by Archetipo95.'
+    'Make "swiss-knife / visual" and "swiss-knife / accessibility" required status checks.'
   ].filter(Boolean);
   log(`\nNext steps:\n${steps.map((step, index) => `  ${index + 1}. ${step}`).join('\n')}`);
   return plan;

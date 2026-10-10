@@ -1,10 +1,25 @@
 {
   "name": "storybook-swiss-knife",
   "version": "0.1.0",
-  "private": true,
   "description": "Storybook addon: visual regression results (Visual panel, sidebar statuses) from storybook-github-swiss-knife",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Archetipo95/storybook-github-swiss-knife.git",
+    "directory": "packages/addon"
+  },
+  "homepage": "https://github.com/Archetipo95/storybook-github-swiss-knife/blob/main/docs/visual-regression.md",
+  "bugs": {
+    "url": "https://github.com/Archetipo95/storybook-github-swiss-knife/issues"
+  },
+  "keywords": [
+    "storybook-addons",
+    "storybook",
+    "visual-regression",
+    "accessibility",
+    "github-actions"
+  ],
   "exports": {
     ".": "./preset.cjs",
     "./preset": "./preset.cjs",
