@@ -44,10 +44,11 @@ Do not add Jest or Vitest to this action repository unless native `node:test` st
 
 Release checklist:
 
-1. On a branch from the latest `main`, run `npm run prepare-release -- <version>`. It bumps the version and release refs and moves the reusable workflows' internal action pins to that `main` commit. Review the generated changelog entry and move the Unreleased notes under it.
+1. On a branch from the latest `main`, run `npm run prepare-release -- <version>`. It bumps the version (root, `packages/addon` and `runner`) and release refs and moves the reusable workflows' internal action pins to that `main` commit. Review the generated changelog entry and move the Unreleased notes under it.
 2. Confirm this repository's CI and CodeQL checks are green.
 3. Run the `storybook-vue-demo` Action Canary workflow against the candidate branch, tag, or SHA.
 4. Merge the release PR. The `Release Tags` workflow sees the new `package.json` version on `main`, re-runs the tests, checks `package-lock.json` and `CHANGELOG.md` agree, then creates `vX.Y.Z` and moves the major tag (`v1`) to it. Do not tag by hand. If the checks fail, `main` shows a failed `Release Tags` run and no tag is created. Every later push to `main` also moves `v1` back onto the newest release if it has drifted; it never moves it backwards.
-5. Update the demo repository's stable action refs after the tag exists.
+5. Publish the addon from the tag: `git checkout vX.Y.Z && cd packages/addon && npm publish` (`prepack` builds `dist/`). `npx storybook-swiss-knife init` pins workflows to `v<addon version>`, so publish only after the tag exists.
+6. Update the demo repository's stable action refs after the tag exists.
 
 ---
