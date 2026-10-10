@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 
+import { moveInternalPins } from './internal-pins.js';
 import { addReleaseSection } from './release-changelog.js';
 
 const version = process.argv[2];
@@ -55,50 +55,14 @@ function releaseRefFiles() {
   ];
 }
 
-// Reusable workflows pin this repository's own composite actions to a commit
-// SHA. Move every pin to the commit on main this release is prepared from, so
-// the released workflows run the released code (the Release Tags workflow
-// refuses to tag when they differ). That is the branch's merge base with
-// origin/main, not HEAD: a squash merge drops the branch's own commits, and a
-// pin must stay reachable. SWISS_KNIFE_RELEASE_BASE overrides it (tests, or a
-// clone without origin/main, where HEAD is used).
-const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
-const tryGit = (...args) => {
-  try {
-    return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: 'pipe' }).trim();
-  } catch {
-    return '';
-  }
-};
-const uncommitted = git('status', '--porcelain', '--', 'src', 'actions', 'runner');
-if (uncommitted) {
-  console.error(
-    `Commit action, src and runner changes before preparing ${tag}; internal pins must point at committed code:\n${uncommitted}`
-  );
+// Reusable workflows pin this repository's own composite actions to a commit SHA; move them to
+// the commit this release is prepared from (scripts/internal-pins.js).
+let pinSha;
+try {
+  pinSha = moveInternalPins({ root, purpose: `preparing ${tag}` });
+} catch (error) {
+  console.error(error.message);
   process.exit(1);
-}
-const baseRef = process.env.SWISS_KNIFE_RELEASE_BASE;
-const pinSha = baseRef
-  ? git('rev-parse', '--verify', `${baseRef}^{commit}`)
-  : tryGit('merge-base', 'HEAD', 'origin/main') || git('rev-parse', 'HEAD');
-// The branch's own commits are not pinned, so they must not change code the pins run.
-const unpinned = git('diff', '--name-only', pinSha, 'HEAD', '--', 'src', 'actions', 'runner');
-if (unpinned) {
-  console.error(
-    `Commits since ${pinSha.slice(0, 7)} change code the internal pins would not run:\n${unpinned}\n` +
-      'Merge them to main first, then prepare the release from main. If they are already on main, ' +
-      'origin/main is out of date here: run `git fetch origin main` and try again.'
-  );
-  process.exit(1);
-}
-for (const file of walkFiles('.github/workflows').filter(file => /\.ya?ml$/.test(file))) {
-  write(
-    file,
-    read(file).replace(
-      /(Archetipo95\/storybook-github-swiss-knife\/actions\/[A-Za-z0-9_-]+@)[0-9a-f]{40}/g,
-      `$1${pinSha}`
-    )
-  );
 }
 
 // The addon's version is also the default ref `npx storybook-swiss-knife init`
