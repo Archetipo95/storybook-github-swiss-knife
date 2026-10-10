@@ -1,0 +1,11 @@
+{
+  "v": 3,
+  "stories": {
+    "example-button--primary": {
+      "id": "example-button--primary",
+      "title": "Example/Button",
+      "name": "Primary",
+      "importPath": "./src/stories/Button.stories.js"
+    }
+  }
+}
