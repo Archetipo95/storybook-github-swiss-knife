@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The Visual panel's **Show changed pixels** stays on while moving between stories; it used to reset on every story.
+
 ## [0.1.1] - 2026-10-10
 
 ### Added

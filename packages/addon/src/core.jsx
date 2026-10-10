@@ -196,9 +196,17 @@ function PulsingPixels({ mask }) {
 
 const SIDE_LABELS = { base: 'Base', pr: 'PR' };
 
+// Module state, so "Show changed pixels" stays on while moving between stories: every story
+// mounts a new Comparison.
+let showChangedPixels = false;
+
 function Comparison({ manifest, storyId, theme }) {
   const [side, setSide] = useState('pr');
-  const [showDiff, setShowDiff] = useState(false);
+  const [showDiff, setShowDiffState] = useState(showChangedPixels);
+  const setShowDiff = value => {
+    showChangedPixels = value;
+    setShowDiffState(value);
+  };
   const changedPixels = useChangedPixels(imageUrl(manifest, storyId, 'diff'), showDiff);
   const toggle = () => setSide(current => (current === 'pr' ? 'base' : 'pr'));
   return (
