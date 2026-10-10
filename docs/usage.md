@@ -177,7 +177,7 @@ jobs:
 | `preview_root`                | `string`  | `pr-preview`         | Root directory (on the Pages branch) under which PR previews are published, as `<preview_root>/pr-<number>`                               |
 | `preview_retention_days`      | `number`  | `30`                 | Days an _open_ PR's preview may remain before the janitor prunes it; closed-PR previews are always eligible for removal regardless of age |
 | `warning_days_before_cleanup` | `number`  | `3`                  | Days before cleanup to warn in the bot PR comment; `0` disables warnings                                                                  |
-| `managed_directories`         | `string`  | `''`                 | Comma-separated directories preserved during root publication in directory mode (e.g. `pr-preview`)                                       |
+| `managed_directories`         | `string`  | `''`                 | Comma-separated directories preserved during root publication in directory mode, besides the preview root (always kept)                   |
 | `generate_badges`             | `boolean` | `true`               | Whether to automatically generate SVG/JSON component and story count badges                                                               |
 | `badges_directory`            | `string`  | `badges`             | Relative directory inside the static output where generated badges are hosted                                                             |
 | `test_results_path`           | `string`  | `''`                 | Optional repository-relative path to a JSON interaction test results file (for example, `.storybook/test-results.json`)                   |

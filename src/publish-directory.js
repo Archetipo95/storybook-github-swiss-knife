@@ -1,6 +1,12 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { resolveDeploymentTarget, validateConfig, validateRelativeDirectory } from './config.js';
+import {
+  DEFAULT_CONFIG,
+  normalizeManagedDirectories,
+  resolveDeploymentTarget,
+  validateConfig,
+  validateRelativeDirectory
+} from './config.js';
 import { CNAME_FILE, normalizeCname, readCnameFile, writeCnameFile } from './cname.js';
 import { requestPagesRebuild, withSerializedBranchWrite, WRITE_LOCK_NAME } from './git-branch-writer.js';
 
@@ -13,12 +19,27 @@ async function pathExists(file) {
   }
 }
 
+/**
+ * Top-level entries a root publish must keep: the first segment of every managed directory and of
+ * the preview root (PR previews live there), or, when previews are published at the branch root
+ * (empty preview root), every `pr-<N>` directory.
+ */
+function keptRootEntry(managedDirectories, previewRoot) {
+  const kept = new Set(
+    [...normalizeManagedDirectories(managedDirectories), ...normalizeManagedDirectories(previewRoot)].map(
+      directory => directory.split('/')[0]
+    )
+  );
+  const previewsAtRoot = normalizeManagedDirectories(previewRoot).length === 0;
+  return entry => kept.has(entry) || (previewsAtRoot && /^pr-\d+$/.test(entry));
+}
+
 export async function replaceDirectory(
   repo,
   targetDirectory,
   sourceDirectory,
   managedDirectories = [],
-  { cname = '', preserveCname = true, preserveEntries = [] } = {}
+  { cname = '', preserveCname = true, preserveEntries = [], previewRoot = DEFAULT_CONFIG.preview_root } = {}
 ) {
   validateRelativeDirectory(targetDirectory, 'target_directory', { allowEmpty: true });
   for (const entry of preserveEntries) {
@@ -34,8 +55,11 @@ export async function replaceDirectory(
     const staging = `${repo}.staging-${process.pid}`;
     await fs.rm(staging, { recursive: true, force: true });
     await fs.cp(sourceDirectory, staging, { recursive: true, preserveTimestamps: true });
+    // A root build replaces the site, but never the PR previews or other managed directories:
+    // they are published separately to the same branch.
+    const isKept = keptRootEntry(managedDirectories, previewRoot);
     for (const entry of await fs.readdir(repo)) {
-      if (entry !== '.git' && entry !== WRITE_LOCK_NAME && !managedDirectories.includes(entry))
+      if (entry !== '.git' && entry !== WRITE_LOCK_NAME && !isKept(entry))
         await fs.rm(path.join(repo, entry), { recursive: true, force: true });
     }
     for (const entry of await fs.readdir(staging)) {
@@ -101,6 +125,7 @@ export async function publishDirectory({
   targetDirectory = '',
   managedDirectories = [],
   preserveEntries = [],
+  previewRoot = DEFAULT_CONFIG.preview_root,
   siteUrl = '',
   basePath = '',
   cname = '',
@@ -128,7 +153,8 @@ export async function publishDirectory({
       await replaceDirectory(repoPath, targetDirectory, source, managedDirectories, {
         cname,
         preserveCname,
-        preserveEntries
+        preserveEntries,
+        previewRoot
       });
       return true;
     }
@@ -171,11 +197,9 @@ if (process.argv[1]?.endsWith('publish-directory.js')) {
     cname: process.env.CNAME || '',
     preserveCname: process.env.PRESERVE_CNAME !== 'false',
     triggerPagesRebuild: process.env.TRIGGER_PAGES_REBUILD === 'true',
-    managedDirectories: process.env.MANAGED_DIRECTORIES
-      ? process.env.MANAGED_DIRECTORIES.split(',')
-          .map(value => value.trim())
-          .filter(Boolean)
-      : [],
+    managedDirectories: normalizeManagedDirectories(process.env.MANAGED_DIRECTORIES),
+    // Unset keeps the default preview root; an explicit empty value means previews at the root.
+    previewRoot: process.env.PREVIEW_ROOT ?? DEFAULT_CONFIG.preview_root,
     token: process.env.GITHUB_TOKEN,
     repository: process.env.GITHUB_REPOSITORY
   })

@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Re-running a Pages write that changes nothing (a deploy or PR preview of the same build) failed after every retry. git prints `nothing to commit` on stdout, which the error check never saw. The writer now asks git whether anything is staged (`git diff --cached --quiet`) and returns `{ changed: false }`, and git errors include stdout and the exit code.
+- A root publish in directory mode (a `main` deploy to the Pages branch root) deleted everything except `managed_directories`, which is empty by default, so every deploy wiped the PR previews under `pr-preview/`. It now always keeps the preview root (`preview_root`, `pr-preview` by default, or the `pr-<N>` directories when previews are published at the root), plus the managed directories. `managed_directories` entries with a trailing slash (`pr-preview/`) match too. The publisher action has a new `preview_root` input.
 
 ## [0.2.1] - 2026-10-10
 
