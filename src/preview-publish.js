@@ -13,7 +13,10 @@ import { publishDirectory } from './publish-directory.js';
 import { buildCommentBody, upsertPreviewComment } from './preview-comment.js';
 import { createDeployment, updateDeploymentStatus } from './github-deployments.js';
 import { injectAuthGate } from './inject-auth-gate.js';
-import { generateStatsGraph } from './generate-stats.js';
+import { generateStatsGraph, readArtifactCurrentSnapshot } from './generate-stats.js';
+
+// Re-exported for callers of the publisher module.
+export { readArtifactCurrentSnapshot };
 import { auditBundleSize, readBundleReport } from './audit-static.js';
 import { appendCommandFile } from './command-file.js';
 
@@ -80,27 +83,6 @@ export function readBundleMetadata(bundleDir) {
  * rejection path (fork, stale run, provenance mismatch) is returned/thrown
  * before any write-capable operation runs.
  */
-/**
- * Reads the exact "current PR" snapshot the untrusted build already wrote
- * into the artifact's own `<statsDirectory>/history.json` (a single entry,
- * computed by `generate-stats.js` against the real PR source tree - which
- * the trusted publisher must never check out or execute). Returns null when
- * absent/malformed so the caller can skip regeneration entirely rather than
- * recompute against the built static output, which lacks source files and
- * would silently misreport `totalComponents`/`coveragePercent`.
- */
-export function readArtifactCurrentSnapshot(contentDir, statsDirectory = 'stats') {
-  const historyPath = path.join(contentDir, statsDirectory, 'history.json');
-  if (!fs.existsSync(historyPath)) return null;
-  try {
-    const raw = JSON.parse(fs.readFileSync(historyPath, 'utf8'));
-    if (Array.isArray(raw) && raw.length > 0) return raw[raw.length - 1];
-  } catch {
-    // Malformed artifact stats file - treat as absent.
-  }
-  return null;
-}
-
 export function resolveBaseMetricsPath({
   pagesRepo,
   baseRef,

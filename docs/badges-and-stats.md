@@ -24,6 +24,19 @@ You can embed these badges directly into your `README.md`:
 
 ---
 
+# Where Badges & Stats Are Computed
+
+Coverage and the Storybook version come from the source, so badges and the stats snapshot are
+computed where the source is checked out:
+
+- **`publisher` action:** it keeps badges the build already made (`badges/overview.json` in the
+  output) and uses the build's stats snapshot when there is one, if they are for the commit
+  being published (a leftover for another commit is ignored with a warning). Otherwise it computes them
+  where it runs, which needs the source checked out in that job. Without a `package.json` there
+  it warns.
+- **PR previews:** the untrusted build makes both, and the trusted publisher adds the snapshot
+  to the base branch's history.
+
 # Coverage Discovery & Path Filtering
 
 The component coverage calculation uses the checked-out repository as the default discovery root. In the current release, the action walks the workspace and counts likely framework component files such as `.vue`, `.jsx`, `.tsx`, and `.svelte` while excluding common non-component and generated paths (`node_modules`, `.git`, `storybook-static`, `dist`, `build`, `coverage`, and files ending with `.stories.*`, `.story.*`, `.test.*`, `.spec.*`). This default behavior is intentionally repository-wide and is what drives the coverage badge, `badges/overview.json`, PR preview coverage deltas, and the growth-chart ledger.

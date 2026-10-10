@@ -489,6 +489,27 @@ export function updateHistoryLedger({ existingHistory = [], currentSnapshot, max
 }
 
 /**
+ * Reads the snapshot a build already wrote into its output's `<statsDirectory>/history.json`
+ * (a single entry, computed by `generate-stats.js` where the source was checked out: an
+ * untrusted PR build, or the reusable workflow's build job). Publishers, which only have the
+ * static output, never check out or execute that source. Returns null when
+ * absent/malformed so the caller can skip regeneration entirely rather than
+ * recompute against the built static output, which lacks source files and
+ * would silently misreport `totalComponents`/`coveragePercent`.
+ */
+export function readArtifactCurrentSnapshot(contentDir, statsDirectory = 'stats') {
+  const historyPath = path.join(contentDir, statsDirectory, 'history.json');
+  if (!fs.existsSync(historyPath)) return null;
+  try {
+    const raw = JSON.parse(fs.readFileSync(historyPath, 'utf8'));
+    if (Array.isArray(raw) && raw.length > 0) return raw[raw.length - 1];
+  } catch {
+    // Malformed artifact stats file - treat as absent.
+  }
+  return null;
+}
+
+/**
  * Generates statistics graph (history.svg) and updates the ledger (history.json).
  */
 export function generateStatsGraph({
@@ -643,6 +664,18 @@ if (process.argv[1] && process.argv[1].endsWith('generate-stats.js')) {
   const ignorePaths = process.env.SB_COVERAGE_IGNORE_PATHS || '';
 
   try {
+    // Publishing (with the Pages history): when the build already wrote its snapshot where the
+    // source was checked out, use it. Recounting here would miss the source (coverage 100%,
+    // version "deployed") and add a wrong point to the history.
+    let currentSnapshot = pagesRepo ? readArtifactCurrentSnapshot(staticDir, statsDir) : null;
+    // A snapshot for another commit is not this build's (e.g. a stats/ folder shipped in public/).
+    if (currentSnapshot?.commit && commitSha && !commitSha.startsWith(currentSnapshot.commit)) {
+      console.log(
+        `::warning::Ignoring the stats snapshot in the output: it is for commit ${currentSnapshot.commit}, not ${commitSha.slice(0, 7)}.`
+      );
+      currentSnapshot = null;
+    }
+    if (currentSnapshot) console.log('Using the snapshot the build wrote with the source checked out.');
     const result = generateStatsGraph({
       staticDir,
       workspaceRoot,
@@ -651,6 +684,7 @@ if (process.argv[1] && process.argv[1].endsWith('generate-stats.js')) {
       siteUrl,
       basePath,
       commitSha,
+      currentSnapshot,
       includePaths,
       ignorePaths
     });

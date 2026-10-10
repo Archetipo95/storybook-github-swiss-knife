@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - CI fails when a reusable workflow uses source, or a named export, that its pinned toolkit commit does not have. Between #26 and 0.3.0, `main`'s own workflows imported `src/command-file.js` from a toolkit pinned before it existed, and this repository's PR preview publishing failed with `ERR_MODULE_NOT_FOUND`. New `npm run bump-pins` moves the internal action pins without a release, for the second of the two pull requests such a change now takes (see "Workflows and the pinned toolkit" in `docs/development.md`).
 
+### Fixed
+
+- The `publisher` action regenerated badges and the stats point wherever it ran. Without the source (a publish job that only has the static output) that gives coverage 100% and the Storybook version "deployed", overwrites the build's correct badges, and adds such a point to `stats/history.json`. It now keeps badges the build already made (`badges/overview.json` in the output) and adds the build's stats snapshot (`stats/history.json` in the output) to the Pages history instead of recounting, when they are for the commit being published (a leftover from another commit, such as a `badges/` or `stats/` folder in `public/`, is ignored with a warning). When it does make badges without a `package.json` in the workspace, it warns. The usage docs' two-job example now checks the source out in the publish job.
+
 ## [0.3.0] - 2026-10-10
 
 ### Changed
