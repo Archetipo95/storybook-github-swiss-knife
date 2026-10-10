@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Docs: how `visual.threshold` and `visual.maxDiffPixels` decide what counts as a change. At the default `threshold` of `0.2`, a colour swap between shades of similar brightness (`#1d4ed8` to `#6d28d9`) is reported as unchanged; `0.1` catches it.
 - The visual workflow's reuse job is named **Reuse results (label event)**: since 0.2.1 every label event re-gates the commit's results, not only the approval label.
 - `npm run prepare-release` adds a hint when it refuses: with a stale local `origin/main`, main's own newer commits look like the release branch's, so it suggests `git fetch origin main`.
 

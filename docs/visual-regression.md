@@ -79,6 +79,23 @@ Settings live in `.storybook/swiss-knife.json` (`visual`, `a11y`); see
 parameters (`a11y.disable` / `a11y.test: 'off'`, `a11y.config.rules`, `a11y.options.rules`,
 `a11y.context` / `a11y.element`). Tag a story `skip-visual` to leave it out entirely.
 
+### How sensitive the comparison is
+
+Two settings decide when a screenshot counts as changed (Playwright's own comparison):
+
+- `visual.threshold` (default `0.2`): how different one pixel's colour must be to count as
+  changed, from 0 to 1. The difference weighs brightness most, so a colour swap between shades of
+  similar brightness can stay under `0.2`. For example, a background changed from `#1d4ed8` to
+  `#6d28d9` is reported as unchanged at `0.2` and as changed at `0.1`. Lower it (`0.1` is a good
+  start) when such colour changes matter, as in a design system.
+- `visual.maxDiffPixels` (default `100`): how many changed pixels a screenshot may have and still
+  pass. A small detail, such as rounder corners on a button, can change fewer. Set
+  `parameters.swissKnife.visual.maxDiffPixels` on a story to tighten it there.
+
+Lower values catch smaller changes, but also pick up tiny rendering differences, for example after
+a runner image update. Changing either value captures new baselines, since they are part of the
+baseline cache key.
+
 ## Storybook addon
 
 ```bash
