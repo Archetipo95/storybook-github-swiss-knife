@@ -42,9 +42,14 @@ export function run(command, args, cwd) {
       stderr += data;
     });
     child.on('error', reject);
-    child.on('close', code =>
-      code === 0 ? resolve(stdout.trim()) : reject(new Error(`${command} ${args.join(' ')} failed: ${stderr.trim()}`))
-    );
+    child.on('close', code => {
+      if (code === 0) return resolve(stdout.trim());
+      // git prints some failures (and every `nothing to commit`) on stdout, so keep both.
+      const output = [stderr.trim(), stdout.trim()].filter(Boolean).join('\n');
+      const error = new Error(`${command} ${args.join(' ')} failed (exit ${code})${output ? `: ${output}` : ''}`);
+      error.exitCode = code;
+      reject(error);
+    });
   });
 }
 
@@ -153,7 +158,17 @@ export async function withSerializedBranchWrite({
         const changed = await mutate(repo);
         if (!changed) return { changed: false };
         await run('git', ['add', '-A'], repo);
-        let committed = true;
+        // mutate can rewrite identical content (a re-run publishing the same build). Ask git
+        // whether anything is staged instead of matching its "nothing to commit" text, which is
+        // localised: `diff --quiet` exits 1 when there are changes, 0 when there are none.
+        const staged = await run('git', ['diff', '--cached', '--quiet'], repo).then(
+          () => false,
+          error => {
+            if (error.exitCode === 1) return true;
+            throw error;
+          }
+        );
+        if (!staged) return { changed: false };
         await run(
           'git',
           [
@@ -166,14 +181,7 @@ export async function withSerializedBranchWrite({
             commitMessage
           ],
           repo
-        ).catch(error => {
-          if (error.message.includes('nothing to commit')) {
-            committed = false;
-            return;
-          }
-          throw error;
-        });
-        if (!committed) return { changed: false };
+        );
         const commitSha = await run('git', ['rev-parse', 'HEAD'], repo);
         await run('git', ['push', 'origin', `HEAD:${branch}`], repo);
         return { changed: true, commitSha };
