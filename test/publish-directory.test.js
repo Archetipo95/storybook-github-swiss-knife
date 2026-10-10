@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { normalizeManagedDirectories } from '../src/config.js';
 import { replaceDirectory } from '../src/publish-directory.js';
 
 test('replaceDirectory replaces only the selected target and preserves siblings', async () => {
@@ -218,4 +219,73 @@ test('publishDirectory surfaces opt-in Pages rebuild failures after push', async
     await fs.rm(seed, { recursive: true, force: true });
     await fs.rm(source, { recursive: true, force: true });
   }
+});
+
+/** A Pages branch with a published preview and a stale root file, and a new root build. */
+async function rootPublishFixture(previewDir = 'pr-preview/pr-1') {
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'pages-root-previews-'));
+  const source = await fs.mkdtemp(path.join(os.tmpdir(), 'pages-root-source-'));
+  await fs.mkdir(path.join(repo, previewDir), { recursive: true });
+  await fs.writeFile(path.join(repo, previewDir, 'index.html'), 'preview');
+  await fs.writeFile(path.join(repo, 'old.html'), 'old');
+  await fs.writeFile(path.join(source, 'index.html'), 'new');
+  const cleanup = async () => {
+    await fs.rm(repo, { recursive: true, force: true });
+    await fs.rm(source, { recursive: true, force: true });
+  };
+  return { repo, source, cleanup };
+}
+
+test('a root publish keeps the PR previews under the default preview root', async () => {
+  const { repo, source, cleanup } = await rootPublishFixture();
+  try {
+    await replaceDirectory(repo, '', source);
+    assert.equal(await fs.readFile(path.join(repo, 'pr-preview', 'pr-1', 'index.html'), 'utf8'), 'preview');
+    assert.equal(await fs.readFile(path.join(repo, 'index.html'), 'utf8'), 'new');
+    await assert.rejects(fs.readFile(path.join(repo, 'old.html')));
+  } finally {
+    await cleanup();
+  }
+});
+
+test('a root publish keeps managed directories written with a trailing slash', async () => {
+  const { repo, source, cleanup } = await rootPublishFixture('legacy-previews/pr-1');
+  try {
+    await replaceDirectory(repo, '', source, ['legacy-previews/']);
+    assert.equal(await fs.readFile(path.join(repo, 'legacy-previews', 'pr-1', 'index.html'), 'utf8'), 'preview');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('a root publish keeps a custom, nested preview root', async () => {
+  const { repo, source, cleanup } = await rootPublishFixture('previews/storybook/pr-1');
+  try {
+    await replaceDirectory(repo, '', source, [], { previewRoot: 'previews/storybook' });
+    assert.equal(await fs.readFile(path.join(repo, 'previews', 'storybook', 'pr-1', 'index.html'), 'utf8'), 'preview');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('with previews at the branch root, a root publish keeps the pr-<N> directories only', async () => {
+  const { repo, source, cleanup } = await rootPublishFixture('pr-12');
+  try {
+    await fs.mkdir(path.join(repo, 'pr-preview-notes'), { recursive: true });
+    await replaceDirectory(repo, '', source, [], { previewRoot: '' });
+    assert.equal(await fs.readFile(path.join(repo, 'pr-12', 'index.html'), 'utf8'), 'preview');
+    await assert.rejects(fs.access(path.join(repo, 'pr-preview-notes')));
+    await assert.rejects(fs.readFile(path.join(repo, 'old.html')));
+  } finally {
+    await cleanup();
+  }
+});
+
+test('normalizeManagedDirectories trims, drops ./ and trailing slashes, and dedupes', () => {
+  assert.deepEqual(normalizeManagedDirectories(' pr-preview/ , ./docs//, docs ,,'), ['pr-preview', 'docs']);
+  assert.deepEqual(normalizeManagedDirectories(['a/b/', 'c']), ['a/b', 'c']);
+  assert.deepEqual(normalizeManagedDirectories('one\ntwo/'), ['one', 'two']);
+  assert.deepEqual(normalizeManagedDirectories(''), []);
+  assert.deepEqual(normalizeManagedDirectories(undefined), []);
+  assert.deepEqual(normalizeManagedDirectories(`pr-preview${'/'.repeat(50000)}`), ['pr-preview']);
 });

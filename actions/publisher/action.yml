@@ -13,6 +13,10 @@ inputs:
   managed_directories:
     required: false
     default: ''
+  preview_root:
+    description: 'Where PR previews live on the Pages branch; a root publish keeps it (empty: previews are pr-<N> directories at the root)'
+    required: false
+    default: 'pr-preview'
   site_url:
     required: false
     default: ''
@@ -120,6 +124,7 @@ runs:
         PAGES_BRANCH: ${{ inputs.pages_branch }}
         TARGET_DIRECTORY: ${{ inputs.target_directory }}
         MANAGED_DIRECTORIES: ${{ inputs.managed_directories }}
+        PREVIEW_ROOT: ${{ inputs.preview_root }}
         SITE_URL: ${{ inputs.site_url }}
         BASE_PATH: ${{ inputs.base_path }}
         CNAME: ${{ inputs.cname }}

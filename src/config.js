@@ -45,6 +45,29 @@ export const DEFAULT_CONFIG = {
   }
 };
 
+/**
+ * Directory list from a config value: an array, or a comma- or newline-separated string. Entries
+ * are trimmed and lose a leading `./` and trailing slashes, so `pr-preview/` and `pr-preview` are
+ * the same directory; empty and repeated entries are dropped.
+ * @param {string | string[] | undefined | null} value
+ * @returns {string[]}
+ */
+export function normalizeManagedDirectories(value) {
+  if (value === undefined || value === null || value === '') return [];
+  const entries = Array.isArray(value) ? value : String(value).split(/\r?\n|,/);
+  const normalized = entries
+    .map(entry => {
+      let directory = String(entry)
+        .trim()
+        .replace(/^(\.\/)+/, '');
+      // A loop, not /\/+$/: that regex is polynomial on long runs of slashes (CodeQL ReDoS).
+      while (directory.endsWith('/')) directory = directory.slice(0, -1);
+      return directory;
+    })
+    .filter(Boolean);
+  return [...new Set(normalized)];
+}
+
 export const ALLOWED_PACKAGE_MANAGERS = new Set(['npm', 'yarn', 'pnpm', 'bun']);
 export const COMPOSITE_PACKAGE_MANAGERS = new Set(['npm', 'yarn', 'pnpm']);
 export const ALLOWED_MODES = new Set(['artifact', 'directory']);
@@ -143,13 +166,9 @@ export function validateConfig(config, { allowedPackageManagers = ALLOWED_PACKAG
     throw new Error('Config create_deployment must be a boolean');
   }
   if (config.managed_directories !== undefined) {
-    const values = Array.isArray(config.managed_directories)
-      ? config.managed_directories
-      : String(config.managed_directories)
-          .split(',')
-          .map(value => value.trim())
-          .filter(Boolean);
-    values.forEach(value => validateRelativeDirectory(value, 'managed_directories'));
+    normalizeManagedDirectories(config.managed_directories).forEach(value =>
+      validateRelativeDirectory(value, 'managed_directories')
+    );
   }
 
   if (config.preview_root !== undefined) {
@@ -433,8 +452,9 @@ export function resolveConfiguration({
           ? Boolean(fileConfig.preserve_cname)
           : DEFAULT_CONFIG.preserve_cname,
     artifact_name: inputs.artifact_name || fileConfig?.artifact_name || DEFAULT_CONFIG.artifact_name,
-    managed_directories:
-      inputs.managed_directories || fileConfig?.managed_directories || DEFAULT_CONFIG.managed_directories,
+    managed_directories: normalizeManagedDirectories(
+      inputs.managed_directories || fileConfig?.managed_directories || DEFAULT_CONFIG.managed_directories
+    ),
     package_manager: packageManager,
     preview_root:
       inputs.preview_root !== undefined && inputs.preview_root !== ''

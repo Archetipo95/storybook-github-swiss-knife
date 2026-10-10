@@ -222,7 +222,11 @@ jobs:
             for (const [key, value] of Object.entries(c)) {
               if (typeof value !== "object") console.log(`${key}=${value ?? ""}`);
             }
-            console.log(`managed_directories=${Array.isArray(c.managed_directories) ? c.managed_directories.join(",") : c.managed_directories || ""}`);
+            // The preview root is managed too, so a root publish keeps the PR previews. Top-level
+            // names only: the pinned publisher keeps an entry on an exact name match.
+            const managed = Array.isArray(c.managed_directories) ? c.managed_directories : String(c.managed_directories || "").split(",");
+            const kept = [...managed, c.preview_root].map(value => String(value || "").trim().replace(/^(\.\/)+/, "").split("/")[0]).filter(Boolean);
+            console.log(`managed_directories=${[...new Set(kept)].join(",")}`);
             console.log(`artifact_name=${c.artifact_name || "github-pages"}`);
             console.log(`test_results_path=${c.test_results_path || ""}`);
             console.log(`install_command=${c.build.install_command ?? ""}`);
