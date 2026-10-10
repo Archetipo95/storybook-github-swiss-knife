@@ -132,8 +132,9 @@ minutes, and fills the sidebar and the panel without a reload.
   when it has a blocking impact (`a11y.blockingImpacts`) and fails on more nodes than the
   baseline records for that story and rule. Baseline entries a pull request adds or raises are
   listed in the check, so they are reviewed like code.
-- Adding or removing the approval label re-evaluates the commit's results in about a minute;
-  nothing is screenshotted again.
+- Adding or removing any label re-evaluates the commit's results in about a minute, with the
+  approval label read from the pull request at that moment; nothing is screenshotted again.
+  A label run cancelled by a newer label event leaves the checks to the newer run.
 - The report and the Storybook gallery are published to `<preview_root>/pr-<N>/visual/`.
 - Both results are added to the pull request's preview comment (created if the preview has not
   posted one yet); set `visual.prComment: false` to keep them in the checks only.

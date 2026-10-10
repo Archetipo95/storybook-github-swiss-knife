@@ -62,7 +62,8 @@ function fakeGitHub({
   prHead = HEAD,
   comments = [],
   readBack = [],
-  prOnRecheck = null
+  prOnRecheck = null,
+  newerRunEvent = null
 } = {}) {
   const calls = [];
   let prReads = 0;
@@ -72,6 +73,7 @@ function fakeGitHub({
     if (route === `/repos/${REPO}/actions/runs/${RUN_ID}`) {
       return {
         id: RUN_ID,
+        event: 'pull_request',
         head_sha: HEAD,
         workflow_id: 99,
         conclusion,
@@ -105,7 +107,11 @@ function fakeGitHub({
     if (route === `/repos/${REPO}/issues/7/events`) {
       return [{ event: 'labeled', created_at: labeledAt, label: { name: 'visual-approved' } }];
     }
-    if (route === `/repos/${REPO}/actions/workflows/99/runs`) return { workflow_runs: [{ created_at: firstRunAt }] };
+    if (route === `/repos/${REPO}/actions/workflows/99/runs`) {
+      const runs = [{ id: RUN_ID, event: 'pull_request', created_at: firstRunAt }];
+      if (newerRunEvent) runs.push({ id: RUN_ID + 1, event: newerRunEvent, created_at: '2026-10-04T11:00:00Z' });
+      return { workflow_runs: runs };
+    }
     if (route === `/repos/${REPO}/commits/${HEAD}/check-runs`) return { total_count: existingChecks };
     if (route === `/repos/${REPO}/issues/7/comments` && method === 'GET') return comments;
     if (route.startsWith(`/repos/${REPO}/issues/comments/`) && method === 'GET') return readBack.shift() ?? null;
@@ -226,6 +232,23 @@ test('a pull request that moved to a newer commit while the gate ran gets no rep
 
 test('a cancelled run fails both checks even with a partial bundle', async () => {
   const { calls } = await run({ github: fakeGitHub({ conclusion: 'cancelled' }) });
+  assert.deepEqual(
+    checkRuns(calls).map(check => check.conclusion),
+    ['failure', 'failure']
+  );
+});
+
+test('a cancelled run replaced by a newer run of the same commit leaves the checks to it', async () => {
+  const { output, calls, published } = await run({
+    github: fakeGitHub({ conclusion: 'cancelled', newerRunEvent: 'pull_request' })
+  });
+  assert.deepEqual(output, { skipped: true, supersededBy: RUN_ID + 1 });
+  assert.equal(checkRuns(calls).length, 0);
+  assert.equal(published.length, 0);
+});
+
+test('a newer run from another event does not replace a cancelled pull request run', async () => {
+  const { calls } = await run({ github: fakeGitHub({ conclusion: 'cancelled', newerRunEvent: 'push' }) });
   assert.deepEqual(
     checkRuns(calls).map(check => check.conclusion),
     ['failure', 'failure']

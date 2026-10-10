@@ -82,7 +82,12 @@ runs:
         case "$MODE" in
           baseline)
             # A story that fails to render has no baseline; its head screenshot is reported as new.
-            npx playwright test -c playwright.config.js --update-snapshots=all --retries=0 || true ;;
+            # A capture that failed without writing any baseline fails the step, so nothing empty
+            # is compared against or cached.
+            status=0
+            npx playwright test -c playwright.config.js --update-snapshots=all --retries=0 || status=$?
+            node "$GITHUB_ACTION_PATH/../../src/visual/baseline-capture.js" "$status" \
+              "$SWISS_KNIFE_PROJECT_DIR" "$SWISS_KNIFE_SNAPSHOT_DIR" ;;
           compare)
             # A blob left by the baseline capture must never be uploaded as compare results.
             rm -rf "$PLAYWRIGHT_BLOB_OUTPUT_DIR"
