@@ -193,6 +193,16 @@ jobs:
 | `audit_bundle_size`           | `boolean` | `false`              | Report total, gzip-estimated and per-type asset sizes in the job summary ([Bundle size](bundle-size.md))                                  |
 | `bundle_size_max_mb`          | `string`  | `''`                 | Optional total static output budget in megabytes; the build fails when exceeded                                                           |
 
+In the composite action and the reusable workflows, the on/off settings that
+the [configuration file](#configuration-file-storybook-pagesyml) can also set
+(`preserve_cname`, `generate_badges`, `generate_stats_graph`,
+`enable_passcode_gate`, `smoke_test`, `auto_base_url`, `audit_bundle_size` and
+`create_deployment`) are declared as string inputs that default to empty. Pass
+`true` or `false` as before. When you leave one out, the value comes from the
+configuration file, and the default in the table applies only when the file
+does not set it either. `create_deployment` defaults to `true` in the reusable
+workflows and `false` in the composite action.
+
 When `smoke_test` is enabled, the action serves the static output only on
 `127.0.0.1`, opens the manager and canvas with Playwright, and fails on
 uncaught page errors, console errors, failed requests, HTTP errors, or a
@@ -231,7 +241,7 @@ build:
   build_command: npm run build-storybook
 ```
 
-_Note: Explicit workflow inputs override file configuration, which in turn overrides default values._
+_Note: Explicit workflow inputs override file configuration, which in turn overrides default values. An input you leave out (or set to `''`) does not override the file._
 
 For Bun projects, use the reusable workflow and set `package_manager: bun`. It provisions Bun in its read-only build job; the deploy-capable composite action intentionally rejects Bun so installation never runs in a job with Pages, OIDC, or write privileges. When omitted, the commands default to `bun install --frozen-lockfile` and `bun run build-storybook`:
 

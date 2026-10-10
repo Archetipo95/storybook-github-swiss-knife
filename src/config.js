@@ -406,11 +406,18 @@ export function loadConfigFile(filePath) {
   return parsed;
 }
 
+/**
+ * Resolves each setting from the inputs (when non-empty), then the config file, then the defaults.
+ * `defaults` replaces DEFAULT_CONFIG values for one caller (the reusable workflows create
+ * deployments by default; the composite action does not).
+ */
 export function resolveConfiguration({
   inputs = {},
   configFilePath,
-  allowedPackageManagers = ALLOWED_PACKAGE_MANAGERS
+  allowedPackageManagers = ALLOWED_PACKAGE_MANAGERS,
+  defaults = {}
 } = {}) {
+  const fallback = { ...DEFAULT_CONFIG, ...defaults };
   let fileConfig = null;
   if (configFilePath !== undefined) {
     if (fs.existsSync(configFilePath)) fileConfig = loadConfigFile(configFilePath);
@@ -420,40 +427,40 @@ export function resolveConfiguration({
     if (process.env.GITHUB_ACTIONS === 'true') warnings.forEach(warning => console.warn(`::warning::${warning}`));
   }
 
-  const packageManager = inputs.package_manager || fileConfig?.package_manager || DEFAULT_CONFIG.package_manager;
-  const defaultBuild = packageManager === 'bun' ? BUN_DEFAULT_BUILD : DEFAULT_CONFIG.build;
+  const packageManager = inputs.package_manager || fileConfig?.package_manager || fallback.package_manager;
+  const defaultBuild = packageManager === 'bun' ? BUN_DEFAULT_BUILD : fallback.build;
   const merged = {
-    version: fileConfig?.version ?? DEFAULT_CONFIG.version,
-    mode: inputs.mode || fileConfig?.mode || DEFAULT_CONFIG.mode,
-    path: inputs.path || fileConfig?.path || DEFAULT_CONFIG.path,
-    pages_branch: inputs.pages_branch || fileConfig?.pages_branch || DEFAULT_CONFIG.pages_branch,
-    target_directory: inputs.target_directory || fileConfig?.target_directory || DEFAULT_CONFIG.target_directory,
-    environment: inputs.environment || fileConfig?.environment || DEFAULT_CONFIG.environment,
+    version: fileConfig?.version ?? fallback.version,
+    mode: inputs.mode || fileConfig?.mode || fallback.mode,
+    path: inputs.path || fileConfig?.path || fallback.path,
+    pages_branch: inputs.pages_branch || fileConfig?.pages_branch || fallback.pages_branch,
+    target_directory: inputs.target_directory || fileConfig?.target_directory || fallback.target_directory,
+    environment: inputs.environment || fileConfig?.environment || fallback.environment,
     environment_name:
       inputs.environment_name ||
       inputs.environment ||
       fileConfig?.environment_name ||
       fileConfig?.environment ||
-      DEFAULT_CONFIG.environment_name,
-    environment_url: inputs.environment_url || fileConfig?.environment_url || DEFAULT_CONFIG.environment_url,
+      fallback.environment_name,
+    environment_url: inputs.environment_url || fileConfig?.environment_url || fallback.environment_url,
     create_deployment:
       inputs.create_deployment !== undefined && inputs.create_deployment !== ''
         ? String(inputs.create_deployment) === 'true'
         : fileConfig?.create_deployment !== undefined
           ? Boolean(fileConfig.create_deployment)
-          : DEFAULT_CONFIG.create_deployment,
-    site_url: inputs.site_url || fileConfig?.site_url || DEFAULT_CONFIG.site_url,
-    base_path: inputs.base_path || fileConfig?.base_path || DEFAULT_CONFIG.base_path,
-    cname: normalizeCname(inputs.cname || fileConfig?.cname || DEFAULT_CONFIG.cname),
+          : fallback.create_deployment,
+    site_url: inputs.site_url || fileConfig?.site_url || fallback.site_url,
+    base_path: inputs.base_path || fileConfig?.base_path || fallback.base_path,
+    cname: normalizeCname(inputs.cname || fileConfig?.cname || fallback.cname),
     preserve_cname:
       inputs.preserve_cname !== undefined && inputs.preserve_cname !== ''
         ? String(inputs.preserve_cname) === 'true'
         : fileConfig?.preserve_cname !== undefined
           ? Boolean(fileConfig.preserve_cname)
-          : DEFAULT_CONFIG.preserve_cname,
-    artifact_name: inputs.artifact_name || fileConfig?.artifact_name || DEFAULT_CONFIG.artifact_name,
+          : fallback.preserve_cname,
+    artifact_name: inputs.artifact_name || fileConfig?.artifact_name || fallback.artifact_name,
     managed_directories: normalizeManagedDirectories(
-      inputs.managed_directories || fileConfig?.managed_directories || DEFAULT_CONFIG.managed_directories
+      inputs.managed_directories || fileConfig?.managed_directories || fallback.managed_directories
     ),
     package_manager: packageManager,
     preview_root:
@@ -465,97 +472,97 @@ export function resolveConfiguration({
           ? fileConfig.preview_root === '.' || fileConfig.preview_root === './'
             ? ''
             : fileConfig.preview_root
-          : DEFAULT_CONFIG.preview_root,
+          : fallback.preview_root,
     preview_retention_days: Number(
       inputs.preview_retention_days !== undefined && inputs.preview_retention_days !== ''
         ? inputs.preview_retention_days
         : fileConfig?.preview_retention_days !== undefined && fileConfig?.preview_retention_days !== ''
           ? fileConfig.preview_retention_days
-          : DEFAULT_CONFIG.preview_retention_days
+          : fallback.preview_retention_days
     ),
     warning_days_before_cleanup: Number(
       inputs.warning_days_before_cleanup !== undefined && inputs.warning_days_before_cleanup !== ''
         ? inputs.warning_days_before_cleanup
         : fileConfig?.warning_days_before_cleanup !== undefined && fileConfig?.warning_days_before_cleanup !== ''
           ? fileConfig.warning_days_before_cleanup
-          : DEFAULT_CONFIG.warning_days_before_cleanup
+          : fallback.warning_days_before_cleanup
     ),
     generate_badges:
       inputs.generate_badges !== undefined && inputs.generate_badges !== ''
         ? String(inputs.generate_badges) === 'true'
         : fileConfig?.generate_badges !== undefined
           ? Boolean(fileConfig.generate_badges)
-          : DEFAULT_CONFIG.generate_badges,
-    badges_directory: inputs.badges_directory || fileConfig?.badges_directory || DEFAULT_CONFIG.badges_directory,
+          : fallback.generate_badges,
+    badges_directory: inputs.badges_directory || fileConfig?.badges_directory || fallback.badges_directory,
     test_results_path:
       inputs.test_results_path !== undefined && inputs.test_results_path !== ''
         ? String(inputs.test_results_path)
         : fileConfig?.test_results_path !== undefined && fileConfig.test_results_path !== ''
           ? String(fileConfig.test_results_path)
-          : DEFAULT_CONFIG.test_results_path,
+          : fallback.test_results_path,
     coverage_include_paths:
       inputs.coverage_include_paths !== undefined && inputs.coverage_include_paths !== ''
         ? String(inputs.coverage_include_paths)
         : fileConfig?.coverage_include_paths !== undefined && fileConfig.coverage_include_paths !== ''
           ? String(fileConfig.coverage_include_paths)
-          : DEFAULT_CONFIG.coverage_include_paths,
+          : fallback.coverage_include_paths,
     coverage_ignore_paths:
       inputs.coverage_ignore_paths !== undefined && inputs.coverage_ignore_paths !== ''
         ? String(inputs.coverage_ignore_paths)
         : fileConfig?.coverage_ignore_paths !== undefined && fileConfig.coverage_ignore_paths !== ''
           ? String(fileConfig.coverage_ignore_paths)
-          : DEFAULT_CONFIG.coverage_ignore_paths,
+          : fallback.coverage_ignore_paths,
     generate_stats_graph:
       inputs.generate_stats_graph !== undefined && inputs.generate_stats_graph !== ''
         ? String(inputs.generate_stats_graph) === 'true'
         : fileConfig?.generate_stats_graph !== undefined
           ? Boolean(fileConfig.generate_stats_graph)
-          : DEFAULT_CONFIG.generate_stats_graph,
-    stats_directory: inputs.stats_directory || fileConfig?.stats_directory || DEFAULT_CONFIG.stats_directory,
+          : fallback.generate_stats_graph,
+    stats_directory: inputs.stats_directory || fileConfig?.stats_directory || fallback.stats_directory,
     enable_passcode_gate:
       inputs.enable_passcode_gate !== undefined && inputs.enable_passcode_gate !== ''
         ? String(inputs.enable_passcode_gate) === 'true'
         : fileConfig?.enable_passcode_gate !== undefined
           ? Boolean(fileConfig.enable_passcode_gate)
-          : DEFAULT_CONFIG.enable_passcode_gate,
+          : fallback.enable_passcode_gate,
     passcode_session_hours: Number(
       inputs.passcode_session_hours !== undefined && inputs.passcode_session_hours !== ''
         ? inputs.passcode_session_hours
-        : (fileConfig?.passcode_session_hours ?? DEFAULT_CONFIG.passcode_session_hours)
+        : (fileConfig?.passcode_session_hours ?? fallback.passcode_session_hours)
     ),
     smoke_test:
       inputs.smoke_test !== undefined && inputs.smoke_test !== ''
         ? String(inputs.smoke_test) === 'true'
         : fileConfig?.smoke_test !== undefined
           ? Boolean(fileConfig.smoke_test)
-          : DEFAULT_CONFIG.smoke_test,
+          : fallback.smoke_test,
     smoke_test_stories:
       inputs.smoke_test_stories !== undefined && inputs.smoke_test_stories !== ''
         ? String(inputs.smoke_test_stories)
-        : fileConfig?.smoke_test_stories || DEFAULT_CONFIG.smoke_test_stories,
+        : fileConfig?.smoke_test_stories || fallback.smoke_test_stories,
     smoke_test_timeout_ms: Number(
       inputs.smoke_test_timeout_ms !== undefined && inputs.smoke_test_timeout_ms !== ''
         ? inputs.smoke_test_timeout_ms
-        : (fileConfig?.smoke_test_timeout_ms ?? DEFAULT_CONFIG.smoke_test_timeout_ms)
+        : (fileConfig?.smoke_test_timeout_ms ?? fallback.smoke_test_timeout_ms)
     ),
     auto_base_url:
       inputs.auto_base_url !== undefined && inputs.auto_base_url !== ''
         ? String(inputs.auto_base_url) === 'true'
         : fileConfig?.auto_base_url !== undefined
           ? Boolean(fileConfig.auto_base_url)
-          : DEFAULT_CONFIG.auto_base_url,
+          : fallback.auto_base_url,
     audit_bundle_size:
       inputs.audit_bundle_size !== undefined && inputs.audit_bundle_size !== ''
         ? String(inputs.audit_bundle_size) === 'true'
         : fileConfig?.audit_bundle_size !== undefined
           ? Boolean(fileConfig.audit_bundle_size)
-          : DEFAULT_CONFIG.audit_bundle_size,
+          : fallback.audit_bundle_size,
     bundle_size_max_mb:
       inputs.bundle_size_max_mb !== undefined && inputs.bundle_size_max_mb !== ''
         ? String(inputs.bundle_size_max_mb)
         : fileConfig?.bundle_size_max_mb !== undefined && fileConfig.bundle_size_max_mb !== ''
           ? String(fileConfig.bundle_size_max_mb)
-          : DEFAULT_CONFIG.bundle_size_max_mb,
+          : fallback.bundle_size_max_mb,
     build: {
       install_command:
         inputs.install_command ||

@@ -10,7 +10,10 @@ so it measures your Storybook output only.
 | `bundle_size_max_mb` | `string`  | `''`    | Optional total output budget in MB; the build fails when it is exceeded     |
 
 The inputs are accepted by the reusable workflow, the composite action, the
-`preview-build` action, and `.storybook-pages.yml`.
+`preview-build` action, and `.storybook-pages.yml`. When the reusable workflow
+or the composite action leaves `audit_bundle_size` out, the configuration
+file's value applies, then the default. The `preview-build` action does not
+read the configuration file.
 
 ```yaml
 jobs:

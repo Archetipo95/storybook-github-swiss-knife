@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docs: how `visual.threshold` and `visual.maxDiffPixels` decide what counts as a change. At the default `threshold` of `0.2`, a colour swap between shades of similar brightness (`#1d4ed8` to `#6d28d9`) is reported as unchanged; `0.1` catches it.
 - The visual workflow's reuse job is named **Reuse results (label event)**: since 0.2.1 every label event re-gates the commit's results, not only the approval label.
 - `npm run prepare-release` adds a hint when it refuses: with a stale local `origin/main`, main's own newer commits look like the release branch's, so it suggests `git fetch origin main`.
+- **Config-file on/off settings now apply when the input is left out** (minor release). `preserve_cname`, `generate_badges`, `generate_stats_graph`, `enable_passcode_gate`, `smoke_test`, `auto_base_url`, `audit_bundle_size` and `create_deployment` in `.storybook/swiss-knife.json` (or `.storybook-pages.yml`) were ignored by the composite action and the reusable workflows: each input had a `true` or `false` default, and a non-empty input wins over the file. The inputs are now strings that default to empty, so the file's value applies, then the old default. Passing `true` or `false` works as before. If your config file sets one of these, check it: that value now takes effect.
 
 ### Fixed
 
