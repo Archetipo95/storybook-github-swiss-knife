@@ -89,17 +89,19 @@ jobs:
           INPUT_WARNING_DAYS: ${{ inputs.warning_days_before_cleanup || github.event.inputs.warning_days_before_cleanup }}
         run: |
           node -e '
-            import(process.env.SWISS_KNIFE_ROOT + "/src/config.js").then(({resolveConfiguration}) => {
+            Promise.all(["config.js", "command-file.js"].map(file => import(process.env.SWISS_KNIFE_ROOT + "/src/" + file))).then(([{resolveConfiguration}, {formatCommandFile}]) => {
               const c = resolveConfiguration({inputs: {
                 preview_root: process.env.INPUT_PREVIEW_ROOT,
                 pages_branch: process.env.INPUT_PAGES_BRANCH,
                 preview_retention_days: process.env.INPUT_RETENTION_DAYS,
                 warning_days_before_cleanup: process.env.INPUT_WARNING_DAYS
               }});
-              console.log(`preview_root=${c.preview_root}`);
-              console.log(`pages_branch=${c.pages_branch}`);
-              console.log(`retention_days=${c.preview_retention_days}`);
-              console.log(`warning_days_before_cleanup=${c.warning_days_before_cleanup}`);
+              process.stdout.write(formatCommandFile({
+                preview_root: c.preview_root,
+                pages_branch: c.pages_branch,
+                retention_days: c.preview_retention_days,
+                warning_days_before_cleanup: c.warning_days_before_cleanup
+              }));
             });
           ' >> "$GITHUB_OUTPUT"
 

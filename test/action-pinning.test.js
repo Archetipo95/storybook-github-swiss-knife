@@ -92,7 +92,13 @@ test('reusable workflow caches dependencies and Storybook output only in its rea
     /cache:\s*\n\s*description: 'Whether to restore and save dependency and Storybook compilation caches/
   );
   assert.match(workflow, /cache_key_prefix:\s*\n\s*description: 'Prefix for Bun and Storybook compilation cache keys'/);
-  assert.match(buildJob, /cache: \$\{\{ inputs\.cache && steps\.config\.outputs\.package_manager \|\| '' \}\}/);
+  // The npm, pnpm and Yarn cache is a second setup-node, after corepack provides pnpm and Yarn.
+  assert.match(
+    buildJob,
+    /- name: Enable corepack\n[\s\S]*?run: corepack enable\n\n\s*- name: Restore dependency cache\n\s*if: \$\{\{ inputs\.cache && steps\.config\.outputs\.dependency_lockfile != '' && \(/
+  );
+  assert.match(buildJob, /\n\s*cache: \$\{\{ steps\.config\.outputs\.package_manager \}\}\n/);
+  assert.equal(buildJob.match(/^\s*cache: /gm).length, 1, 'only the cache step sets setup-node cache');
   assert.match(buildJob, /Restore Bun dependency cache/);
   assert.match(buildJob, /~\/\.bun\/install\/cache/);
   assert.match(buildJob, /Restore Storybook compilation cache/);

@@ -320,7 +320,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           node -e '
-            import(process.env.SWISS_KNIFE_ROOT + "/src/config.js").then(({resolveConfiguration}) => {
+            Promise.all(["config.js", "command-file.js"].map(file => import(process.env.SWISS_KNIFE_ROOT + "/src/" + file))).then(([{resolveConfiguration}, {formatCommandFile}]) => {
               const c = resolveConfiguration({inputs: {
                 preview_root: process.env.INPUT_PREVIEW_ROOT,
                 pages_branch: process.env.INPUT_PAGES_BRANCH,
@@ -333,18 +333,20 @@ jobs:
                 badges_directory: process.env.INPUT_BADGES_DIRECTORY,
                 managed_directories: process.env.INPUT_MANAGED_DIRECTORIES
               }, defaults: {create_deployment: true}});
-              console.log(`preview_root=${c.preview_root}`);
-              console.log(`pages_branch=${c.pages_branch}`);
-              console.log(`site_url=${c.site_url}`);
-              console.log(`base_path=${c.base_path}`);
-              console.log(`generate_stats_graph=${c.generate_stats_graph}`);
-              // Resolved here (input, then the config file, then the default) so the publisher
-              // never receives an empty value: an explicit "" does not fall back to its default.
-              console.log(`create_deployment=${Boolean(c.create_deployment)}`);
-              console.log(`enable_passcode_gate=${Boolean(c.enable_passcode_gate)}`);
-              console.log(`stats_directory=${c.stats_directory}`);
-              console.log(`badges_directory=${c.badges_directory}`);
-              console.log(`managed_directories=${Array.isArray(c.managed_directories) ? c.managed_directories.join(",") : c.managed_directories || ""}`);
+              process.stdout.write(formatCommandFile({
+                preview_root: c.preview_root,
+                pages_branch: c.pages_branch,
+                site_url: c.site_url,
+                base_path: c.base_path,
+                generate_stats_graph: c.generate_stats_graph,
+                // Resolved here (input, then the config file, then the default) so the publisher
+                // never receives an empty value: an explicit "" does not fall back to its default.
+                create_deployment: Boolean(c.create_deployment),
+                enable_passcode_gate: Boolean(c.enable_passcode_gate),
+                stats_directory: c.stats_directory,
+                badges_directory: c.badges_directory,
+                managed_directories: Array.isArray(c.managed_directories) ? c.managed_directories.join(",") : c.managed_directories || ""
+              }));
             });
           ' >> "$GITHUB_OUTPUT"
 

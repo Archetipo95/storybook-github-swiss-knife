@@ -15,6 +15,7 @@ import { createDeployment, updateDeploymentStatus } from './github-deployments.j
 import { injectAuthGate } from './inject-auth-gate.js';
 import { generateStatsGraph } from './generate-stats.js';
 import { auditBundleSize, readBundleReport } from './audit-static.js';
+import { appendCommandFile } from './command-file.js';
 
 /**
  * Builds the bundle size inputs for the PR comment. The untrusted build only
@@ -417,7 +418,7 @@ if (process.argv[1] && process.argv[1].endsWith('preview-publish.js')) {
           await fsp.appendFile(process.env.GITHUB_STEP_SUMMARY, `### Storybook preview\n\n${result.reason}\n`);
         }
         if (process.env.GITHUB_OUTPUT) {
-          await fsp.appendFile(process.env.GITHUB_OUTPUT, `action=${result.action}\n`);
+          appendCommandFile(process.env.GITHUB_OUTPUT, { action: result.action });
         }
         return;
       }
@@ -427,10 +428,7 @@ if (process.argv[1] && process.argv[1].endsWith('preview-publish.js')) {
         );
       }
       if (process.env.GITHUB_OUTPUT) {
-        await fsp.appendFile(
-          process.env.GITHUB_OUTPUT,
-          `page_url=${result.publishResult.url}\naction=${result.action}\n`
-        );
+        appendCommandFile(process.env.GITHUB_OUTPUT, { page_url: result.publishResult.url, action: result.action });
       }
       if (process.env.GITHUB_STEP_SUMMARY) {
         await fsp.appendFile(

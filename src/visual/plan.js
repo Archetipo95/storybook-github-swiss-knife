@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { loadSwissKnifeConfig } from '../swiss-knife-config.js';
+import { appendCommandFile } from '../command-file.js';
 
 /** Hash of everything that changes how screenshots are taken: runner code, lockfile, config. */
 export function captureFingerprint(runnerRoot, visualConfig) {
@@ -83,11 +84,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.met
   const outputs = plan(process.env);
   console.log(`Visual run: ${outputs.mode} (${outputs.reason}), ${outputs.shard_total} shard(s).`);
   if (process.env.GITHUB_OUTPUT) {
-    fs.appendFileSync(
-      process.env.GITHUB_OUTPUT,
-      Object.entries(outputs)
-        .map(([key, value]) => `${key}=${value}\n`)
-        .join('')
-    );
+    appendCommandFile(process.env.GITHUB_OUTPUT, outputs);
   }
 }

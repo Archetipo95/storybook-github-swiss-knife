@@ -1,4 +1,5 @@
-function shellQuote(value) {
+/** `value` as one single-quoted shell word (safe for eval, including newlines). */
+export function shellQuote(value) {
   return `'${String(value).replaceAll("'", "'\\''")}'`;
 }
 
@@ -57,11 +58,15 @@ export function isStorybookBuildCommand(command = '') {
 }
 
 export function augmentBuildCommand(command, baseUrl, { autoBaseUrl = true } = {}) {
-  if (!autoBaseUrl || !command || !baseUrl || hasExplicitBaseUrl(command) || !isStorybookBuildCommand(command)) {
-    return command;
-  }
-  const separator = /^(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?/.test(command.trim()) ? ' -- ' : ' ';
-  return `${command}${separator}--base-url ${shellQuote(baseUrl)}`;
+  if (!autoBaseUrl || !command || !baseUrl || hasExplicitBaseUrl(command)) return command;
+  // A multi-line command gets the flag on its last Storybook build line.
+  const lines = command.split('\n');
+  const index = lines.findLastIndex(line => isStorybookBuildCommand(line));
+  if (index === -1) return command;
+  const [, line, eol] = /^(.*?)(\r?)$/s.exec(lines[index]);
+  const separator = /^(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?/.test(line.trim()) ? ' -- ' : ' ';
+  lines[index] = `${line}${separator}--base-url ${shellQuote(baseUrl)}${eol}`;
+  return lines.join('\n');
 }
 
 export function buildEnvironment(baseUrl) {
