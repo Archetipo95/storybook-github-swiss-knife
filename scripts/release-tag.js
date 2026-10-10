@@ -24,7 +24,7 @@ function compareVersions(a, b) {
  * Checks that a release tag agrees with the versioned files on the tagged
  * commit. Returns a list of problems; an empty list means the tag is valid.
  */
-export function verifyReleaseTag({ tag, packageVersion, lockVersion, changelog }) {
+export function verifyReleaseTag({ tag, packageVersion, lockVersion, addonVersion, changelog }) {
   const release = parseReleaseTag(tag);
   const problems = [];
   if (packageVersion !== release.version) {
@@ -32,6 +32,11 @@ export function verifyReleaseTag({ tag, packageVersion, lockVersion, changelog }
   }
   if (lockVersion !== undefined && lockVersion !== release.version) {
     problems.push(`package-lock.json version ${lockVersion} does not match ${tag}`);
+  }
+  // The release attaches storybook-swiss-knife-<addon version>.tgz, and `init` pins workflows to
+  // v<addon version>.
+  if (addonVersion !== undefined && addonVersion !== release.version) {
+    problems.push(`packages/addon/package.json version ${addonVersion} does not match ${tag}`);
   }
   if (typeof changelog !== 'string' || !changelog.includes(`## [${release.version}]`)) {
     problems.push(`CHANGELOG.md has no "## [${release.version}]" section`);
@@ -123,6 +128,7 @@ if (process.argv[1] && process.argv[1].endsWith('release-tag.js')) {
         tag: plan.releaseTag,
         packageVersion,
         lockVersion: JSON.parse(read('package-lock.json')).version,
+        addonVersion: JSON.parse(read('packages/addon/package.json')).version,
         changelog: read('CHANGELOG.md')
       });
       if (problems.length > 0) {

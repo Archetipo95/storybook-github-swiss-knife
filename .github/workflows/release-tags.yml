@@ -24,8 +24,46 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The Storybook addon as an npm tarball, packed from the pushed commit and attached to the
+  # release, so projects can install it from the release URL as well as from the registry. Its
+  # own job: the build tooling (esbuild) never runs next to a write token, and a failed pack
+  # stops the release before any tag exists.
+  addon:
+    name: Pack the Storybook addon
+    if: vars.SWISS_KNIFE_RELEASES == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout pushed commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
+      - name: Pack the addon
+        run: |
+          # esbuild finds its binary through its platform package; no install scripts needed.
+          npm ci --prefix packages/addon --ignore-scripts --no-audit --no-fund --loglevel=error
+          mkdir -p "$RUNNER_TEMP/addon"
+          (cd packages/addon && npm pack --pack-destination "$RUNNER_TEMP/addon")
+
+      - name: Upload the addon tarball
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: storybook-swiss-knife-addon
+          path: ${{ runner.temp }}/addon/*.tgz
+          if-no-files-found: error
+          retention-days: 7
+
   tag:
     name: Create release tag and update major tag
+    needs: addon
     # Off until the repository variable SWISS_KNIFE_RELEASES is 'true', so pushes during
     # the private phase never tag or publish a release.
     if: vars.SWISS_KNIFE_RELEASES == 'true'
@@ -73,6 +111,13 @@ jobs:
             exit 1
           fi
 
+      - name: Download the addon tarball
+        if: steps.plan.outputs.verify == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: storybook-swiss-knife-addon
+          path: ${{ runner.temp }}/addon
+
       - name: Create release tag
         if: steps.plan.outputs.create_tag == 'true'
         env:
@@ -94,12 +139,8 @@ jobs:
             exit 0
           fi
           node scripts/release-tag.js --notes "${RELEASE_TAG#v}" > "$RUNNER_TEMP/release-notes.md"
-          # The Storybook addon as an npm tarball built from the tagged commit, so projects can
-          # install it from the release (npm install <asset URL>) as well as from the registry.
-          npm ci --prefix packages/addon --no-audit --no-fund --loglevel=error
-          (cd packages/addon && npm pack --pack-destination "$RUNNER_TEMP")
-          addon_tarball="$RUNNER_TEMP/storybook-swiss-knife-${RELEASE_TAG#v}.tgz"
-          test -f "$addon_tarball"
+          addon_tarball="$RUNNER_TEMP/addon/storybook-swiss-knife-${RELEASE_TAG#v}.tgz"
+          test -f "$addon_tarball" || { echo "::error::No addon tarball for ${RELEASE_TAG#v}: packages/addon's version must match package.json." >&2; exit 1; }
           gh release create "$RELEASE_TAG" "$addon_tarball" --title "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.md" --verify-tag --latest="$LATEST"
           echo "Published release $RELEASE_TAG (latest: $LATEST) with $(basename "$addon_tarball")."
 

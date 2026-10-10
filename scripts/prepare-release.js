@@ -62,7 +62,7 @@ const pinSha = git('rev-parse', 'HEAD');
 const uncommitted = git('status', '--porcelain', '--', 'src', 'actions', 'runner');
 if (uncommitted) {
   console.error(
-    `Commit action and src changes before preparing ${tag}; internal pins must point at committed code:\n${uncommitted}`
+    `Commit action, src and runner changes before preparing ${tag}; internal pins must point at committed code:\n${uncommitted}`
   );
   process.exit(1);
 }
@@ -77,8 +77,10 @@ for (const file of walkFiles('.github/workflows').filter(file => /\.ya?ml$/.test
 }
 
 // The addon's version is also the default ref `npx storybook-swiss-knife init`
-// pins, so it moves with the release; the runner follows for consistency.
-for (const dir of ['.', 'packages/addon', 'runner']) {
+// pins and the name of the tarball attached to the release, so it moves with
+// the release. runner/ keeps its version: the pins above point at the commit
+// before this bump, and the release pin check compares runner/ with them.
+for (const dir of ['.', 'packages/addon']) {
   updateJson(path.join(dir, 'package.json'), pkg => {
     pkg.version = version;
   });

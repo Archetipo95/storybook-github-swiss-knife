@@ -51,7 +51,7 @@ jobs:
 
 Need a custom pipeline or branch-backed directory deploy? See [Usage](docs/usage.md).
 
-> The Storybook addon isn't on npm yet: run `npm pack` in `packages/addon` and install the tarball.
+> The Storybook addon isn't on npm yet: install the tarball attached to each release, `npm install --save-dev https://github.com/Archetipo95/storybook-github-swiss-knife/releases/download/v<version>/storybook-swiss-knife-<version>.tgz`.
 
 ## What you get on your Pages site
 

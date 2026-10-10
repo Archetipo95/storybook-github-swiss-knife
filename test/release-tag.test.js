@@ -19,22 +19,30 @@ test('parseReleaseTag rejects pre-release, unprefixed, and shell-unsafe tags', (
   }
 });
 
-test('verifyReleaseTag requires package, lockfile, and changelog to agree with the tag', () => {
+test('verifyReleaseTag requires package, lockfile, addon, and changelog to agree with the tag', () => {
   const changelog = '# Changelog\n\n## [1.10.0] - 2026-09-30\n';
   assert.deepEqual(
-    verifyReleaseTag({ tag: 'v1.10.0', packageVersion: '1.10.0', lockVersion: '1.10.0', changelog }),
+    verifyReleaseTag({
+      tag: 'v1.10.0',
+      packageVersion: '1.10.0',
+      lockVersion: '1.10.0',
+      addonVersion: '1.10.0',
+      changelog
+    }),
     []
   );
   const problems = verifyReleaseTag({
     tag: 'v1.10.1',
     packageVersion: '1.10.0',
     lockVersion: '1.9.0',
+    addonVersion: '1.10.0',
     changelog
   });
-  assert.equal(problems.length, 3);
+  assert.equal(problems.length, 4);
   assert.match(problems[0], /package\.json version 1\.10\.0/);
   assert.match(problems[1], /package-lock\.json version 1\.9\.0/);
-  assert.match(problems[2], /## \[1\.10\.1\]/);
+  assert.match(problems[2], /packages\/addon\/package\.json version 1\.10\.0/);
+  assert.match(problems[3], /## \[1\.10\.1\]/);
 });
 
 const TAGS = ['v1', 'v0.9.0', 'v1.9.14', 'v1.10.0'];
