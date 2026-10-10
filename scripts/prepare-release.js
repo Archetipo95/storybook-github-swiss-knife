@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
+import { addReleaseSection } from './release-changelog.js';
+
 const version = process.argv[2];
 
 if (!/^\d+\.\d+\.\d+$/.test(version || '')) {
@@ -54,15 +56,37 @@ function releaseRefFiles() {
 }
 
 // Reusable workflows pin this repository's own composite actions to a commit
-// SHA. Move every pin to the commit this release is prepared from, so the
-// released workflows run the released code (the Release Tags workflow
-// refuses to tag when they differ).
+// SHA. Move every pin to the commit on main this release is prepared from, so
+// the released workflows run the released code (the Release Tags workflow
+// refuses to tag when they differ). That is the branch's merge base with
+// origin/main, not HEAD: a squash merge drops the branch's own commits, and a
+// pin must stay reachable. SWISS_KNIFE_RELEASE_BASE overrides it (tests, or a
+// clone without origin/main, where HEAD is used).
 const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
-const pinSha = git('rev-parse', 'HEAD');
+const tryGit = (...args) => {
+  try {
+    return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: 'pipe' }).trim();
+  } catch {
+    return '';
+  }
+};
 const uncommitted = git('status', '--porcelain', '--', 'src', 'actions', 'runner');
 if (uncommitted) {
   console.error(
     `Commit action, src and runner changes before preparing ${tag}; internal pins must point at committed code:\n${uncommitted}`
+  );
+  process.exit(1);
+}
+const baseRef = process.env.SWISS_KNIFE_RELEASE_BASE;
+const pinSha = baseRef
+  ? git('rev-parse', '--verify', `${baseRef}^{commit}`)
+  : tryGit('merge-base', 'HEAD', 'origin/main') || git('rev-parse', 'HEAD');
+// The branch's own commits are not pinned, so they must not change code the pins run.
+const unpinned = git('diff', '--name-only', pinSha, 'HEAD', '--', 'src', 'actions', 'runner');
+if (unpinned) {
+  console.error(
+    `Commits since ${pinSha.slice(0, 7)} change code the internal pins would not run:\n${unpinned}\n` +
+      'Merge them to main first, then prepare the release from main.'
   );
   process.exit(1);
 }
@@ -110,15 +134,6 @@ if (staleRefs.length > 0) {
   process.exit(1);
 }
 
-const changelog = read('CHANGELOG.md');
-if (!changelog.includes(`## [${version}]`)) {
-  write(
-    'CHANGELOG.md',
-    changelog.replace(
-      '## [Unreleased]\n',
-      `## [Unreleased]\n\n## [${version}] - ${new Date().toISOString().slice(0, 10)}\n\n### Changed\n\n- Release ${tag}.\n`
-    )
-  );
-}
+write('CHANGELOG.md', addReleaseSection(read('CHANGELOG.md'), version, new Date().toISOString().slice(0, 10)));
 
 console.log(`Prepared ${tag} (internal action pins -> ${pinSha})`);
