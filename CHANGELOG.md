@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The visual workflow's reuse job is named **Reuse results (label event)**: since 0.2.1 every label event re-gates the commit's results, not only the approval label.
+- `npm run prepare-release` adds a hint when it refuses: with a stale local `origin/main`, main's own newer commits look like the release branch's, so it suggests `git fetch origin main`.
+
 ## [0.2.1] - 2026-10-10
 
 ### Changed

@@ -420,7 +420,7 @@ jobs:
           retention-days: ${{ fromJSON(needs.plan.outputs.retention_days) }}
 
   reuse:
-    name: Reuse results (approval label)
+    name: Reuse results (label event)
     needs: plan
     if: needs.plan.outputs.mode == 'reuse' && needs.plan.outputs.reuse_run_id != ''
     runs-on: ubuntu-24.04

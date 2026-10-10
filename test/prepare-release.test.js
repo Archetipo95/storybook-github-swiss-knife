@@ -98,5 +98,7 @@ test('prepare-release refuses when the branch changes code its pins would not ru
   const prepared = prepareRelease(worktree, base);
   assert.notEqual(prepared.status, 0);
   assert.match(prepared.stderr, /change code the internal pins would not run:\nsrc\/config\.js/);
+  // A stale origin/main makes main's own newer commits look like the branch's: say how to fix it.
+  assert.match(prepared.stderr, /run `git fetch origin main` and try again/);
   assert.equal(git(['status', '--porcelain'], worktree), '', 'nothing may be written before refusing');
 });
