@@ -98,6 +98,40 @@ test('registerAddon adds the addon once, and reports a main file without an addo
   assert.equal(registerAddon('export default { stories: [] };'), null);
 });
 
+test('registerAddon puts the addon on its own line in a multi-line addons array', () => {
+  const lines = (...rows) => rows.join('\n');
+  assert.equal(
+    registerAddon(
+      lines(
+        'const config: StorybookConfig = {',
+        '  addons: [',
+        "    '@storybook/addon-docs',",
+        "    '@storybook/addon-a11y'",
+        '  ],',
+        '};'
+      )
+    ),
+    lines(
+      'const config: StorybookConfig = {',
+      '  addons: [',
+      "    'storybook-swiss-knife',",
+      "    '@storybook/addon-docs',",
+      "    '@storybook/addon-a11y'",
+      '  ],',
+      '};'
+    )
+  );
+  // Tabs, CRLF line endings and a blank line after the bracket keep the first entry's layout.
+  assert.equal(
+    registerAddon('addons: [\r\n\r\n\t\t"@storybook/addon-docs",\r\n\t]'),
+    'addons: [\r\n\r\n\t\t\'storybook-swiss-knife\',\r\n\t\t"@storybook/addon-docs",\r\n\t]'
+  );
+  assert.equal(
+    registerAddon('export default { addons: [\n  ] };'),
+    "export default { addons: ['storybook-swiss-knife'] };"
+  );
+});
+
 test('detectPackageManager reads the lockfile, falling back to the repository root and npm', () => {
   const dir = project({ 'yarn.lock': '', 'apps/ui/package.json': '{}' });
   assert.equal(detectPackageManager(path.join(dir, 'apps/ui'), dir), 'yarn-classic');
