@@ -15,9 +15,10 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
+  deployments: write
 
 jobs:
   deploy-storybook:
@@ -27,6 +28,12 @@ jobs:
       package_manager: 'npm'
       build_command: 'npm run build-storybook'
 ```
+
+The caller grants the most any of the workflow's jobs can use: GitHub checks
+every job when the run starts, including the directory-mode publisher
+(`contents: write`) and the deployment record (`deployments: write`), and
+fails the run otherwise. Each job still asks only for what it uses; the build
+job runs with `contents: read`.
 
 ### Option 2: Composite Action
 
