@@ -2,9 +2,9 @@
 import { AddonPanel } from '@storybook/components';
 import { addons, types, useStorybookApi, useStorybookState } from '@storybook/manager-api';
 import { useTheme } from '@storybook/theming';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
-import { ADDON_ID, createResultsApplier, registerVisualAddon } from './core.jsx';
+import { ADDON_ID, createResultsApplier, onManifest, registerVisualAddon } from './core.jsx';
 
 const apply = createResultsApplier({
   setStatuses: (api, entries) =>
@@ -16,12 +16,15 @@ const apply = createResultsApplier({
     )
 });
 
-// Renders nothing: re-applies statuses and tags whenever the index changes.
+// Renders nothing: applies statuses and tags once the report is found (it may be published after
+// the page opened), and again whenever the index changes.
 function Results() {
   const api = useStorybookApi();
   const { internal_index: index } = useStorybookState();
+  const [manifest, setManifest] = useState(null);
+  useEffect(() => onManifest(setManifest), []);
   useEffect(() => {
-    apply(api, index);
+    if (manifest) apply(api, index);
   });
   return null;
 }
@@ -31,6 +34,7 @@ registerVisualAddon({
   types,
   AddonPanel,
   useStorybookState,
+  useStorybookApi,
   useTheme,
   registerResults: () => addons.add(`${ADDON_ID}/results`, { type: types.experimental_SIDEBAR_TOP, render: Results })
 });

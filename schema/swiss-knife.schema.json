@@ -242,7 +242,7 @@
           "type": ["string", "null"],
           "format": "date-time",
           "default": null,
-          "description": "Freeze Date to this instant; null keeps the real clock."
+          "description": "Start the page clock at this instant (time keeps running from it); null keeps the real clock."
         },
         "timezone": {
           "type": "string",

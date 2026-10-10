@@ -19,9 +19,18 @@ export const VISUAL_TAGS = {
   error: 'visual:failed'
 };
 
-/** Sidebar statuses: warning for changes, error for failures. */
-export function statusEntries(manifest) {
-  const levels = { changed: 'warn', interaction: 'error', error: 'error' };
+/**
+ * Sidebar statuses: errors for failures, and for changes either `modified`/`new` or a warning.
+ * Storybook 10.4+ with change detection on lists `modified` and `new` in its own sidebar filter
+ * (New, Modified), so `changeStatuses` maps the report there; older versions only know warnings,
+ * and their filter has no entry for new stories.
+ * @param {{ stories: Record<string, { status: string, error?: string }> }} manifest
+ * @param {{ changeStatuses?: boolean }} [options]
+ */
+export function statusEntries(manifest, { changeStatuses = false } = {}) {
+  const levels = changeStatuses
+    ? { changed: 'modified', new: 'new', interaction: 'error', error: 'error' }
+    : { changed: 'warn', interaction: 'error', error: 'error' };
   return Object.entries(manifest.stories)
     .filter(([, story]) => levels[story.status])
     .map(([storyId, story]) => ({
@@ -46,6 +55,25 @@ export function withVisualTags(index, manifest) {
       })
     )
   };
+}
+
+// The Visual panel's own sidebar filter: Storybook's status filter has no entry for failures,
+// and before 10.4 none for new or changed stories either.
+export const SIDEBAR_FILTERS = {
+  all: { label: 'All stories', statuses: [] },
+  report: { label: 'Changed, new or failed', statuses: ['changed', 'new', 'interaction', 'error'] },
+  changed: { label: 'Visual changes', statuses: ['changed'] },
+  new: { label: 'New stories', statuses: ['new'] },
+  failed: { label: 'Interaction or render failures', statuses: ['interaction', 'error'] }
+};
+
+/**
+ * Whether a sidebar entry stays visible under a panel filter. While filtering, docs entries are
+ * hidden too: autodocs pages would otherwise keep every component in the sidebar.
+ */
+export function matchesSidebarFilter(filter, manifest, item) {
+  const { statuses } = SIDEBAR_FILTERS[filter] ?? SIDEBAR_FILTERS.all;
+  return statuses.length === 0 || (item?.type === 'story' && statuses.includes(manifest.stories[item.id]?.status));
 }
 
 export const isTagged = index =>
