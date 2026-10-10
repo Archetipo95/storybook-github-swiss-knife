@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The visual workflow's reuse job is named **Reuse results (label event)**: since 0.2.1 every label event re-gates the commit's results, not only the approval label.
 - `npm run prepare-release` adds a hint when it refuses: with a stale local `origin/main`, main's own newer commits look like the release branch's, so it suggests `git fetch origin main`.
 
+### Fixed
+
+- Re-running a Pages write that changes nothing (a deploy or PR preview of the same build) failed after every retry. git prints `nothing to commit` on stdout, which the error check never saw. The writer now asks git whether anything is staged (`git diff --cached --quiet`) and returns `{ changed: false }`, and git errors include stdout and the exit code.
+
 ## [0.2.1] - 2026-10-10
 
 ### Changed

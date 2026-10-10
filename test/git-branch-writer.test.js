@@ -214,3 +214,52 @@ test('retryDelayMs grows with each attempt and is randomized within its window',
   const spread = new Set(Array.from({ length: 20 }, () => retryDelayMs(0)));
   assert.ok(spread.size > 1, 'concurrent writers must not retry in lockstep');
 });
+
+test('withSerializedBranchWrite reports no change when mutate rewrites identical content', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pages-noop-'));
+  const origin = path.join(tmp, 'origin.git');
+  const seed = path.join(tmp, 'seed');
+  const writer = path.join(tmp, 'writer');
+  const git = (cwd, ...args) =>
+    execFileSync(
+      'git',
+      ['-c', 'user.name=test', '-c', 'user.email=test@test.com', '-c', 'commit.gpgsign=false', ...args],
+      { cwd, encoding: 'utf8' }
+    ).trim();
+  const writePreview = repo => {
+    fs.mkdirSync(path.join(repo, 'pr-1'), { recursive: true });
+    fs.writeFileSync(path.join(repo, 'pr-1', 'index.html'), 'same content');
+  };
+
+  try {
+    git(tmp, 'init', '-q', '--bare', origin);
+    git(tmp, 'init', '-q', '-b', 'gh-pages', seed);
+    writePreview(seed);
+    git(seed, 'add', '-A');
+    git(seed, 'commit', '-q', '-m', 'Publish pr-1');
+    git(seed, 'remote', 'add', 'origin', origin);
+    git(seed, 'push', '-q', 'origin', 'gh-pages');
+    git(tmp, 'clone', '-q', '-b', 'gh-pages', origin, writer);
+    const before = git(origin, 'rev-parse', 'gh-pages');
+
+    // A re-run publishes the same build: mutate reports a change, but the tree is identical.
+    let attempts = 0;
+    const result = await withSerializedBranchWrite({
+      repo: writer,
+      branch: 'gh-pages',
+      commitMessage: 'Publish pr-1 again',
+      retryDelay: () => 0,
+      mutate: async repo => {
+        attempts += 1;
+        writePreview(repo);
+        return true;
+      }
+    });
+
+    assert.deepEqual(result, { changed: false });
+    assert.equal(attempts, 1, 'an unchanged tree is not an error to retry');
+    assert.equal(git(origin, 'rev-parse', 'gh-pages'), before, 'nothing is pushed');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
