@@ -94,7 +94,7 @@ on:
         type: string
         default: ''
       auto_base_url:
-        description: 'Whether to compute and inject the Storybook base URL for the deployment target (default: true; empty uses the config file, then the default)'
+        description: 'Whether to set BASE_URL, PUBLIC_URL and STORYBOOK_BASE_HREF to the deployment base URL for the build command (the command itself runs unchanged; default: true; empty uses the config file, then the default)'
         required: false
         type: string
         default: ''
@@ -310,7 +310,7 @@ jobs:
         run: |
           CMD="$BUILD_COMMAND"
           if [ "$AUTO_BASE_URL" = "true" ]; then
-            eval "$(node -e 'import(process.env.SWISS_KNIFE_ROOT + "/src/base-url.js").then(({computeBaseUrl, augmentBuildCommand, buildEnvironment, shellQuote}) => { const baseUrl = computeBaseUrl({repository: process.env.REPOSITORY, siteUrl: process.env.SITE_URL, basePath: process.env.BASE_PATH, eventName: process.env.EVENT_NAME, prNumber: process.env.PR_NUMBER, previewRoot: process.env.PREVIEW_ROOT}); const command = augmentBuildCommand(process.env.BUILD_COMMAND, baseUrl); console.log(`CMD=${shellQuote(command)}`); for (const [key, value] of Object.entries(buildEnvironment(baseUrl))) console.log(`export ${key}=${shellQuote(value)}`); })')"
+            eval "$(node -e 'import(process.env.SWISS_KNIFE_ROOT + "/src/base-url.js").then(({computeBaseUrl, buildEnvironment, shellQuote}) => { const baseUrl = computeBaseUrl({repository: process.env.REPOSITORY, siteUrl: process.env.SITE_URL, basePath: process.env.BASE_PATH, eventName: process.env.EVENT_NAME, prNumber: process.env.PR_NUMBER, previewRoot: process.env.PREVIEW_ROOT}); for (const [key, value] of Object.entries(buildEnvironment(baseUrl))) console.log(`export ${key}=${shellQuote(value)}`); })')"
           fi
           eval "$CMD"
 

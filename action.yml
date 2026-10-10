@@ -132,7 +132,7 @@ inputs:
     required: false
     default: '30000'
   auto_base_url:
-    description: 'Whether to compute and inject the Storybook base URL for the deployment target (default: true; empty uses the config file, then the default)'
+    description: 'Whether to set BASE_URL, PUBLIC_URL and STORYBOOK_BASE_HREF to the deployment base URL for the build command (the command itself runs unchanged; default: true; empty uses the config file, then the default)'
     required: false
     default: ''
   audit_bundle_size:
@@ -226,7 +226,7 @@ runs:
       run: |
         CMD="$SB_BUILD_COMMAND"
         if [ "$SB_AUTO_BASE_URL" = "true" ]; then
-          eval "$(node -e 'import(process.env.GITHUB_ACTION_PATH + "/src/base-url.js").then(({computeBaseUrl, augmentBuildCommand, buildEnvironment, shellQuote}) => { const baseUrl = computeBaseUrl({repository: process.env.SB_REPOSITORY, siteUrl: process.env.SB_SITE_URL, basePath: process.env.SB_BASE_PATH, eventName: process.env.SB_EVENT_NAME, prNumber: process.env.SB_PR_NUMBER, previewRoot: process.env.SB_PREVIEW_ROOT}); const command = augmentBuildCommand(process.env.SB_BUILD_COMMAND, baseUrl); console.log(`CMD=${shellQuote(command)}`); for (const [key, value] of Object.entries(buildEnvironment(baseUrl))) console.log(`export ${key}=${shellQuote(value)}`); })')"
+          eval "$(node -e 'import(process.env.GITHUB_ACTION_PATH + "/src/base-url.js").then(({computeBaseUrl, buildEnvironment, shellQuote}) => { const baseUrl = computeBaseUrl({repository: process.env.SB_REPOSITORY, siteUrl: process.env.SB_SITE_URL, basePath: process.env.SB_BASE_PATH, eventName: process.env.SB_EVENT_NAME, prNumber: process.env.SB_PR_NUMBER, previewRoot: process.env.SB_PREVIEW_ROOT}); for (const [key, value] of Object.entries(buildEnvironment(baseUrl))) console.log(`export ${key}=${shellQuote(value)}`); })')"
         fi
         echo "Running custom build command: $CMD"
         eval "$CMD"

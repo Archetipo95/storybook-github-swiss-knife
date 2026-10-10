@@ -74,7 +74,7 @@
         },
         "auto_base_url": {
           "type": "boolean",
-          "description": "Derive the Storybook base URL automatically."
+          "description": "Set BASE_URL, PUBLIC_URL and STORYBOOK_BASE_HREF to the deployment base URL for the build command."
         },
         "managed_directories": {
           "oneOf": [
