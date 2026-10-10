@@ -140,6 +140,7 @@ export async function publishDirectory({
     pages_branch: branch,
     target_directory: targetDirectory,
     managed_directories: managedDirectories,
+    preview_root: previewRoot,
     site_url: siteUrl,
     base_path: basePath,
     cname,

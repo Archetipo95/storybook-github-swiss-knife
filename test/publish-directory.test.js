@@ -287,4 +287,5 @@ test('normalizeManagedDirectories trims, drops ./ and trailing slashes, and dedu
   assert.deepEqual(normalizeManagedDirectories('one\ntwo/'), ['one', 'two']);
   assert.deepEqual(normalizeManagedDirectories(''), []);
   assert.deepEqual(normalizeManagedDirectories(undefined), []);
+  assert.deepEqual(normalizeManagedDirectories(`pr-preview${'/'.repeat(50000)}`), ['pr-preview']);
 });

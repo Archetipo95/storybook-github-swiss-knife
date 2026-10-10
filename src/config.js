@@ -56,12 +56,14 @@ export function normalizeManagedDirectories(value) {
   if (value === undefined || value === null || value === '') return [];
   const entries = Array.isArray(value) ? value : String(value).split(/\r?\n|,/);
   const normalized = entries
-    .map(entry =>
-      String(entry)
+    .map(entry => {
+      let directory = String(entry)
         .trim()
-        .replace(/^(\.\/)+/, '')
-        .replace(/\/+$/, '')
-    )
+        .replace(/^(\.\/)+/, '');
+      // A loop, not /\/+$/: that regex is polynomial on long runs of slashes (CodeQL ReDoS).
+      while (directory.endsWith('/')) directory = directory.slice(0, -1);
+      return directory;
+    })
     .filter(Boolean);
   return [...new Set(normalized)];
 }
