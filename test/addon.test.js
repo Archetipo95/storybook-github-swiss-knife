@@ -42,6 +42,28 @@ test("statusEntries with changeStatuses fills Storybook's New and Modified sideb
   ]);
 });
 
+test('withVisualTags with onlyFailures tags only failed stories and keeps the other entries', () => {
+  const index = {
+    v: 5,
+    entries: {
+      'a--changed': { id: 'a--changed', tags: ['dev'] },
+      'a--new': { id: 'a--new' },
+      'a--broken': { id: 'a--broken' },
+      'a--play': { id: 'a--play', tags: ['dev'] }
+    }
+  };
+  const tagged = withVisualTags(index, manifest, { onlyFailures: true });
+  assert.equal(tagged.entries['a--changed'], index.entries['a--changed']);
+  assert.equal(tagged.entries['a--new'], index.entries['a--new']);
+  assert.deepEqual(tagged.entries['a--broken'].tags, ['visual:failed']);
+  assert.deepEqual(tagged.entries['a--play'].tags, ['dev', 'visual:failed']);
+
+  // A report without failures leaves every entry as it was, so the index is not re-saved.
+  const noFailures = { stories: { 'a--changed': { status: 'changed' }, 'a--new': { status: 'new' } } };
+  const untouched = withVisualTags(index, noFailures, { onlyFailures: true });
+  assert.ok(Object.keys(index.entries).every(id => untouched.entries[id] === index.entries[id]));
+});
+
 test('matchesSidebarFilter keeps only the matching stories while filtering', () => {
   const story = id => ({ type: 'story', id });
   const docs = { type: 'docs', id: 'a--docs' };

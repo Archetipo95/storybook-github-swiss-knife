@@ -41,13 +41,20 @@ export function statusEntries(manifest, { changeStatuses = false } = {}) {
     }));
 }
 
-/** The story index with `visual:*` tags on the stories in the report. */
-export function withVisualTags(index, manifest) {
+const FAILURE_STATUSES = new Set(['interaction', 'error']);
+
+/**
+ * The story index with `visual:*` tags on the stories in the report; with `onlyFailures`, only
+ * `visual:failed` (Storybook's own filter covers new and changed stories). Entries that gain no
+ * tag are returned as they were.
+ */
+export function withVisualTags(index, manifest, { onlyFailures = false } = {}) {
   return {
     ...index,
     entries: Object.fromEntries(
       Object.entries(index.entries).map(([storyId, entry]) => {
-        const tag = VISUAL_TAGS[manifest.stories[storyId]?.status];
+        const status = manifest.stories[storyId]?.status;
+        const tag = onlyFailures && !FAILURE_STATUSES.has(status) ? undefined : VISUAL_TAGS[status];
         return [
           storyId,
           tag && !(entry.tags ?? []).includes(tag) ? { ...entry, tags: [...(entry.tags ?? []), tag] } : entry

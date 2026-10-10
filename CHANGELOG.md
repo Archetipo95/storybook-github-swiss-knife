@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Storybook 10.4+ (change detection on): the addon no longer adds the `visual:changed` and `visual:new` tags or the Visual panel's **Sidebar** select, which repeated Storybook's own **New** / **Modified** filter. Saved filters or `--includeTags`/`--excludeTags` that use those two tags no longer match there. `visual:failed` stays, since that filter has no entry for failures. Storybook 8.6, 9 and 10.0–10.3, or change detection off, keep all three tags and the select.
+
+### Fixed
+
+- The Visual panel's **Show changed pixels** stays on while moving between stories; it used to reset on every story.
+
 ## [0.1.1] - 2026-10-10
 
 ### Added
