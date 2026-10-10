@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="192" height="20" role="img" aria-label="build: passed • a5a694c">
-  <title>build: passed • a5a694c</title>
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="20" role="img" aria-label="build: passed • ab36238">
+  <title>build: passed • ab36238</title>
   <linearGradient id="s" x2="0" y2="100%">
     <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
     <stop offset="1" stop-opacity=".1"/>
@@ -15,7 +15,7 @@
   <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="110">
     <text aria-hidden="true" x="275" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="310">build</text>
     <text x="275" y="140" transform="scale(.1)" fill="#fff" textLength="310">build</text>
-    <text aria-hidden="true" x="1235" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="1130">passed • a5a694c</text>
-    <text x="1235" y="140" transform="scale(.1)" fill="#fff" textLength="1130">passed • a5a694c</text>
+    <text aria-hidden="true" x="1235" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="1130">passed • ab36238</text>
+    <text x="1235" y="140" transform="scale(.1)" fill="#fff" textLength="1130">passed • ab36238</text>
   </g>
 </svg>
