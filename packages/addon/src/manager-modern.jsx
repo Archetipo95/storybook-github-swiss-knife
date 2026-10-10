@@ -3,7 +3,14 @@ import { AddonPanel } from 'storybook/internal/components';
 import { addons, experimental_getStatusStore, types, useStorybookApi, useStorybookState } from 'storybook/manager-api';
 import { useTheme } from 'storybook/theming';
 
-import { ADDON_ID, applyVisualTags, onManifest, registerVisualAddon, statusEntries } from './core.jsx';
+import {
+  ADDON_ID,
+  applyVisualTags,
+  hasNativeChangeFilter,
+  onManifest,
+  registerVisualAddon,
+  statusEntries
+} from './core.jsx';
 
 const VALUES = {
   new: 'status-value:new',
@@ -12,19 +19,17 @@ const VALUES = {
   error: 'status-value:error'
 };
 
-// Storybook 10.4+ lists `new` and `modified` statuses in its own sidebar filter (New, Modified)
-// while change detection is on, which it is by default, also in a built Storybook. Older versions
-// do not know those values, so changes stay warnings there.
-const changeStatuses = () => Boolean(globalThis.FEATURES?.changeDetection);
-
-// Statuses are keyed by story id and need no index. Storybook 10 also exposes the index, so the
-// stories get the `visual:*` tags too; the index arrives after registration and is replaced when
+// Statuses are keyed by story id and need no index. With Storybook's own New/Modified filter
+// (10.4+) they are `new`/`modified` and are all the sidebar needs; older versions do not know
+// those values, so changes stay warnings there. Storybook 10.0–10.3 also exposes the index, so
+// its stories get the `visual:*` tags; the index arrives after registration and is replaced when
 // stories change, so the tags are re-checked.
 function registerResults(api) {
   let tagTimer;
   onManifest(manifest => {
+    const nativeChangeFilter = hasNativeChangeFilter();
     experimental_getStatusStore(ADDON_ID).set(
-      statusEntries(manifest, { changeStatuses: changeStatuses() }).map(({ storyId, level, title, description }) => ({
+      statusEntries(manifest, { changeStatuses: nativeChangeFilter }).map(({ storyId, level, title, description }) => ({
         storyId,
         typeId: ADDON_ID,
         value: VALUES[level],
@@ -32,7 +37,7 @@ function registerResults(api) {
         description
       }))
     );
-    if (typeof api.getIndex !== 'function' || tagTimer) return;
+    if (nativeChangeFilter || typeof api.getIndex !== 'function' || tagTimer) return;
     let busy = false;
     const tag = async () => {
       if (busy) return;

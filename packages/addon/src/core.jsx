@@ -81,6 +81,14 @@ export function onManifest(listener) {
 }
 
 // Storybook 8.6, 9 and 10 can filter the sidebar from an addon; 10.6 adds a plural form.
+/**
+ * Storybook 10.4+ lists `new` and `modified` statuses in its own sidebar filter (New, Modified)
+ * while change detection is on, which it is by default, also in a built Storybook. There the
+ * addon uses that filter and adds neither its `visual:*` tags nor the panel's Sidebar select,
+ * which would repeat it; older versions get both.
+ */
+export const hasNativeChangeFilter = () => Boolean(globalThis.FEATURES?.changeDetection);
+
 const canFilterSidebar = api =>
   typeof api?.experimental_setFilter === 'function' || typeof api?.experimental_setFilters === 'function';
 const setSidebarFilter = (api, filterFunction) =>
@@ -349,7 +357,7 @@ export function createVisualPanel({ useStorybookState, useStorybookApi, useTheme
               </a>
             </>
           )}
-          {canFilterSidebar(api) && (
+          {canFilterSidebar(api) && !hasNativeChangeFilter() && (
             <>
               {' · '}
               <SidebarFilterSelect api={api} manifest={manifest} />
