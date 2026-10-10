@@ -29,38 +29,82 @@ function destructured(pattern) {
     .filter(Boolean);
 }
 
+const ROOT = String.raw`process\.env\.SWISS_KNIFE_ROOT`;
+// A path under it: `ROOT + "/src/x.js"` or the template literal `${ROOT}/src/x.js`.
+const PATH_ARG = String.raw`(?:${ROOT}\s*\+\s*"\/([^"]+)"|\`\$\{\s*${ROOT}\s*\}\/([^\`$]+)\`)`;
+const FORMS = {
+  // Promise.all(["a.js", "b.js"].map(file => import(ROOT + "/src/" + file))).then(([{x}, {y, z}]) =>
+  promiseAll: new RegExp(
+    String.raw`\[([^\]]*)\]\.map\(\s*(\w+)\s*=>\s*import\(\s*${ROOT}\s*\+\s*"\/([\w./-]*\/)"\s*\+\s*\2\s*\)\s*\)\s*\)\s*\.then\(\s*\(\s*\[([^\]]*)\]\s*\)`,
+    'g'
+  ),
+  // import(ROOT + "/src/x.js").then(({a, b}) => or .then(m => ... m.a(...)
+  importThen: new RegExp(
+    String.raw`import\(\s*${PATH_ARG}\s*\)\s*\.then\(\s*(?:\(\s*\{([^}]*)\}\s*\)|(\w+))\s*=>`,
+    'g'
+  ),
+  // const {a, b} = await import(ROOT + "/src/x.js") or const m = await import(...) ... m.a(...)
+  awaitImport: new RegExp(
+    String.raw`(?:const|let|var)\s+(?:\{([^}]*)\}|(\w+))\s*=\s*await\s+import\(\s*${PATH_ARG}\s*\)`,
+    'g'
+  ),
+  // node "$SWISS_KNIFE_ROOT/src/x.js" or "${SWISS_KNIFE_ROOT}/src/x.js", and any other path under it.
+  shell: /\$(?:SWISS_KNIFE_ROOT|\{SWISS_KNIFE_ROOT\})\/([\w./-]*[\w-])/g
+};
+
+/** The `name.x` members a module object is used for, up to the end of its single-quoted script. */
+function membersUsed(jobText, from, name) {
+  const rest = jobText.slice(from);
+  const end = rest.indexOf("'");
+  const script = end === -1 ? rest : rest.slice(0, end);
+  return [...new Set([...script.matchAll(new RegExp(String.raw`\b${name}\.(\w+)`, 'g'))].map(use => use[1]))];
+}
+
 /**
- * The source a job takes from SWISS_KNIFE_ROOT, as [{ path, names }] (names: the exports it reads,
- * empty when only the file is needed).
+ * What a job takes from SWISS_KNIFE_ROOT: `sources` as [{ path, names }] (names: the exports it
+ * reads, empty when only the file is needed), and `unrecognised`, the lines that use
+ * SWISS_KNIFE_ROOT in a form none of the patterns read (YAML comments aside). An unrecognised use
+ * is a problem: the check fails closed instead of skipping source it cannot see.
  */
-export function swissKnifeSources(jobText) {
+export function swissKnifeUses(jobText) {
   const sources = [];
-  // Promise.all(["a.js", "b.js"].map(file => import(process.env.SWISS_KNIFE_ROOT + "/src/" + file))).then(([{x}, {y, z}]) =>
-  for (const match of jobText.matchAll(
-    /\[([^\]]*)\]\.map\(\s*(\w+)\s*=>\s*import\(process\.env\.SWISS_KNIFE_ROOT \+ "\/([\w./-]*\/)" \+ \2\)\)\)\.then\(\(\[([^\]]*)\]\)/g
-  )) {
+  const spans = [];
+  for (const match of jobText.matchAll(FORMS.promiseAll)) {
+    spans.push([match.index, match.index + match[0].length]);
     const files = [...match[1].matchAll(/"([^"]+)"/g)].map(file => file[1]);
     const patterns = [...match[4].matchAll(/\{([^}]*)\}/g)].map(pattern => destructured(pattern[1]));
     files.forEach((file, index) => sources.push({ path: `${match[3]}${file}`, names: patterns[index] ?? [] }));
   }
-  // import(process.env.SWISS_KNIFE_ROOT + "/src/x.js").then(({a, b}) => or .then(m => ... m.a(...)
-  for (const match of jobText.matchAll(
-    /import\(process\.env\.SWISS_KNIFE_ROOT \+ "\/([^"]+)"\)\.then\((?:\(\{([^}]*)\}\)|(\w+))\s*=>/g
-  )) {
-    let names = match[2] !== undefined ? destructured(match[2]) : [];
-    if (match[3]) {
-      // The script is single-quoted for the shell, so it ends at the next quote.
-      const rest = jobText.slice(match.index + match[0].length);
-      const script = rest.slice(0, rest.indexOf("'") === -1 ? undefined : rest.indexOf("'"));
-      names = [...new Set([...script.matchAll(new RegExp(`\\b${match[3]}\\.(\\w+)`, 'g'))].map(use => use[1]))];
-    }
-    sources.push({ path: match[1], names });
+  for (const match of jobText.matchAll(FORMS.importThen)) {
+    spans.push([match.index, match.index + match[0].length]);
+    const names =
+      match[3] !== undefined ? destructured(match[3]) : membersUsed(jobText, match.index + match[0].length, match[4]);
+    sources.push({ path: match[1] ?? match[2], names });
   }
-  // node "$SWISS_KNIFE_ROOT/src/x.js", and any other path under it.
-  for (const match of jobText.matchAll(/\$SWISS_KNIFE_ROOT\/([\w./-]*[\w-])/g)) {
+  for (const match of jobText.matchAll(FORMS.awaitImport)) {
+    spans.push([match.index, match.index + match[0].length]);
+    const names =
+      match[1] !== undefined ? destructured(match[1]) : membersUsed(jobText, match.index + match[0].length, match[2]);
+    sources.push({ path: match[3] ?? match[4], names });
+  }
+  for (const match of jobText.matchAll(FORMS.shell)) {
+    spans.push([match.index, match.index + match[0].length]);
     sources.push({ path: match[1], names: [] });
   }
-  return sources;
+  const unrecognised = [];
+  for (const use of jobText.matchAll(/SWISS_KNIFE_ROOT/g)) {
+    if (spans.some(([start, end]) => use.index >= start && use.index < end)) continue;
+    const lineStart = jobText.lastIndexOf('\n', use.index) + 1;
+    const lineEnd = jobText.indexOf('\n', use.index);
+    const line = jobText.slice(lineStart, lineEnd === -1 ? undefined : lineEnd).trim();
+    if (!line.startsWith('#') && !unrecognised.includes(line)) unrecognised.push(line);
+  }
+  return { sources, unrecognised };
+}
+
+/** The sources a job takes from SWISS_KNIFE_ROOT (see swissKnifeUses). */
+export function swissKnifeSources(jobText) {
+  return swissKnifeUses(jobText).sources;
 }
 
 /** The names a module exports; `star` when it re-exports another module wholesale. */
@@ -90,7 +134,12 @@ export function exportedNames(source) {
 export function checkWorkflowSources({ file, workflow, readAtPin }) {
   const problems = [];
   for (const job of jobs(workflow)) {
-    const sources = swissKnifeSources(job.text);
+    const { sources, unrecognised } = swissKnifeUses(job.text);
+    for (const line of unrecognised) {
+      problems.push(
+        `${file} job ${job.name}: unrecognised use of SWISS_KNIFE_ROOT (teach scripts/workflow-sources.js this form): ${line}`
+      );
+    }
     if (!sources.length) continue;
     const pins = [...new Set([...job.text.matchAll(TOOLKIT_PIN)].map(pin => pin[1]))];
     if (!pins.length) {

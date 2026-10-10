@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { checkWorkflowSources, exportedNames, swissKnifeSources } from '../scripts/workflow-sources.js';
+import { checkWorkflowSources, exportedNames, swissKnifeSources, swissKnifeUses } from '../scripts/workflow-sources.js';
 
 // main's workflows run SWISS_KNIFE_ROOT from the toolkit pin. A workflow that uses a module or
 // export newer than the pin breaks on main until the pins move (it did between #26 and v0.3.0:
@@ -108,6 +108,49 @@ test('swissKnifeSources reads every form the workflows use', () => {
     { path: 'src/base-url.js', names: ['computeBaseUrl', 'shellQuote'] },
     { path: 'src/generate-badges.js', names: ['generateBadges', 'writeBadges', 'x'] },
     { path: 'src/smoke-test.js', names: [] }
+  ]);
+});
+
+test('swissKnifeSources reads await import, template literals, any + spacing and ${SWISS_KNIFE_ROOT}', () => {
+  const sources = swissKnifeSources(`
+    node -e 'const { resolveTrustedPullRequestContext } = await import(process.env.SWISS_KNIFE_ROOT + "/src/resolve-run-context.js");'
+    node -e 'const m = await import(process.env.SWISS_KNIFE_ROOT + "/src/a.js"); m.go(); m.stop();'
+    node -e 'import(\`\${process.env.SWISS_KNIFE_ROOT}/src/t.js\`).then(({x}) => x())'
+    node -e 'import(process.env.SWISS_KNIFE_ROOT+"/src/nospace.js").then(({y}) => y())'
+    run: node "\${SWISS_KNIFE_ROOT}/src/brace.js"
+  `);
+  assert.deepEqual(sources, [
+    { path: 'src/t.js', names: ['x'] },
+    { path: 'src/nospace.js', names: ['y'] },
+    { path: 'src/resolve-run-context.js', names: ['resolveTrustedPullRequestContext'] },
+    { path: 'src/a.js', names: ['go', 'stop'] },
+    { path: 'src/brace.js', names: [] }
+  ]);
+});
+
+test('the real pr-preview-publish await import is checked', () => {
+  const publish = workflows.find(({ file }) => file.endsWith('/pr-preview-publish.yml')).workflow;
+  assert.ok(
+    swissKnifeSources(publish).some(
+      ({ path: source, names }) =>
+        source === 'src/resolve-run-context.js' && names.includes('resolveTrustedPullRequestContext')
+    )
+  );
+});
+
+test('swissKnifeUses fails closed: an unrecognised use is reported, a YAML comment is not', () => {
+  const { sources, unrecognised } = swissKnifeUses(`
+    # The steps below run swiss-knife's own scripts (SWISS_KNIFE_ROOT).
+    run: echo "$SWISS_KNIFE_ROOT"
+    node -e 'import(require("node:path").join(process.env.SWISS_KNIFE_ROOT, "src/x.js"))'
+  `);
+  assert.deepEqual(sources, []);
+  assert.deepEqual(unrecognised, [
+    'run: echo "$SWISS_KNIFE_ROOT"',
+    `node -e 'import(require("node:path").join(process.env.SWISS_KNIFE_ROOT, "src/x.js"))'`
+  ]);
+  assert.deepEqual(check(`node -e 'import(require("node:path").join(process.env.SWISS_KNIFE_ROOT, "src/x.js"))'`, {}), [
+    `w.yml job build: unrecognised use of SWISS_KNIFE_ROOT (teach scripts/workflow-sources.js this form): node -e 'import(require("node:path").join(process.env.SWISS_KNIFE_ROOT, "src/x.js"))'`
   ]);
 });
 
