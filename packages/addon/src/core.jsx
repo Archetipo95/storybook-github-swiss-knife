@@ -80,15 +80,16 @@ export function onManifest(listener) {
   return () => manifestListeners.delete(listener);
 }
 
-// Storybook 8.6, 9 and 10 can filter the sidebar from an addon; 10.6 adds a plural form.
 /**
  * Storybook 10.4+ lists `new` and `modified` statuses in its own sidebar filter (New, Modified)
  * while change detection is on, which it is by default, also in a built Storybook. There the
- * addon uses that filter and adds neither its `visual:*` tags nor the panel's Sidebar select,
- * which would repeat it; older versions get both.
+ * addon uses that filter, and adds only the `visual:failed` tag, which it has no entry for:
+ * no `visual:changed`/`visual:new` tags and no panel Sidebar select. Older versions get all three
+ * tags and the select.
  */
 export const hasNativeChangeFilter = () => Boolean(globalThis.FEATURES?.changeDetection);
 
+// Storybook 8.6, 9 and 10 can filter the sidebar from an addon; 10.6 adds a plural form.
 const canFilterSidebar = api =>
   typeof api?.experimental_setFilter === 'function' || typeof api?.experimental_setFilters === 'function';
 const setSidebarFilter = (api, filterFunction) =>
@@ -382,11 +383,16 @@ export function createVisualPanel({ useStorybookState, useStorybookApi, useTheme
   };
 }
 
-/** Adds the `visual:*` tags to the index, unless it already has them. */
-export async function applyVisualTags(api, index) {
+/**
+ * Adds the `visual:*` tags to the index (only `visual:failed` with `onlyFailures`). The index is
+ * saved only when a story gains a tag, so a report without failures never re-saves it.
+ */
+export async function applyVisualTags(api, index, { onlyFailures = false } = {}) {
   const manifest = await loadManifest();
-  if (!manifest || !index || isTagged(index) || typeof api.setIndex !== 'function') return;
-  await api.setIndex(withVisualTags(index, manifest));
+  if (!manifest || !index?.entries || typeof api.setIndex !== 'function') return;
+  const tagged = withVisualTags(index, manifest, { onlyFailures });
+  if (Object.entries(tagged.entries).every(([storyId, entry]) => entry === index.entries[storyId])) return;
+  await api.setIndex(tagged);
 }
 
 /**

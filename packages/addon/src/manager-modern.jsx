@@ -20,10 +20,10 @@ const VALUES = {
 };
 
 // Statuses are keyed by story id and need no index. With Storybook's own New/Modified filter
-// (10.4+) they are `new`/`modified` and are all the sidebar needs; older versions do not know
-// those values, so changes stay warnings there. Storybook 10.0–10.3 also exposes the index, so
-// its stories get the `visual:*` tags; the index arrives after registration and is replaced when
-// stories change, so the tags are re-checked.
+// (10.4+) they are `new`/`modified`; older versions do not know those values, so changes stay
+// warnings there. Storybook 10 also exposes the index, so stories get `visual:*` tags: only
+// `visual:failed` on 10.4+, which that filter has no entry for, all three on 10.0–10.3. The index
+// arrives after registration and is replaced when stories change, so the tags are re-checked.
 function registerResults(api) {
   let tagTimer;
   onManifest(manifest => {
@@ -37,13 +37,13 @@ function registerResults(api) {
         description
       }))
     );
-    if (nativeChangeFilter || typeof api.getIndex !== 'function' || tagTimer) return;
+    if (typeof api.getIndex !== 'function' || tagTimer) return;
     let busy = false;
     const tag = async () => {
       if (busy) return;
       busy = true;
       try {
-        await applyVisualTags(api, api.getIndex());
+        await applyVisualTags(api, api.getIndex(), { onlyFailures: nativeChangeFilter });
       } finally {
         busy = false;
       }

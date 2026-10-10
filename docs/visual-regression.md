@@ -110,7 +110,8 @@ How the sidebar is filtered depends on the Storybook version:
 
 - **Storybook 10.4+** (with change detection on, the default): changed stories are `modified`
   and new ones `new`, so Storybook's own sidebar filter (**New**, **Modified**) lists the pull
-  request's visual changes against its base branch. The addon adds nothing else to filter with.
+  request's visual changes against its base branch. That filter has no entry for failures, so the
+  addon adds a `visual:failed` tag to failed stories, in the same menu.
 - **Older versions**, or change detection turned off: changed stories get a warning, and the
   addon adds what Storybook lacks there: a **Sidebar** select in the Visual panel that narrows the
   sidebar to changed, new or failed stories (8.6, 9 and 10), and `visual:changed`, `visual:new`
