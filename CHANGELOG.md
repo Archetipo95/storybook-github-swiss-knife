@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-10
+
 ### Changed
 
 - Docs: how `visual.threshold` and `visual.maxDiffPixels` decide what counts as a change. At the default `threshold` of `0.2`, a colour swap between shades of similar brightness (`#1d4ed8` to `#6d28d9`) is reported as unchanged; `0.1` catches it.

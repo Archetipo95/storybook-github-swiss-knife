@@ -44,6 +44,6 @@ existing workflow files unless `--force`), or follow
 | `build_command`   | `build_command` / `custom_build_command`     | Fully supported                        |
 
 **Migrating to `storybook-github-swiss-knife`:**
-Simply replace `bitovi/github-actions-storybook-to-github-pages@v1.0.3` with `Archetipo95/storybook-github-swiss-knife@v0.2.1` in your workflow.
+Simply replace `bitovi/github-actions-storybook-to-github-pages@v1.0.3` with `Archetipo95/storybook-github-swiss-knife@v0.3.0` in your workflow.
 
 ---

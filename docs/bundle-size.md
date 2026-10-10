@@ -18,7 +18,7 @@ read the configuration file.
 ```yaml
 jobs:
   storybook:
-    uses: Archetipo95/storybook-github-swiss-knife/.github/workflows/deploy-storybook.yml@v0.2.1
+    uses: Archetipo95/storybook-github-swiss-knife/.github/workflows/deploy-storybook.yml@v0.3.0
     with:
       audit_bundle_size: true
       bundle_size_max_mb: '25'
