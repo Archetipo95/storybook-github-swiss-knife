@@ -61,9 +61,11 @@ function fakeGitHub({
   callerAtHead = 'caller workflow',
   prHead = HEAD,
   comments = [],
-  readBack = []
+  readBack = [],
+  prOnRecheck = null
 } = {}) {
   const calls = [];
+  let prReads = 0;
   const request = async (apiPath, { method = 'GET', body } = {}) => {
     calls.push({ method, apiPath, body });
     const route = apiPath.split('?')[0];
@@ -82,13 +84,15 @@ function fakeGitHub({
       return { artifacts: [{ name: `swiss-knife-visual-pr-7-run-${artifactRunId}` }] };
     }
     if (route === `/repos/${REPO}/pulls/7`) {
-      return {
+      prReads += 1;
+      const pr = {
         number: 7,
         state: 'open',
         head: { sha: prHead, repo: { full_name: headRepo } },
         base: { sha: BASE },
         labels: labels.map(name => ({ name }))
       };
+      return prReads > 1 && prOnRecheck ? { ...pr, ...prOnRecheck } : pr;
     }
     if (route === `/repos/${REPO}`) return { default_branch: 'main' };
     if (route.startsWith(`/repos/${REPO}/contents/.github/`)) {
@@ -204,6 +208,20 @@ test('an artifact named for another run does not identify the pull request', asy
     checkRuns(calls).map(check => check.conclusion),
     ['failure', 'failure']
   );
+});
+
+test('a pull request closed while the gate ran gets its checks but no report', async () => {
+  const { output, calls, published } = await run({ github: fakeGitHub({ prOnRecheck: { state: 'closed' } }) });
+  assert.equal(checkRuns(calls).length, 2);
+  assert.equal(published.length, 0);
+  assert.equal(output.published, false);
+});
+
+test('a pull request that moved to a newer commit while the gate ran gets no report for the old one', async () => {
+  const { published } = await run({
+    github: fakeGitHub({ prOnRecheck: { head: { sha: 'c'.repeat(40), repo: { full_name: REPO } } } })
+  });
+  assert.equal(published.length, 0);
 });
 
 test('a cancelled run fails both checks even with a partial bundle', async () => {

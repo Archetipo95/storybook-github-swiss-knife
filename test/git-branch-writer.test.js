@@ -4,7 +4,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { assertSafeBranchName, requestPagesRebuild, withSerializedBranchWrite } from '../src/git-branch-writer.js';
+import {
+  assertSafeBranchName,
+  requestPagesRebuild,
+  retryDelayMs,
+  withSerializedBranchWrite
+} from '../src/git-branch-writer.js';
 
 const COMMIT_SHA = 'a'.repeat(40);
 
@@ -163,10 +168,15 @@ test('withSerializedBranchWrite re-runs mutate on the new branch tip when a conc
     git(tmp, 'clone', '-q', '-b', 'gh-pages', origin, writer);
 
     const sawRivalPreview = [];
+    const delays = [];
     const result = await withSerializedBranchWrite({
       repo: writer,
       branch: 'gh-pages',
       commitMessage: 'Publish pr-1',
+      retryDelay: attempt => {
+        delays.push(attempt);
+        return 0;
+      },
       mutate: async repo => {
         sawRivalPreview.push(fs.existsSync(path.join(repo, 'pr-2')));
         if (sawRivalPreview.length === 1) {
@@ -181,6 +191,7 @@ test('withSerializedBranchWrite re-runs mutate on the new branch tip when a conc
     });
 
     assert.deepEqual(sawRivalPreview, [false, true], 'the retry must start from the tip that contains pr-2');
+    assert.deepEqual(delays, [0], 'one pause before the second attempt');
     assert.equal(result.changed, true);
     assert.equal(git(origin, 'rev-parse', 'gh-pages'), result.commitSha);
     assert.deepEqual(git(origin, 'ls-tree', '-r', '--name-only', 'gh-pages').split('\n'), [
@@ -191,4 +202,15 @@ test('withSerializedBranchWrite re-runs mutate on the new branch tip when a conc
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
+});
+
+test('retryDelayMs grows with each attempt and is randomized within its window', () => {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    for (let sample = 0; sample < 50; sample += 1) {
+      const delay = retryDelayMs(attempt);
+      assert.ok(delay >= (attempt + 1) * 500 && delay <= (attempt + 1) * 2000, `attempt ${attempt}: ${delay}`);
+    }
+  }
+  const spread = new Set(Array.from({ length: 20 }, () => retryDelayMs(0)));
+  assert.ok(spread.size > 1, 'concurrent writers must not retry in lockstep');
 });
