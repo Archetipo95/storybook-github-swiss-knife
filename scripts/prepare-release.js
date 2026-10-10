@@ -59,7 +59,7 @@ function releaseRefFiles() {
 // refuses to tag when they differ).
 const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
 const pinSha = git('rev-parse', 'HEAD');
-const uncommitted = git('status', '--porcelain', '--', 'src', 'actions');
+const uncommitted = git('status', '--porcelain', '--', 'src', 'actions', 'runner');
 if (uncommitted) {
   console.error(
     `Commit action and src changes before preparing ${tag}; internal pins must point at committed code:\n${uncommitted}`

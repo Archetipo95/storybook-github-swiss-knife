@@ -292,16 +292,21 @@ test('every input passed to an internal pinned action is declared at that pin', 
 // Regular PRs cannot satisfy this (a pin cannot reference its own commit), so
 // `npm run prepare-release` moves the pins to the release base commit.
 test(
-  'internal pins run the same action and src code as the release commit',
+  'internal pins run the same action, src and runner code as the release commit',
   { skip: !process.env.RELEASE_PIN_CHECK },
   () => {
     for (const file of filesToScan()) {
       const relFile = path.relative(repoRoot, file);
       for (const { subaction, sha } of internalActionSteps(fs.readFileSync(file, 'utf8'))) {
-        const changed = execFileSync('git', ['diff', '--name-only', sha, 'HEAD', '--', `${subaction}/`, 'src/'], {
-          cwd: repoRoot,
-          encoding: 'utf8'
-        }).trim();
+        // runner/ too: visual-capture and visual-report run the runner from their own checkout.
+        const changed = execFileSync(
+          'git',
+          ['diff', '--name-only', sha, 'HEAD', '--', `${subaction}/`, 'src/', 'runner/'],
+          {
+            cwd: repoRoot,
+            encoding: 'utf8'
+          }
+        ).trim();
         assert.equal(
           changed,
           '',

@@ -48,7 +48,7 @@ Release checklist:
 2. Confirm this repository's CI and CodeQL checks are green.
 3. Run the `storybook-vue-demo` Action Canary workflow against the candidate branch, tag, or SHA.
 4. Merge the release PR. The `Release Tags` workflow sees the new `package.json` version on `main`, re-runs the tests, checks `package-lock.json` and `CHANGELOG.md` agree, then creates `vX.Y.Z` and moves the major tag (`v1`) to it. Do not tag by hand. If the checks fail, `main` shows a failed `Release Tags` run and no tag is created. Every later push to `main` also moves `v1` back onto the newest release if it has drifted; it never moves it backwards.
-5. Publish the addon from the tag: `git checkout vX.Y.Z && cd packages/addon && npm publish` (`prepack` builds `dist/`). `npx storybook-swiss-knife init` pins workflows to `v<addon version>`, so publish only after the tag exists.
+5. The `Release Tags` workflow attaches the addon tarball (`storybook-swiss-knife-X.Y.Z.tgz`, packed from the tagged commit) to the GitHub release. Publish it to npm from the tag too: `git checkout vX.Y.Z && cd packages/addon && npm publish` (`prepack` builds `dist/`). `npx storybook-swiss-knife init` pins workflows to `v<addon version>`, so publish only after the tag exists.
 6. Update the demo repository's stable action refs after the tag exists.
 
 ---

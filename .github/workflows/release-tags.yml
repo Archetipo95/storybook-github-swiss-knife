@@ -94,8 +94,14 @@ jobs:
             exit 0
           fi
           node scripts/release-tag.js --notes "${RELEASE_TAG#v}" > "$RUNNER_TEMP/release-notes.md"
-          gh release create "$RELEASE_TAG" --title "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.md" --verify-tag --latest="$LATEST"
-          echo "Published release $RELEASE_TAG (latest: $LATEST)."
+          # The Storybook addon as an npm tarball built from the tagged commit, so projects can
+          # install it from the release (npm install <asset URL>) as well as from the registry.
+          npm ci --prefix packages/addon --no-audit --no-fund --loglevel=error
+          (cd packages/addon && npm pack --pack-destination "$RUNNER_TEMP")
+          addon_tarball="$RUNNER_TEMP/storybook-swiss-knife-${RELEASE_TAG#v}.tgz"
+          test -f "$addon_tarball"
+          gh release create "$RELEASE_TAG" "$addon_tarball" --title "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.md" --verify-tag --latest="$LATEST"
+          echo "Published release $RELEASE_TAG (latest: $LATEST) with $(basename "$addon_tarball")."
 
       - name: Move major tag to the newest release
         env:

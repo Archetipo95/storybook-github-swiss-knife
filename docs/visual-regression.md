@@ -85,6 +85,12 @@ parameters (`a11y.disable` / `a11y.test: 'off'`, `a11y.config.rules`, `a11y.opti
 npm install --save-dev storybook-swiss-knife
 ```
 
+Every release also carries the addon as an npm tarball, built from the release's commit:
+
+```bash
+npm install --save-dev https://github.com/Archetipo95/storybook-github-swiss-knife/releases/download/v<version>/storybook-swiss-knife-<version>.tgz
+```
+
 ```js
 // .storybook/main.js
 export default {
