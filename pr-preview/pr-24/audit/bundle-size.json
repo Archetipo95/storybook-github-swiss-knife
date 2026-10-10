@@ -2,7 +2,7 @@
   "version": 1,
   "totalFiles": 20,
   "totalBytes": 20016,
-  "totalGzipBytes": 8467,
+  "totalGzipBytes": 8469,
   "categories": {
     "js": {
       "files": 0,
@@ -22,7 +22,7 @@
     "image": {
       "files": 7,
       "bytes": 17811,
-      "gzipBytes": 6686
+      "gzipBytes": 6688
     },
     "html": {
       "files": 2,
@@ -56,7 +56,7 @@
       "path": "badges/status.svg",
       "category": "image",
       "bytes": 1256,
-      "gzipBytes": 514
+      "gzipBytes": 516
     },
     {
       "path": "badges/build.svg",
