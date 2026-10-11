@@ -419,7 +419,7 @@ jobs:
 
     outputs:
       page_url: ${{ steps.deploy-pages.outputs.page_url }}
-      status: 'success'
+      status: ${{ steps.status.outputs.status }}
       deployment_id: ${{ steps.create-deployment.outputs.deployment_id || steps.deploy-pages.outputs.deployment_id }}
 
     steps:
@@ -473,6 +473,16 @@ jobs:
           DEPLOYMENT_DESCRIPTION: Deployment failed for ${{ needs.build-and-upload.outputs.environment_name || needs.build-and-upload.outputs.environment || 'github-pages' }}
         run: node "$SWISS_KNIFE_ROOT/src/github-deployments.js"
 
+      # Last, and always: the job's own outcome, which a caller can read after a failure.
+      - name: Set the status output
+        id: status
+        if: ${{ always() }}
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          if [ "$JOB_STATUS" = success ]; then status=success; else status=failed; fi
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
   directory-publish:
     name: Publish Storybook directory
     needs: build-and-upload
@@ -483,7 +493,7 @@ jobs:
       pages: write
     outputs:
       page_url: ${{ steps.publish.outputs.page_url }}
-      status: success
+      status: ${{ steps.status.outputs.status }}
     steps:
       - name: Download trusted build output
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -518,3 +528,13 @@ jobs:
           badges_directory: ${{ needs.build-and-upload.outputs.badges_directory }}
           generate_stats_graph: ${{ needs.build-and-upload.outputs.generate_stats_graph }}
           stats_directory: ${{ needs.build-and-upload.outputs.stats_directory }}
+
+      # Last, and always: the job's own outcome, which a caller can read after a failure.
+      - name: Set the status output
+        id: status
+        if: ${{ always() }}
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          if [ "$JOB_STATUS" = success ]; then status=success; else status=failed; fi
+          echo "status=$status" >> "$GITHUB_OUTPUT"

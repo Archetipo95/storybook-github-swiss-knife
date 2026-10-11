@@ -292,6 +292,8 @@ Set `cache: false` to disable all reusable-workflow caches, or set `cache_key_pr
 | `status`        | `success`, `skipped` (`publish: 'false'`) or `failed` (an earlier step failed: read it from a step that still runs, such as `if: always()`, or with `continue-on-error: true` on this step) |
 | `deployment_id` | The GitHub Pages deployment ID                                                                                                                                                              |
 
+The composite action's `status` is described above. The reusable workflow's `status` is `success` or `failed`, the outcome of the job that published (the Pages deploy, or the directory publish); a caller reads it after a failure from a job with `if: always()`. It is empty when nothing was published (the build failed).
+
 ---
 
 ## Configuration File (`.storybook-pages.yml`)
