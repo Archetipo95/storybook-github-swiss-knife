@@ -9,7 +9,7 @@ import {
 } from './config.js';
 import { appendCommandFile } from './command-file.js';
 import { CNAME_FILE, normalizeCname, readCnameFile, writeCnameFile } from './cname.js';
-import { requestPagesRebuild, withSerializedBranchWrite, WRITE_LOCK_NAME } from './git-branch-writer.js';
+import { requestPagesRebuild, withSerializedBranchWrite } from './git-branch-writer.js';
 
 async function pathExists(file) {
   try {
@@ -60,8 +60,7 @@ export async function replaceDirectory(
     // they are published separately to the same branch.
     const isKept = keptRootEntry(managedDirectories, previewRoot);
     for (const entry of await fs.readdir(repo)) {
-      if (entry !== '.git' && entry !== WRITE_LOCK_NAME && !isKept(entry))
-        await fs.rm(path.join(repo, entry), { recursive: true, force: true });
+      if (entry !== '.git' && !isKept(entry)) await fs.rm(path.join(repo, entry), { recursive: true, force: true });
     }
     for (const entry of await fs.readdir(staging)) {
       await fs.rename(path.join(staging, entry), path.join(repo, entry));

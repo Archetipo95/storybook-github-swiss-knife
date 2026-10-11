@@ -25,22 +25,6 @@ test('replaceDirectory replaces only the selected target and preserves siblings'
   await fs.rm(source, { recursive: true, force: true });
 });
 
-test('replaceDirectory preserves the shared writer lock during a root publish', async () => {
-  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'pages-publish-root-'));
-  const source = await fs.mkdtemp(path.join(os.tmpdir(), 'pages-source-root-'));
-  await fs.mkdir(path.join(repo, '.storybook-pages-write.lock'));
-  await fs.writeFile(path.join(repo, 'old.html'), 'old');
-  await fs.writeFile(path.join(source, 'index.html'), 'new');
-
-  await replaceDirectory(repo, '', source);
-
-  assert.equal(await fs.readFile(path.join(repo, 'index.html'), 'utf8'), 'new');
-  await fs.access(path.join(repo, '.storybook-pages-write.lock'));
-  await assert.rejects(fs.readFile(path.join(repo, 'old.html')));
-  await fs.rm(repo, { recursive: true, force: true });
-  await fs.rm(source, { recursive: true, force: true });
-});
-
 test('publishDirectory sends an opt-in authenticated Pages rebuild request with proper headers', async () => {
   const { publishDirectory } = await import('../src/publish-directory.js');
   const repoBare = await fs.mkdtemp(path.join(os.tmpdir(), 'pages-bare-'));
