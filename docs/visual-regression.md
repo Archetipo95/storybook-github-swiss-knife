@@ -10,7 +10,7 @@ branch, scans it with axe, and posts two required checks: `swiss-knife / visual`
 addon isn't on npm yet, so run it from the release tarball:
 
 ```bash
-npx --yes https://github.com/Archetipo95/storybook-github-swiss-knife/releases/download/v0.5.0/storybook-swiss-knife-0.5.0.tgz init
+npx --yes https://github.com/Archetipo95/storybook-github-swiss-knife/releases/download/v0.5.1/storybook-swiss-knife-0.5.1.tgz init
 ```
 
 By hand:
@@ -36,7 +36,7 @@ permissions:
   contents: read
 jobs:
   visual:
-    uses: Archetipo95/storybook-github-swiss-knife/.github/workflows/visual.yml@v0.5.0
+    uses: Archetipo95/storybook-github-swiss-knife/.github/workflows/visual.yml@v0.5.1
     permissions:
       contents: read
       actions: read
@@ -56,7 +56,7 @@ permissions:
 jobs:
   gate:
     if: github.event.workflow_run.event == 'pull_request'
-    uses: Archetipo95/storybook-github-swiss-knife/.github/workflows/visual-gate.yml@v0.5.0
+    uses: Archetipo95/storybook-github-swiss-knife/.github/workflows/visual-gate.yml@v0.5.1
     permissions:
       actions: read
       checks: write
