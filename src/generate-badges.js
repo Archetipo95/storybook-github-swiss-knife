@@ -479,24 +479,6 @@ export function readTestResultsFile(testResultsPath, workspaceRoot = process.cwd
 }
 
 /**
- * Resolves color for status/build messages based on state keyword.
- */
-export function resolveBadgeStateColor(messageOrState, defaultColor = '4caf50') {
-  if (!messageOrState) return defaultColor;
-  const str = String(messageOrState).toLowerCase();
-  if (str.includes('building') || str.includes('in progress') || str.includes('pending')) {
-    return 'dfb317';
-  }
-  if (str.includes('fail') || str.includes('error')) {
-    return 'e05d44';
-  }
-  if (str.includes('pass') || str.includes('published') || str.includes('success')) {
-    return '4caf50';
-  }
-  return defaultColor;
-}
-
-/**
  * Generates badge SVG files and JSON endpoint files inside the static output directory.
  */
 export function generateBadges({
@@ -506,10 +488,6 @@ export function generateBadges({
   siteUrl = '',
   basePath = '',
   commitSha = process.env.GITHUB_SHA || '',
-  statusMessage = '',
-  buildMessage = '',
-  buildState = '',
-  statusState = '',
   testResultsPath = '',
   coverageIncludePaths = [],
   coverageIgnorePaths = []
@@ -559,145 +537,41 @@ export function generateBadges({
       ? `${testResults.passed}/${testResults.total} passed`
       : `${testResults.failed}/${testResults.total} failed`
     : 'n/a';
-  const testsColor = testResults ? (testResults.failed === 0 ? '#4caf50' : '#e05d44') : '#9e9e9e';
+  const testsColor = testResults?.failed > 0 ? 'e05d44' : '4caf50';
 
-  // Determine status & build messages and colors
-  let statusMsg = statusMessage;
-  if (!statusMsg) {
-    if (statusState === 'building' || buildState === 'building') {
-      statusMsg = shortSha ? `building • ${shortSha}` : 'building';
-    } else if (statusState === 'failed' || buildState === 'failed') {
-      statusMsg = shortSha ? `failed • ${shortSha}` : 'failed';
-    } else {
-      statusMsg = shortSha ? `published • ${shortSha}` : 'published';
-    }
+  const statusMsg = shortSha ? `published • ${shortSha}` : 'published';
+  const buildMsg = shortSha ? `passed • ${shortSha}` : 'passed';
+  const coverageColor = metrics.coveragePercent >= 100 ? '4caf50' : metrics.coveragePercent >= 75 ? '0288d1' : 'ff9800';
+
+  // Each badge is written as an SVG and as a shields.io JSON endpoint (`json` overrides the
+  // message there). The SVGs and endpoints are public URLs: keep names, labels and colors stable.
+  const badges = [
+    { name: 'storybook', label: 'storybook', message: storybookMsg, color: 'ff4785' },
+    { name: 'stories', label: 'stories', message: storiesMsg, color: '0288d1' },
+    { name: 'components', label: 'components', message: componentsMsg, color: '4caf50' },
+    { name: 'status', label: 'storybook', message: statusMsg, color: '4caf50' },
+    { name: 'build', label: 'build', message: buildMsg, color: '4caf50' },
+    {
+      name: 'coverage',
+      label: 'coverage',
+      message: `${metrics.coveragePercent}% (${metrics.componentsCount}/${metrics.totalComponents})`,
+      json: `${metrics.coveragePercent}%`,
+      color: coverageColor
+    },
+    ...(testResults ? [{ name: 'tests', label: 'tests', message: testsMessage, color: testsColor }] : [])
+  ];
+  // The order the JSON endpoints have always been written and listed in.
+  const JSON_ORDER = ['stories', 'components', 'coverage', 'status', 'build', 'storybook', 'tests'];
+  const jsonBadges = JSON_ORDER.map(name => badges.find(badge => badge.name === name)).filter(Boolean);
+
+  for (const { name, label, message, color } of badges) {
+    const svg = renderBadgeSvg({ label, message, labelColor: '#555555', messageColor: normalizeColor(color) });
+    fs.writeFileSync(path.join(outDir, `${name}.svg`), svg, 'utf8');
   }
-
-  let buildMsg = buildMessage;
-  if (!buildMsg) {
-    if (buildState === 'building' || statusState === 'building') {
-      buildMsg = shortSha ? `building • ${shortSha}` : 'building';
-    } else if (buildState === 'failed' || statusState === 'failed') {
-      buildMsg = shortSha ? `failed • ${shortSha}` : 'failed';
-    } else {
-      buildMsg = shortSha ? `passed • ${shortSha}` : 'passed';
-    }
+  for (const { name, label, message, json, color } of jsonBadges) {
+    const endpoint = { schemaVersion: 1, label, message: json ?? message, color };
+    fs.writeFileSync(path.join(outDir, `${name}.json`), JSON.stringify(endpoint, null, 2), 'utf8');
   }
-
-  const statusColor = resolveBadgeStateColor(statusMsg, '4caf50');
-  const buildColor = resolveBadgeStateColor(buildMsg, '4caf50');
-
-  // 1. Generate standard SVGs
-  const svgStorybook = renderBadgeSvg({
-    label: 'storybook',
-    message: storybookMsg,
-    labelColor: '#555555',
-    messageColor: '#ff4785'
-  });
-
-  const svgStories = renderBadgeSvg({
-    label: 'stories',
-    message: storiesMsg,
-    labelColor: '#555555',
-    messageColor: '#0288d1'
-  });
-
-  const svgComponents = renderBadgeSvg({
-    label: 'components',
-    message: componentsMsg,
-    labelColor: '#555555',
-    messageColor: '#4caf50'
-  });
-
-  const svgStatus = renderBadgeSvg({
-    label: 'storybook',
-    message: statusMsg,
-    labelColor: '#555555',
-    messageColor: normalizeColor(statusColor)
-  });
-
-  const svgBuild = renderBadgeSvg({
-    label: 'build',
-    message: buildMsg,
-    labelColor: '#555555',
-    messageColor: normalizeColor(buildColor)
-  });
-
-  const svgCoverage = renderBadgeSvg({
-    label: 'coverage',
-    message: `${metrics.coveragePercent}% (${metrics.componentsCount}/${metrics.totalComponents})`,
-    labelColor: '#555555',
-    messageColor: metrics.coveragePercent >= 100 ? '#4caf50' : metrics.coveragePercent >= 75 ? '#0288d1' : '#ff9800'
-  });
-
-  const svgTests = renderBadgeSvg({
-    label: 'tests',
-    message: testsMessage,
-    labelColor: '#555555',
-    messageColor: normalizeColor(testsColor)
-  });
-
-  fs.writeFileSync(path.join(outDir, 'storybook.svg'), svgStorybook, 'utf8');
-  fs.writeFileSync(path.join(outDir, 'stories.svg'), svgStories, 'utf8');
-  fs.writeFileSync(path.join(outDir, 'components.svg'), svgComponents, 'utf8');
-  fs.writeFileSync(path.join(outDir, 'status.svg'), svgStatus, 'utf8');
-  fs.writeFileSync(path.join(outDir, 'build.svg'), svgBuild, 'utf8');
-  fs.writeFileSync(path.join(outDir, 'coverage.svg'), svgCoverage, 'utf8');
-  if (testResults) {
-    fs.writeFileSync(path.join(outDir, 'tests.svg'), svgTests, 'utf8');
-  }
-
-  // 2. Generate Shields.io-compatible JSON endpoints
-  const jsonStories = {
-    schemaVersion: 1,
-    label: 'stories',
-    message: storiesMsg,
-    color: '0288d1'
-  };
-
-  const jsonComponents = {
-    schemaVersion: 1,
-    label: 'components',
-    message: componentsMsg,
-    color: '4caf50'
-  };
-
-  const jsonCoverage = {
-    schemaVersion: 1,
-    label: 'coverage',
-    message: `${metrics.coveragePercent}%`,
-    color: metrics.coveragePercent >= 100 ? '4caf50' : metrics.coveragePercent >= 75 ? '0288d1' : 'ff9800'
-  };
-
-  const jsonStatus = {
-    schemaVersion: 1,
-    label: 'storybook',
-    message: statusMsg,
-    color: statusColor
-  };
-
-  const jsonBuild = {
-    schemaVersion: 1,
-    label: 'build',
-    message: buildMsg,
-    color: buildColor
-  };
-
-  const jsonStorybook = {
-    schemaVersion: 1,
-    label: 'storybook',
-    message: storybookMsg,
-    color: 'ff4785'
-  };
-
-  const jsonTests = testResults
-    ? {
-        schemaVersion: 1,
-        label: 'tests',
-        message: testsMessage,
-        color: testResults.failed === 0 ? '4caf50' : 'e05d44'
-      }
-    : null;
 
   const jsonOverview = {
     schemaVersion: 1,
@@ -722,15 +596,6 @@ export function generateBadges({
     generatedAt: new Date().toISOString()
   };
 
-  fs.writeFileSync(path.join(outDir, 'stories.json'), JSON.stringify(jsonStories, null, 2), 'utf8');
-  fs.writeFileSync(path.join(outDir, 'components.json'), JSON.stringify(jsonComponents, null, 2), 'utf8');
-  fs.writeFileSync(path.join(outDir, 'coverage.json'), JSON.stringify(jsonCoverage, null, 2), 'utf8');
-  fs.writeFileSync(path.join(outDir, 'status.json'), JSON.stringify(jsonStatus, null, 2), 'utf8');
-  fs.writeFileSync(path.join(outDir, 'build.json'), JSON.stringify(jsonBuild, null, 2), 'utf8');
-  fs.writeFileSync(path.join(outDir, 'storybook.json'), JSON.stringify(jsonStorybook, null, 2), 'utf8');
-  if (jsonTests) {
-    fs.writeFileSync(path.join(outDir, 'tests.json'), JSON.stringify(jsonTests, null, 2), 'utf8');
-  }
   fs.writeFileSync(path.join(outDir, 'overview.json'), JSON.stringify(jsonOverview, null, 2), 'utf8');
 
   // Calculate full URL for markdown snippets
@@ -756,20 +621,8 @@ export function generateBadges({
     derivedBadgesUrl,
     markdownSnippets,
     filesGenerated: [
-      'storybook.svg',
-      'stories.svg',
-      'components.svg',
-      'status.svg',
-      'build.svg',
-      'coverage.svg',
-      ...(testResults ? ['tests.svg'] : []),
-      'stories.json',
-      'components.json',
-      'coverage.json',
-      'status.json',
-      'build.json',
-      'storybook.json',
-      ...(testResults ? ['tests.json'] : []),
+      ...badges.map(({ name }) => `${name}.svg`),
+      ...jsonBadges.map(({ name }) => `${name}.json`),
       'overview.json'
     ]
   };
@@ -782,10 +635,6 @@ if (process.argv[1] && process.argv[1].endsWith('generate-badges.js')) {
   const siteUrl = process.env.SB_SITE_URL || '';
   const basePath = process.env.SB_BASE_PATH || '';
   const commitSha = process.env.GITHUB_SHA || '';
-  const statusMessage = process.env.SB_STATUS_MESSAGE || '';
-  const buildMessage = process.env.SB_BUILD_MESSAGE || '';
-  const buildState = process.env.SB_BUILD_STATE || '';
-  const statusState = process.env.SB_STATUS_STATE || '';
   const testResultsPath = process.env.SB_TEST_RESULTS_PATH || '';
   const coverageIncludePaths = process.env.SB_COVERAGE_INCLUDE_PATHS || '';
   const coverageIgnorePaths = process.env.SB_COVERAGE_IGNORE_PATHS || '';
@@ -798,10 +647,6 @@ if (process.argv[1] && process.argv[1].endsWith('generate-badges.js')) {
       siteUrl,
       basePath,
       commitSha,
-      statusMessage,
-      buildMessage,
-      buildState,
-      statusState,
       testResultsPath,
       coverageIncludePaths: coverageIncludePaths ? coverageIncludePaths.split(/\r?\n|,/) : [],
       coverageIgnorePaths: coverageIgnorePaths ? coverageIgnorePaths.split(/\r?\n|,/) : []

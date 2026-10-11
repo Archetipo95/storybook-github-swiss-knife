@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Badge generation is one table for the SVGs and the shields.io JSON endpoints, which were written out twice (about 190 lines less); a golden test pins every badge file byte for byte. The status and build badges' "building" and "failed" states are gone: no workflow ever set `SB_BUILD_STATE`, `SB_STATUS_STATE`, `SB_BUILD_MESSAGE` or `SB_STATUS_MESSAGE`, and a failed build publishes no badges, so they always read `published • <sha>` and `passed • <sha>`, as before.
+
 ### Fixed
 
 - The composite action's `status` output never reported `failed`, as documented: the step that sets it was skipped after any failure, leaving it empty. It now reads `failed` after a failed step (for a step that still runs, such as `if: always()`, or with `continue-on-error: true` on the action), `skipped` with `publish: 'false'`, and `success` otherwise.

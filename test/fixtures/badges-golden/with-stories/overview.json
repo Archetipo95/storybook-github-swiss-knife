@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "status": "published • abcdef1",
+  "build": "passed • abcdef1",
+  "commit": "abcdef1",
+  "storybookVersion": "v9.1.20",
+  "storiesCount": 2,
+  "componentsCount": 2,
+  "totalComponents": 3,
+  "coveragePercent": 67,
+  "docsCount": 1,
+  "hasStoriesData": true,
+  "tests": {
+    "total": 4,
+    "passed": 4,
+    "failed": 0,
+    "passedPercent": 100
+  },
+  "generatedAt": "<generatedAt>"
+}
