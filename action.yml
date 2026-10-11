@@ -59,24 +59,12 @@ inputs:
     description: 'Deployment mode: artifact or trusted branch-backed directory'
     required: false
     default: ''
-  pages_branch:
-    description: 'Branch used by directory mode'
-    required: false
-    default: ''
-  target_directory:
-    description: 'Directory replaced by directory mode; empty publishes the root'
-    required: false
-    default: ''
   site_url:
     description: 'Canonical Pages site URL'
     required: false
     default: ''
   base_path:
     description: 'Optional URL base path'
-    required: false
-    default: ''
-  managed_directories:
-    description: 'Comma-separated managed directories preserved during root publication'
     required: false
     default: ''
   generate_badges:
