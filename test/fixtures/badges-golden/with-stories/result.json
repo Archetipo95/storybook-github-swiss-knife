@@ -1,0 +1,21 @@
+{
+  "filesGenerated": [
+    "storybook.svg",
+    "stories.svg",
+    "components.svg",
+    "status.svg",
+    "build.svg",
+    "coverage.svg",
+    "tests.svg",
+    "stories.json",
+    "components.json",
+    "coverage.json",
+    "status.json",
+    "build.json",
+    "storybook.json",
+    "tests.json",
+    "overview.json"
+  ],
+  "markdownSnippets": "[![Storybook](https://octo.github.io/widgets/preprod/badges/storybook.svg)](https://octo.github.io/widgets/preprod) [![Status](https://octo.github.io/widgets/preprod/badges/status.svg)](https://octo.github.io/widgets/preprod) [![Coverage](https://octo.github.io/widgets/preprod/badges/coverage.svg)](https://octo.github.io/widgets/preprod) [![Stories](https://octo.github.io/widgets/preprod/badges/stories.svg)](https://octo.github.io/widgets/preprod) [![Components](https://octo.github.io/widgets/preprod/badges/components.svg)](https://octo.github.io/widgets/preprod) [![Tests](https://octo.github.io/widgets/preprod/badges/tests.svg)](https://octo.github.io/widgets/preprod)",
+  "derivedBadgesUrl": "https://octo.github.io/widgets/preprod/badges"
+}
