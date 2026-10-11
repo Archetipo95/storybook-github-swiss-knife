@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **Breaking: three composite action inputs and one `pr-preview-publish.yml` input are removed** (minor release): no step of the action used its three, and the workflow's repeated its event. To migrate:
+  - Callers of `pr-preview-publish.yml`: drop `workflow_run_id` from `with:`. A reusable workflow rejects an input it does not declare, so a caller that still passes it fails at startup. The run to publish comes from the caller's `workflow_run` event, as it already did: the gate skips every other event, and `publish` with it, and the input could only name another run, which the gate then checked like the event's own. A caller on any other event now gets a warning that nothing is published, where its run used to finish green without doing anything.
+  - Callers of the composite action (`uses: Archetipo95/storybook-github-swiss-knife@…`): drop `pages_branch`, `target_directory` and `managed_directories` from `with:`. A leftover one only produces an "Unexpected input" warning. They apply only to directory mode, which the action does not publish, and no step read them. `.storybook-pages.yml` can still set them for `deploy-storybook.yml`.
+
 ### Changed
 
 - Workflow leftovers removed, none of them visible to callers: four `deploy-storybook.yml` build-job outputs nothing read, the publisher step's `env:` block that repeated its inputs, the preview gate's "Fetch current pull request head SHA" step and its output (the publish job re-reads the PR itself), and nine `|| inputs.pages_branch || 'gh-pages'` fallbacks that could never apply. A test now fails on any job output that no later job reads and the workflow does not re-export.

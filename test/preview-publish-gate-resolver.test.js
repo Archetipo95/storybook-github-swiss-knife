@@ -111,8 +111,7 @@ test('extract-context step resolves the trusted PR context when the workspace ha
     env: {
       SWISS_KNIFE_ROOT: repoRoot,
       NODE_OPTIONS: `--require ${stubPath}`,
-      WORKFLOW_RUN_EVENT: JSON.stringify(runData),
-      INPUT_RUN_ID: ''
+      WORKFLOW_RUN_EVENT: JSON.stringify(runData)
     }
   });
 
@@ -127,7 +126,7 @@ test('extract-context step fails loudly when SWISS_KNIFE_ROOT does not hold the 
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-resolver-missing-'));
   const { result } = runStep({
     cwd: workDir,
-    env: { SWISS_KNIFE_ROOT: workDir, WORKFLOW_RUN_EVENT: '', INPUT_RUN_ID: '999' }
+    env: { SWISS_KNIFE_ROOT: workDir, WORKFLOW_RUN_EVENT: '' }
   });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /Cannot find module/);

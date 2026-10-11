@@ -183,8 +183,8 @@ Without the source in the publish job, the publisher warns and can't compute the
 | `artifact_name`               | `string`  | `github-pages`       | GitHub Pages artifact name                                                                                                                |
 | `environment`                 | `string`  | `github-pages`       | GitHub Pages deployment environment name                                                                                                  |
 | `mode`                        | `string`  | `artifact`           | `artifact` or trusted branch-backed `directory`                                                                                           |
-| `pages_branch`                | `string`  | `gh-pages`           | Pages branch used by directory mode                                                                                                       |
-| `target_directory`            | `string`  | `''`                 | Relative directory to replace; empty means the production root                                                                            |
+| `pages_branch`                | `string`  | `gh-pages`           | Reusable workflow only: Pages branch used by directory mode                                                                               |
+| `target_directory`            | `string`  | `''`                 | Reusable workflow only: relative directory to replace; empty means the production root                                                    |
 | `site_url`                    | `string`  | `''`                 | Canonical site URL used for deployment metadata                                                                                           |
 | `base_path`                   | `string`  | `''`                 | URL base path; derived from `target_directory` when empty                                                                                 |
 | `cname`                       | `string`  | `''`                 | Reusable workflow, directory mode: custom domain written as a single-line `CNAME` at the Pages branch root; ignored in artifact mode      |
@@ -193,7 +193,7 @@ Without the source in the publish job, the publisher warns and can't compute the
 | `preview_root`                | `string`  | `pr-preview`         | Root directory (on the Pages branch) under which PR previews are published, as `<preview_root>/pr-<number>`                               |
 | `preview_retention_days`      | `number`  | `30`                 | Days an _open_ PR's preview may remain before the janitor prunes it; closed-PR previews are always eligible for removal regardless of age |
 | `warning_days_before_cleanup` | `number`  | `3`                  | Days before cleanup to warn in the bot PR comment; `0` disables warnings                                                                  |
-| `managed_directories`         | `string`  | `''`                 | Comma-separated directories preserved during root publication in directory mode, besides the preview root (always kept)                   |
+| `managed_directories`         | `string`  | `''`                 | Reusable workflow only: comma-separated directories kept by a directory-mode root publish, besides the preview root (always kept)         |
 | `generate_badges`             | `boolean` | `true`               | Whether to automatically generate SVG/JSON component and story count badges                                                               |
 | `badges_directory`            | `string`  | `badges`             | Relative directory inside the static output where generated badges are hosted                                                             |
 | `test_results_path`           | `string`  | `''`                 | Optional repository-relative path to a JSON interaction test results file (for example, `.storybook/test-results.json`)                   |
