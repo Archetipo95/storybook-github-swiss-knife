@@ -41,3 +41,62 @@ test('the CLI fails a crashed capture and counts screenshots in the resolved sna
   assert.equal(run(1, snapshots).status, 0);
   assert.equal(run(0, 'missing').status, 0);
 });
+
+// A shard whose stories all fail to render on the base branch (a throwing global decorator, say)
+// writes no screenshot either. That is not a crash: those stories are reported as new on pull
+// requests, so the one that fixes them can go green (second audit #19). The run's JSON report
+// tells the two apart.
+const STORY_FAILURE = 'Story render or play function failed: TypeError: boom';
+const report = tests => ({
+  errors: [],
+  suites: [
+    {
+      specs: tests.map(([id, message]) => ({
+        title: id,
+        tests: [
+          {
+            status: message ? 'unexpected' : 'expected',
+            annotations: [{ type: 'story', description: id }],
+            results: [message ? { error: { message } } : {}]
+          }
+        ]
+      }))
+    }
+  ]
+});
+
+test('a baseline capture whose stories all failed to render is usable; a crash is not', () => {
+  const allStoriesFailed = report([
+    ['button--primary', STORY_FAILURE],
+    ['button--secondary', STORY_FAILURE]
+  ]);
+  assert.equal(baselineCaptureProblem({ status: 1, screenshots: 0, report: allStoriesFailed }), null);
+
+  // Other failures, run errors, or no test at all: the capture did not work.
+  for (const broken of [
+    report([['button--primary', 'page.goto: net::ERR_CONNECTION_REFUSED']]),
+    report([
+      ['button--primary', STORY_FAILURE],
+      ['button--secondary', 'browserType.launch: Executable does not exist']
+    ]),
+    { ...allStoriesFailed, errors: [{ message: 'Error: Cannot find module' }] },
+    report([]),
+    null
+  ]) {
+    assert.match(baselineCaptureProblem({ status: 1, screenshots: 0, report: broken }), /wrote no screenshot/);
+  }
+});
+
+test('the CLI reads the JSON report it is given', t => {
+  const project = fs.mkdtempSync(path.join(os.tmpdir(), 'sk-baseline-report-'));
+  t.after(() => fs.rmSync(project, { recursive: true, force: true }));
+  const reportFile = path.join(project, 'baseline-results.json');
+  const run = () =>
+    spawnSync('node', [script, '1', project, '.swiss-knife/snapshots', reportFile], { encoding: 'utf8' });
+  fs.writeFileSync(reportFile, JSON.stringify(report([['button--primary', STORY_FAILURE]])));
+  assert.equal(run().status, 0);
+  fs.writeFileSync(reportFile, JSON.stringify(report([['button--primary', 'page.goto: net::ERR_ABORTED']])));
+  assert.equal(run().status, 1);
+  fs.rmSync(reportFile);
+  assert.equal(run().status, 1, 'no report: as before');
+});
