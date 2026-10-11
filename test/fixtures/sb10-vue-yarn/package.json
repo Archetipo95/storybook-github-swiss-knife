@@ -4,6 +4,7 @@
   "type": "module",
   "packageManager": "yarn@4.18.1",
   "scripts": {
+    "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build --quiet --output-dir storybook-static"
   },
   "devDependencies": {

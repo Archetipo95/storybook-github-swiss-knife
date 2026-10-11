@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The default Yarn build ran the project's `storybook` script instead of the Storybook binary: `yarn storybook build`, in `visual.yml` and in the workflows `storybook-swiss-knife init` writes, runs a package.json script of that name first, and `storybook init` adds one (`storybook dev -p 6006`), so the build started a dev server and never finished. Yarn 2+ now builds with `corepack yarn run -B storybook build` (binaries only) and Yarn 1 with `npx --no-install storybook build`. `visual.yml` also tells Yarn 1 from Yarn 2+ (`.yarnrc.yml`, or `packageManager: yarn@2` and up) for its default install, which ran Yarn 2's `install --immutable` on Yarn 1 projects; Yarn 1 gets `yarn install --frozen-lockfile`, as `init` and the deploy workflows already did. The fixtures now carry the `storybook` script, and their base build runs `init`'s default command.
+
 ## [0.5.1] - 2026-10-11
 
 ### Changed

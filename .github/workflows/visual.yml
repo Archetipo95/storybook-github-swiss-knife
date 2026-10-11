@@ -178,9 +178,16 @@ jobs:
           }
           lockdir=.
           if ! has_lockfile . && has_lockfile "$GITHUB_WORKSPACE"; then lockdir="$GITHUB_WORKSPACE"; fi
+          # Yarn 2+ has .yarnrc.yml or declares itself in packageManager; a bare yarn.lock is Yarn 1.
+          yarn_berry() {
+            [ -f "$lockdir/.yarnrc.yml" ] ||
+              node -e 'process.exit(/^yarn@([2-9]|\d{2,})/.test(require(process.argv[1]).packageManager || "") ? 0 : 1)' \
+                "$(cd "$lockdir" && pwd)/package.json" 2>/dev/null
+          }
           if [ -z "$INSTALL_COMMAND" ]; then
             if [ -f "$lockdir/pnpm-lock.yaml" ]; then INSTALL_COMMAND='corepack pnpm install --frozen-lockfile'
-            elif [ -f "$lockdir/yarn.lock" ]; then INSTALL_COMMAND='corepack yarn install --immutable'
+            elif [ -f "$lockdir/yarn.lock" ] && yarn_berry; then INSTALL_COMMAND='corepack yarn install --immutable'
+            elif [ -f "$lockdir/yarn.lock" ]; then INSTALL_COMMAND='yarn install --frozen-lockfile'
             elif [ -f "$lockdir/bun.lock" ] || [ -f "$lockdir/bun.lockb" ]; then INSTALL_COMMAND='bun install --frozen-lockfile'
             else INSTALL_COMMAND='npm ci'
             fi
@@ -189,7 +196,8 @@ jobs:
           eval "$INSTALL_COMMAND"
           if [ -z "$BUILD_COMMAND" ]; then
             if [ -f "$lockdir/pnpm-lock.yaml" ]; then BUILD_COMMAND='corepack pnpm exec storybook build --quiet --output-dir "$STORYBOOK_DIR"'
-            elif [ -f "$lockdir/yarn.lock" ]; then BUILD_COMMAND='corepack yarn storybook build --quiet --output-dir "$STORYBOOK_DIR"'
+            # The binary: `yarn storybook` would run a package.json `storybook` script (storybook dev).
+            elif [ -f "$lockdir/yarn.lock" ] && yarn_berry; then BUILD_COMMAND='corepack yarn run -B storybook build --quiet --output-dir "$STORYBOOK_DIR"'
             else BUILD_COMMAND='npx --no-install storybook build --quiet --output-dir "$STORYBOOK_DIR"'
             fi
           fi
@@ -240,9 +248,16 @@ jobs:
           }
           lockdir=.
           if ! has_lockfile . && has_lockfile "$GITHUB_WORKSPACE"; then lockdir="$GITHUB_WORKSPACE"; fi
+          # Yarn 2+ has .yarnrc.yml or declares itself in packageManager; a bare yarn.lock is Yarn 1.
+          yarn_berry() {
+            [ -f "$lockdir/.yarnrc.yml" ] ||
+              node -e 'process.exit(/^yarn@([2-9]|\d{2,})/.test(require(process.argv[1]).packageManager || "") ? 0 : 1)' \
+                "$(cd "$lockdir" && pwd)/package.json" 2>/dev/null
+          }
           if [ -z "$INSTALL_COMMAND" ]; then
             if [ -f "$lockdir/pnpm-lock.yaml" ]; then INSTALL_COMMAND='corepack pnpm install --frozen-lockfile'
-            elif [ -f "$lockdir/yarn.lock" ]; then INSTALL_COMMAND='corepack yarn install --immutable'
+            elif [ -f "$lockdir/yarn.lock" ] && yarn_berry; then INSTALL_COMMAND='corepack yarn install --immutable'
+            elif [ -f "$lockdir/yarn.lock" ]; then INSTALL_COMMAND='yarn install --frozen-lockfile'
             elif [ -f "$lockdir/bun.lock" ] || [ -f "$lockdir/bun.lockb" ]; then INSTALL_COMMAND='bun install --frozen-lockfile'
             else INSTALL_COMMAND='npm ci'
             fi
@@ -251,7 +266,8 @@ jobs:
           eval "$INSTALL_COMMAND"
           if [ -z "$BUILD_COMMAND" ]; then
             if [ -f "$lockdir/pnpm-lock.yaml" ]; then BUILD_COMMAND='corepack pnpm exec storybook build --quiet --output-dir "$STORYBOOK_DIR"'
-            elif [ -f "$lockdir/yarn.lock" ]; then BUILD_COMMAND='corepack yarn storybook build --quiet --output-dir "$STORYBOOK_DIR"'
+            # The binary: `yarn storybook` would run a package.json `storybook` script (storybook dev).
+            elif [ -f "$lockdir/yarn.lock" ] && yarn_berry; then BUILD_COMMAND='corepack yarn run -B storybook build --quiet --output-dir "$STORYBOOK_DIR"'
             else BUILD_COMMAND='npx --no-install storybook build --quiet --output-dir "$STORYBOOK_DIR"'
             fi
           fi

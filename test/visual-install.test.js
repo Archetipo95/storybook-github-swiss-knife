@@ -34,7 +34,7 @@ function runInstall(t, files, workingDirectory, { buildCommand } = {}) {
   const bin = path.join(workspace, '.stub-bin');
   const log = path.join(workspace, '.stub-calls');
   fs.mkdirSync(bin);
-  for (const tool of ['corepack', 'npm', 'bun']) {
+  for (const tool of ['corepack', 'npm', 'npx', 'yarn', 'bun']) {
     // A build (`--output-dir <dir>`) leaves the index.json the step checks for.
     fs.writeFileSync(
       path.join(bin, tool),
@@ -74,7 +74,7 @@ test('a package with its own lockfile, or a repository without one, installs in 
     ['<workspace>/apps/ui npm ci']
   );
   assert.deepEqual(runInstall(t, { 'apps/ui/package.json': '{}' }, 'apps/ui'), ['<workspace>/apps/ui npm ci']);
-  assert.deepEqual(runInstall(t, { 'package.json': '{}', 'yarn.lock': '' }, '.'), [
+  assert.deepEqual(runInstall(t, { 'package.json': '{}', 'yarn.lock': '', '.yarnrc.yml': '' }, '.'), [
     '<workspace> corepack yarn install --immutable'
   ]);
 });
@@ -85,8 +85,32 @@ test('the default build follows the same lockfile and runs in the package', t =>
     '<workspace> corepack pnpm install --frozen-lockfile',
     '<workspace>/apps/ui corepack pnpm exec storybook build --quiet --output-dir storybook-static'
   ]);
-  assert.deepEqual(runInstall(t, { ...files, 'yarn.lock': '' }, 'apps/ui', { buildCommand: '' }), [
+  assert.deepEqual(runInstall(t, { ...files, 'yarn.lock': '', '.yarnrc.yml': '' }, 'apps/ui', { buildCommand: '' }), [
     '<workspace> corepack yarn install --immutable',
-    '<workspace>/apps/ui corepack yarn storybook build --quiet --output-dir storybook-static'
+    '<workspace>/apps/ui corepack yarn run -B storybook build --quiet --output-dir storybook-static'
   ]);
+});
+
+// `yarn storybook build` runs a package.json `storybook` script first (`storybook init` adds
+// `storybook dev -p 6006`), so the default build runs the binary.
+test('the default Yarn build runs the Storybook binary: run -B on Yarn 2+, npx on Yarn 1', t => {
+  const withScript = JSON.stringify({ scripts: { storybook: 'storybook dev -p 6006' } });
+  const berry = JSON.stringify({ packageManager: 'yarn@4.18.1', scripts: { storybook: 'storybook dev -p 6006' } });
+  assert.deepEqual(runInstall(t, { 'package.json': berry, 'yarn.lock': '' }, '.', { buildCommand: '' }), [
+    '<workspace> corepack yarn install --immutable',
+    '<workspace> corepack yarn run -B storybook build --quiet --output-dir storybook-static'
+  ]);
+  assert.deepEqual(runInstall(t, { 'package.json': withScript, 'yarn.lock': '' }, '.', { buildCommand: '' }), [
+    '<workspace> yarn install --frozen-lockfile',
+    '<workspace> npx --no-install storybook build --quiet --output-dir storybook-static'
+  ]);
+  assert.deepEqual(
+    runInstall(t, { 'package.json': '{}', 'apps/ui/package.json': withScript, 'yarn.lock': '' }, 'apps/ui', {
+      buildCommand: ''
+    }),
+    [
+      '<workspace> yarn install --frozen-lockfile',
+      '<workspace>/apps/ui npx --no-install storybook build --quiet --output-dir storybook-static'
+    ]
+  );
 });
