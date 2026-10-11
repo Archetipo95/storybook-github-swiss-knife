@@ -204,3 +204,68 @@ test('the removed-stories check is never counted as a story, even when it skippe
   });
   assert.deepEqual([classified.tests.length, classified.skipped.length, classified.removed.length], [0, 0, 0]);
 });
+
+// Playwright 1.63's toHaveScreenshot message: header, comparator error, `Snapshot: <name>`, call log.
+const screenshotFailure = (id, { header = '', error }) => ({
+  title: id,
+  tests: [
+    {
+      status: 'unexpected',
+      annotations: [{ type: 'story', description: id }],
+      results: [
+        {
+          error: {
+            message: `Error: expect(page).toHaveScreenshot(expected) failed\n\n${header}  ${error}\n\n  Snapshot: ${id}.png\n\nCall log:\n  - Expect "toHaveScreenshot(${id}.png)" with timeout 5000ms\n`
+          },
+          attachments: [{ name: `${id}-expected.png` }, { name: `${id}-actual.png` }, { name: `${id}-diff.png` }]
+        }
+      ]
+    }
+  ]
+});
+
+test('a story whose name says closed or timeout is a reviewable change when its pixels differ', () => {
+  const diff = '1234 pixels (ratio 0.01 of all image pixels) are different.';
+  const report = {
+    suites: [
+      {
+        specs: [
+          screenshotFailure('accordion--closed', { error: diff }),
+          screenshotFailure('toast--timeout', { error: diff }),
+          screenshotFailure('dialog--has-been-closed', {
+            error: 'Expected an image 10px by 10px, received 12px by 10px.'
+          })
+        ]
+      }
+    ]
+  };
+  const classified = classifyVisualResults(report);
+  assert.deepEqual(ids(classified.changed), ['accordion--closed', 'dialog--has-been-closed', 'toast--timeout']);
+  assert.deepEqual(classified.broken, []);
+});
+
+test("Playwright's timeout and closed-page failures stay render errors, whatever the story is called", () => {
+  const report = {
+    suites: [
+      {
+        specs: [
+          // Timed out after an unstable comparison: the header carries `Timeout: <n>ms`.
+          screenshotFailure('card--stable', {
+            header: 'Timeout: 5000ms\n',
+            error: 'Failed to take two consecutive stable screenshots.'
+          }),
+          screenshotFailure('card--waits', { header: 'Timeout: 5000ms\n', error: 'Timeout 5000ms exceeded.' }),
+          screenshotFailure('card--gone', { error: 'Target page, context or browser has been closed' }),
+          // A pixel difference reported with a timeout is still a timeout.
+          screenshotFailure('card--late', {
+            header: 'Timeout: 5000ms\n',
+            error: '12 pixels (ratio 0.01 of all image pixels) are different.'
+          })
+        ]
+      }
+    ]
+  };
+  const classified = classifyVisualResults(report);
+  assert.deepEqual(classified.changed, []);
+  assert.deepEqual(ids(classified.broken), ['card--gone', 'card--late', 'card--stable', 'card--waits']);
+});

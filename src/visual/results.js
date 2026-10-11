@@ -11,6 +11,10 @@ export const STORY_FAILURE_PREFIX = 'Story render or play function failed';
 // toHaveScreenshot is an operational failure and must stay blocking.
 const PIXEL_DIFF =
   /\d+ pixels \(ratio [\d.]+ of all image pixels\) are different|Expected an image \d+px by \d+px, received \d+px by \d+px/;
+// Playwright's own wording for a comparison that never finished: the matcher's timeout (in the
+// error, or the `Timeout: <n>ms` line of the header) or a closed page. The phrases, not the bare
+// words: the message also names the snapshot, as in `Snapshot: accordion--closed.png`.
+const UNFINISHED = /Timeout \d+ms exceeded|^\s*Timeout: \d+ms\s*$|has been closed|page has closed/im;
 
 const collectTests = suite => [
   ...(suite.specs ?? []).flatMap(spec => spec.tests.map(test => ({ title: spec.title, ...test }))),
@@ -29,7 +33,7 @@ function isScreenshotDiff(test) {
   return (
     headline.includes('toHaveScreenshot') &&
     PIXEL_DIFF.test(headline) &&
-    !/timeout|closed/i.test(headline) &&
+    !UNFINISHED.test(headline) &&
     (result?.attachments ?? []).some(({ name }) => name.endsWith('-diff.png'))
   );
 }
