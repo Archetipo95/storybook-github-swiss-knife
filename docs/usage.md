@@ -271,11 +271,11 @@ Set `cache: false` to disable all reusable-workflow caches, or set `cache_key_pr
 
 ### Outputs
 
-| Output          | Description                                               |
-| --------------- | --------------------------------------------------------- |
-| `page_url`      | The URL of the published GitHub Pages site                |
-| `status`        | Status of the deployment (`success`, `skipped`, `failed`) |
-| `deployment_id` | The GitHub Pages deployment ID                            |
+| Output          | Description                                                                                                                                                                                 |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `page_url`      | The URL of the published GitHub Pages site                                                                                                                                                  |
+| `status`        | `success`, `skipped` (`publish: 'false'`) or `failed` (an earlier step failed: read it from a step that still runs, such as `if: always()`, or with `continue-on-error: true` on this step) |
+| `deployment_id` | The GitHub Pages deployment ID                                                                                                                                                              |
 
 ---
 
