@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-11
+
 ### Removed
 
 - **Breaking: three composite action inputs and one `pr-preview-publish.yml` input are removed** (minor release): no step of the action used its three, and the workflow's repeated its event. To migrate:
