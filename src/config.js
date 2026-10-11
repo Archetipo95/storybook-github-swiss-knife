@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import { loadSwissKnifeConfig } from './swiss-knife-config.js';
 import { normalizeCname } from './cname.js';
+import { detectPackageManager } from '../packages/addon/cli/package-manager.js';
 
 export const DEFAULT_CONFIG = {
   version: 1,
@@ -409,13 +410,15 @@ export function loadConfigFile(filePath) {
 /**
  * Resolves each setting from the inputs (when non-empty), then the config file, then the defaults.
  * `defaults` replaces DEFAULT_CONFIG values for one caller (the reusable workflows create
- * deployments by default; the composite action does not).
+ * deployments by default; the composite action does not). `package_manager` set by neither comes
+ * from the lockfile in `projectDir` when the caller supports that manager.
  */
 export function resolveConfiguration({
   inputs = {},
   configFilePath,
   allowedPackageManagers = ALLOWED_PACKAGE_MANAGERS,
-  defaults = {}
+  defaults = {},
+  projectDir = process.cwd()
 } = {}) {
   const fallback = { ...DEFAULT_CONFIG, ...defaults };
   let fileConfig = null;
@@ -427,7 +430,14 @@ export function resolveConfiguration({
     if (process.env.GITHUB_ACTIONS === 'true') warnings.forEach(warning => console.warn(`::warning::${warning}`));
   }
 
-  const packageManager = inputs.package_manager || fileConfig?.package_manager || fallback.package_manager;
+  // A pnpm or Yarn repository that sets no package_manager would otherwise get the npm default
+  // install, which fails on its lockfile (workspace: protocols, for one). An explicit setting is
+  // never overridden.
+  const lockfileManager = detectPackageManager(projectDir).replace(/^yarn-classic$/, 'yarn');
+  const packageManager =
+    inputs.package_manager ||
+    fileConfig?.package_manager ||
+    (allowedPackageManagers.has(lockfileManager) ? lockfileManager : fallback.package_manager);
   const defaultBuild = packageManager === 'bun' ? BUN_DEFAULT_BUILD : fallback.build;
   const merged = {
     version: fileConfig?.version ?? fallback.version,

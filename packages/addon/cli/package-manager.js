@@ -15,11 +15,18 @@ const LOCKFILES = [
 
 /** The package manager from the project's lockfile (the repository root is checked too). */
 export function detectPackageManager(projectDir, rootDir = projectDir) {
-  for (const dir of new Set([projectDir, rootDir])) {
-    const found = LOCKFILES.find(([file]) => fs.existsSync(path.join(dir, file)));
-    if (found) return found[1] === 'yarn' && isYarnClassic(dir) ? 'yarn-classic' : found[1];
-  }
-  return 'npm';
+  const dir = lockfileDirectory(projectDir, rootDir);
+  if (!dir) return 'npm';
+  const [, manager] = LOCKFILES.find(([file]) => fs.existsSync(path.join(dir, file)));
+  return manager === 'yarn' && isYarnClassic(dir) ? 'yarn-classic' : manager;
+}
+
+/** The directory, of the project's and the repository root, that holds a lockfile; null if none. */
+export function lockfileDirectory(projectDir, rootDir = projectDir) {
+  return (
+    [...new Set([projectDir, rootDir])].find(dir => LOCKFILES.some(([file]) => fs.existsSync(path.join(dir, file)))) ??
+    null
+  );
 }
 
 /** The lockfile `packageManager` ('npm', 'pnpm', 'yarn' or 'bun') reads in `dir`, or null. */

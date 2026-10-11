@@ -171,7 +171,7 @@ Without the source in the publish job, the publisher warns and can't compute the
 | Input                         | Type      | Default              | Description                                                                                                                               |
 | ----------------------------- | --------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `path`                        | `string`  | `storybook-static`   | Path to the directory containing built static Storybook files                                                                             |
-| `package_manager`             | `string`  | `npm`                | Reusable workflow: `npm`, `yarn`, `pnpm`, or `bun`; composite action: `npm`, `yarn`, or `pnpm`                                            |
+| `package_manager`             | `string`  | lockfile, else `npm` | Reusable workflow: `npm`, `yarn`, `pnpm`, or `bun`; composite action: `npm`, `yarn`, or `pnpm`                                            |
 | `cache`                       | `boolean` | `true`               | Reusable workflow only: restore and save dependency plus Storybook compilation caches in its read-only build job                          |
 | `cache_key_prefix`            | `string`  | `storybook-gh-pages` | Reusable workflow only: prefix for Bun and Storybook compilation cache keys                                                               |
 | `checkout`                    | `string`  | `'true'`             | Whether to check out the repository automatically (Action only)                                                                           |
@@ -237,7 +237,9 @@ directory for the run. Story globs are matched against `stories.json` or
 
 `build_command` runs your Storybook build. When `install_command` is empty, the
 dependencies are installed first, with the command for `package_manager` and
-the project's lockfile:
+the project's lockfile. A `package_manager` that neither the input nor the
+configuration file sets comes from the lockfile (`pnpm-lock.yaml`, `yarn.lock`,
+`bun.lock`; the composite action does not run Bun), else `npm`:
 
 | `package_manager`                                                  | With a lockfile                           | Without one                                  |
 | ------------------------------------------------------------------ | ----------------------------------------- | -------------------------------------------- |

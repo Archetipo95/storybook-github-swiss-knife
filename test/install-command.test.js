@@ -1,10 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import { COMPOSITE_PACKAGE_MANAGERS, resolveConfiguration } from '../src/config.js';
 import { defaultInstallCommand, resolveInstallCommand } from '../src/install-command.js';
+import { compositeInputDefaults, parseCommandFile, stepRun } from './helpers/workflow-step.js';
 
 function project(t, files) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sk-install-'));
@@ -111,4 +114,66 @@ test('resolveInstallCommand: no package.json (a monorepo building in a subfolder
   // An explicit install command still runs.
   const explicit = resolveInstallCommand({ installCommand: 'npm ci --prefix apps/ui', buildCommand: build, dir });
   assert.deepEqual(explicit, { command: 'npm ci --prefix apps/ui', warning: '', notice: '' });
+});
+
+// A pnpm or Yarn repository that sets no package_manager, with a build command (since 0.3.0 the
+// default install runs before it): the default comes from its lockfile, not npm's.
+const configured = (dir, inputs = {}, options = {}) =>
+  resolveConfiguration({ inputs, configFilePath: path.join(dir, '.storybook-pages.yml'), projectDir: dir, ...options });
+const installFor = (dir, packageManager) =>
+  resolveInstallCommand({ buildCommand: 'storybook build', packageManager, dir }).command;
+
+test('an unset package_manager comes from the lockfile, and so does the default install', t => {
+  const cases = [
+    [{ 'pnpm-lock.yaml': '' }, 'pnpm', 'corepack pnpm install --frozen-lockfile'],
+    [{ 'yarn.lock': '' }, 'yarn', 'yarn install --frozen-lockfile'],
+    [{ 'yarn.lock': '', '.yarnrc.yml': '' }, 'yarn', 'corepack yarn install --immutable'],
+    [{ 'bun.lock': '' }, 'bun', 'bun install --frozen-lockfile'],
+    [{ 'package-lock.json': '{}' }, 'npm', 'npm ci'],
+    [{}, 'npm', 'npm install']
+  ];
+  for (const [files, manager, command] of cases) {
+    const dir = project(t, { ...PACKAGE, ...files });
+    const label = Object.keys(files).join(', ') || 'no lockfile';
+    assert.equal(configured(dir).package_manager, manager, label);
+    assert.equal(installFor(dir, manager), command, label);
+  }
+});
+
+test('an explicit package_manager, from the input or the config file, is never overridden by the lockfile', t => {
+  const dir = project(t, { ...PACKAGE, 'pnpm-lock.yaml': '' });
+  assert.equal(configured(dir, { package_manager: 'npm' }).package_manager, 'npm');
+  fs.writeFileSync(path.join(dir, '.storybook-pages.yml'), 'package_manager: yarn\n');
+  assert.equal(configured(dir).package_manager, 'yarn');
+  assert.equal(configured(dir, { package_manager: 'npm' }).package_manager, 'npm');
+});
+
+test('a lockfile of a manager the caller does not support keeps the default (the composite action and bun)', t => {
+  const dir = project(t, { ...PACKAGE, 'bun.lock': '' });
+  assert.equal(configured(dir, {}, { allowedPackageManagers: COMPOSITE_PACKAGE_MANAGERS }).package_manager, 'npm');
+});
+
+test("the composite action's configuration step installs a pnpm project with pnpm", t => {
+  const dir = project(t, {
+    ...PACKAGE,
+    'pnpm-lock.yaml': '',
+    '.storybook-pages.yml': "build:\n  build_command: 'storybook build'\n"
+  });
+  const envFile = path.join(dir, 'github-env');
+  fs.writeFileSync(envFile, '');
+  execFileSync('bash', ['-c', stepRun('action.yml', 'Resolve and validate configuration')], {
+    cwd: dir,
+    env: {
+      ...process.env,
+      GITHUB_ACTION_PATH: process.cwd(),
+      GITHUB_ENV: envFile,
+      CONFIG_INPUTS: JSON.stringify(compositeInputDefaults()),
+      PUBLISH_INPUT: 'false',
+      ARTIFACT_NAME_INPUT: ''
+    },
+    stdio: 'pipe'
+  });
+  const env = parseCommandFile(fs.readFileSync(envFile, 'utf8'));
+  assert.equal(env.SB_PACKAGE_MANAGER, 'pnpm');
+  assert.equal(env.SB_INSTALL_COMMAND, 'corepack pnpm install --frozen-lockfile');
 });
