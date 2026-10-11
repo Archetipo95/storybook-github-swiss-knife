@@ -55,3 +55,51 @@ export function parseCommandFile(text) {
   }
   return values;
 }
+
+/** The `if:` expression of the step named `name`, without `${{ }}`. */
+export function stepIf(file, name) {
+  const lines = fs.readFileSync(path.join(process.cwd(), file), 'utf8').split('\n');
+  const start = lines.findIndex(line => line.trim() === `- name: ${name}`);
+  assert.notEqual(start, -1, `${file} has no step "${name}"`);
+  const indent = lines[start].indexOf('-') + 2;
+  for (const line of lines.slice(start + 1)) {
+    if (line.trim() && line.search(/\S/) < indent) break;
+    const match = /^\s*if: (.*)$/.exec(line);
+    if (match && line.search(/\S/) === indent) return match[1].replace(/^\$\{\{\s*(.*?)\s*\}\}$/, '$1');
+  }
+  return null;
+}
+
+/**
+ * Evaluates a step condition made of `env.X` / `inputs.x` lookups, string literals, `==`, `!=`,
+ * `&&`, `||`, `!` and parentheses, the way the runner compares strings. Anything else throws.
+ */
+export function evaluateIf(expression, { env = {}, inputs = {} } = {}) {
+  const values = [];
+  const skeleton = expression
+    .replace(/'((?:[^']|'')*)'/g, (_, text) => `\u0000${values.push(text.replaceAll("''", "'")) - 1}\u0000`)
+    .replace(/\b(env|inputs)\.([A-Za-z_][\w-]*)/g, (_, scope, name) => {
+      const value = (scope === 'env' ? env : inputs)[name];
+      return `\u0000${values.push(value === undefined ? '' : String(value)) - 1}\u0000`;
+    });
+  assert.match(skeleton, /^(?:\s|\u0000\d+\u0000|==|!=|&&|\|\||!|\(|\))*$/, `unsupported condition: ${expression}`);
+  const js = skeleton
+    .replace(/\u0000(\d+)\u0000/g, (_, index) => JSON.stringify(values[Number(index)].toLowerCase()))
+    .replace(/!=/g, '!==')
+    .replace(/(^|[^!=])==/g, '$1===');
+  return Boolean(new Function(`return (${js});`)());
+}
+
+/** What a composite action's steps get from `toJSON(inputs)` when the caller sets nothing. */
+export function compositeInputDefaults(file = 'action.yml') {
+  const action = fs.readFileSync(path.join(process.cwd(), file), 'utf8');
+  const inputs = {};
+  let current;
+  for (const line of action.slice(action.indexOf('\ninputs:\n'), action.indexOf('\noutputs:\n')).split('\n')) {
+    const name = /^ {2}(\w+):$/.exec(line);
+    if (name) inputs[(current = name[1])] = '';
+    const value = /^ {4}default: '(.*)'$/.exec(line);
+    if (value && current) inputs[current] = value[1];
+  }
+  return inputs;
+}

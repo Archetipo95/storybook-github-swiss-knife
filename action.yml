@@ -286,8 +286,16 @@ runs:
         WORKSPACE_ROOT: ${{ github.workspace }}
       run: node "$GITHUB_ACTION_PATH/src/validate-artifact.js" "$SB_PATH" "$WORKSPACE_ROOT"
 
+    # A build-only run (publish: 'false', typically a pull request without secrets) has no hash
+    # to gate with; whatever publishes its output must inject the gate. A publishing run without
+    # a hash still fails in the inject step.
+    - name: Skip the passcode gate on a build-only run without a hash
+      if: ${{ env.SB_ENABLE_PASSCODE_GATE == 'true' && env.SB_PUBLISH != 'true' && inputs.passcode_hash == '' }}
+      shell: bash
+      run: echo "::notice::enable_passcode_gate is on, but this build-only run (publish 'false') has no passcode_hash, so the passcode gate is not injected. Whatever publishes this output must inject it."
+
     - name: Inject Storybook passcode gate
-      if: ${{ env.SB_ENABLE_PASSCODE_GATE == 'true' }}
+      if: ${{ env.SB_ENABLE_PASSCODE_GATE == 'true' && (env.SB_PUBLISH == 'true' || inputs.passcode_hash != '') }}
       shell: bash
       env:
         SB_PATH: ${{ env.SB_PATH }}
