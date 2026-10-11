@@ -6,8 +6,8 @@ When `generate_badges` is enabled (default), `storybook-github-swiss-knife` anal
 - `badges/stories.svg` / `badges/stories.json` — Story count badge (e.g. `stories | 26`).
 - `badges/components.svg` / `badges/components.json` — Documented component count badge (e.g. `components | 6`).
 - `badges/storybook.svg` / `badges/storybook.json` — Storybook version badge (e.g. `storybook | v8.6.0` or `v10.0.0`).
-- `badges/status.svg` / `badges/status.json` — State-aware deployment status badge with commit SHA (e.g. `storybook | published • 8ba5315`, `storybook | building • 8ba5315` in yellow, or `storybook | failed • 8ba5315` in red).
-- `badges/build.svg` / `badges/build.json` — Build status badge (`build | passed • 8ba5315`, `build | building`, `build | failed`).
+- `badges/status.svg` / `badges/status.json` — Deployment status badge with commit SHA (`storybook | published • 8ba5315`).
+- `badges/build.svg` / `badges/build.json` — Build badge with commit SHA (`build | passed • 8ba5315`); a failed build publishes nothing, so there is no failed state.
 - `badges/tests.svg` / `badges/tests.json` — Optional interaction test badge (`tests | 546/546 passed`, or `tests | 3/546 failed`) when `test_results_path` points at a valid JSON results file.
 - `badges/overview.json` — Comprehensive metadata endpoint aggregating story count, component count, total components, coverage percentage, build status, commit details, and optional test totals.
 

@@ -295,58 +295,6 @@ test('generateBadges creates SVG badges and Shields.io JSON endpoints', () => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-test('generateBadges renders building state with yellow color', () => {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-badge-building-'));
-  const storiesData = {
-    v: 3,
-    stories: {
-      'button--primary': { id: 'button--primary', title: 'Components/Button' }
-    }
-  };
-  fs.writeFileSync(path.join(tmpDir, 'stories.json'), JSON.stringify(storiesData));
-
-  const _result = generateBadges({
-    staticDir: tmpDir,
-    workspaceRoot: tmpDir,
-    badgesDirectory: 'badges',
-    commitSha: 'fedcba987654',
-    buildState: 'building'
-  });
-
-  const badgesDir = path.join(tmpDir, 'badges');
-  const statusSvg = fs.readFileSync(path.join(badgesDir, 'status.svg'), 'utf8');
-  assert.match(statusSvg, /building • fedcba9/);
-  assert.match(statusSvg, /#dfb317/);
-
-  const buildJson = JSON.parse(fs.readFileSync(path.join(badgesDir, 'build.json'), 'utf8'));
-  assert.equal(buildJson.message, 'building • fedcba9');
-  assert.equal(buildJson.color, 'dfb317');
-
-  fs.rmSync(tmpDir, { recursive: true, force: true });
-});
-
-test('generateBadges renders failed state with red color', () => {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-badge-failed-'));
-  const _result = generateBadges({
-    staticDir: tmpDir,
-    workspaceRoot: tmpDir,
-    badgesDirectory: 'badges',
-    commitSha: 'fedcba987654',
-    buildState: 'failed'
-  });
-
-  const badgesDir = path.join(tmpDir, 'badges');
-  const statusSvg = fs.readFileSync(path.join(badgesDir, 'status.svg'), 'utf8');
-  assert.match(statusSvg, /failed • fedcba9/);
-  assert.match(statusSvg, /#e05d44/);
-
-  const buildJson = JSON.parse(fs.readFileSync(path.join(badgesDir, 'build.json'), 'utf8'));
-  assert.equal(buildJson.message, 'failed • fedcba9');
-  assert.equal(buildJson.color, 'e05d44');
-
-  fs.rmSync(tmpDir, { recursive: true, force: true });
-});
-
 test('generateBadges rejects path traversal in badgesDirectory', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-badge-sec-'));
   assert.throws(() => {

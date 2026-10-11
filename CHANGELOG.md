@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Badge generation is one table for the SVGs and the shields.io JSON endpoints, which were written out twice (about 190 lines less); a golden test pins every badge file byte for byte. The status and build badges' "building" and "failed" states are gone: no workflow ever set `SB_BUILD_STATE`, `SB_STATUS_STATE`, `SB_BUILD_MESSAGE` or `SB_STATUS_MESSAGE`, and a failed build publishes no badges, so they always read `published • <sha>` and `passed • <sha>`, as before.
+
 ### Fixed
 
 - The janitor never ran on a private repository's schedule: its job skipped scheduled runs of private repositories, a gate meant for this repository's own private phase, but in a called workflow `github.event` is the caller's. The gate is removed (this repository is public); a test keeps reusable workflows from gating on `github.event.repository.private`.
