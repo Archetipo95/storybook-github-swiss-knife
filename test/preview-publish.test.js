@@ -795,3 +795,43 @@ test('publishPreview reads and links the configured badges and stats directories
     global.fetch = originalFetch;
   }
 });
+
+// base_path is where the production Storybook is served; a preview is served from its own folder
+// (second audit #4). With base_path set, the preview's URL was the production site's.
+test('publishPreview reports the preview folder as its URL, whatever base_path the site sets', async () => {
+  const { bundleDir, metadata } = makeBundle();
+  const pagesRepo = initBarePagesRepo();
+  const originalFetch = global.fetch;
+  const posted = [];
+  global.fetch = async (url, options) => {
+    if (url.includes('/comments') && (!options || options.method === undefined || options.method === 'GET')) {
+      return { ok: true, status: 200, json: async () => [] };
+    }
+    if (url.includes('/comments') && options.method === 'POST') {
+      posted.push(options.body);
+      return { ok: true, status: 201, json: async () => ({ id: 1 }) };
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  };
+  try {
+    const result = await publishPreview({
+      bundleDir,
+      pagesRepo,
+      trustedContext: trustedContextFor(metadata),
+      currentHeadSha: SHA_A,
+      token: 'tok',
+      repository: 'octo/widgets',
+      siteUrl: 'https://octo.github.io/widgets',
+      basePath: '/storybook'
+    });
+    assert.equal(result.publishResult.url, 'https://octo.github.io/widgets/pr-preview/pr-42');
+    // The comment links the preview by its full URL, and to nothing under the production base path.
+    const { body } = JSON.parse(posted[0]);
+    const links = [...body.matchAll(/https:\/\/[^\s)"'\]]+/g)].map(match => new URL(match[0]));
+    assert.ok(links.some(link => link.href.replace(/\/$/, '') === 'https://octo.github.io/widgets/pr-preview/pr-42'));
+    assert.ok(links.every(link => !link.pathname.startsWith('/widgets/storybook')));
+    assert.ok(fs.existsSync(path.join(pagesRepo, 'pr-preview', 'pr-42', 'index.html')));
+  } finally {
+    global.fetch = originalFetch;
+  }
+});

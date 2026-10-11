@@ -3,6 +3,7 @@ import path from 'node:path';
 import {
   DEFAULT_CONFIG,
   normalizeManagedDirectories,
+  normalizeRelativeDirectory,
   resolveDeploymentTarget,
   validateConfig,
   validateRelativeDirectory
@@ -43,6 +44,8 @@ export async function replaceDirectory(
   { cname = '', preserveCname = true, preserveEntries = [], previewRoot = DEFAULT_CONFIG.preview_root } = {}
 ) {
   validateRelativeDirectory(targetDirectory, 'target_directory', { allowEmpty: true });
+  // `staging/` would put the staging and backup copies inside the target (EINVAL on the swap).
+  targetDirectory = normalizeRelativeDirectory(targetDirectory);
   for (const entry of preserveEntries) {
     if (!/^[A-Za-z0-9._-]+$/.test(entry) || entry === '.' || entry === '..') {
       throw new Error(`preserveEntries must be plain entry names, got "${entry}"`);

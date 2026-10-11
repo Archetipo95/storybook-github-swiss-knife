@@ -80,6 +80,17 @@ const BUN_DEFAULT_BUILD = {
   build_command: 'bun run build-storybook'
 };
 
+/** A relative directory without a leading `./` or trailing slashes; '' for the root. */
+export function normalizeRelativeDirectory(value) {
+  let directory = String(value ?? '').trim();
+  while (directory.startsWith('./')) directory = directory.slice(2);
+  // A loop, not /\/+$/: that regex backtracks polynomially on a long run of slashes.
+  let end = directory.length;
+  while (end > 0 && directory[end - 1] === '/') end -= 1;
+  directory = directory.slice(0, end);
+  return directory === '.' ? '' : directory;
+}
+
 export function validateRelativeDirectory(value, field = 'target_directory', { allowEmpty = false } = {}) {
   if (allowEmpty && (value === undefined || value === '' || value === '.' || value === './')) return true;
   if (typeof value !== 'string' || value.trim() === '') {
@@ -175,6 +186,16 @@ export function validateConfig(config, { allowedPackageManagers = ALLOWED_PACKAG
 
   if (config.preview_root !== undefined) {
     validateRelativeDirectory(config.preview_root, 'preview_root', { allowEmpty: true });
+  }
+  // A directory deploy replaces target_directory whole: previews inside it would go with every one.
+  if (config.mode === 'directory' && config.target_directory !== undefined && config.preview_root !== undefined) {
+    const target = normalizeRelativeDirectory(config.target_directory);
+    const previewRoot = normalizeRelativeDirectory(config.preview_root);
+    if (target && previewRoot && (previewRoot === target || previewRoot.startsWith(`${target}/`))) {
+      throw new Error(
+        `preview_root "${config.preview_root}" is inside target_directory "${config.target_directory}", which every directory deploy replaces. Put the previews outside it.`
+      );
+    }
   }
 
   if (config.preview_retention_days !== undefined) {
@@ -514,7 +535,7 @@ export function resolveBaseDirectoryForRef(
   const explicitDirectory = target_directory || environment || '';
   if (explicitDirectory !== '') {
     validateRelativeDirectory(explicitDirectory, 'target_directory', { allowEmpty: true });
-    return explicitDirectory === '.' || explicitDirectory === './' ? '' : explicitDirectory;
+    return normalizeRelativeDirectory(explicitDirectory);
   }
 
   if (!baseRef) {
@@ -532,7 +553,7 @@ export function resolveBaseDirectoryForRef(
   if (mapped !== undefined && mapped !== null) {
     const mappedDirectory = String(mapped).trim();
     validateRelativeDirectory(mappedDirectory, 'ref_to_directory', { allowEmpty: true });
-    return mappedDirectory === '.' || mappedDirectory === './' ? '' : mappedDirectory;
+    return normalizeRelativeDirectory(mappedDirectory);
   }
 
   const normalizedDefaultBranch = default_branch

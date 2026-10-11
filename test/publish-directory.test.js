@@ -273,3 +273,22 @@ test('normalizeManagedDirectories trims, drops ./ and trailing slashes, and dedu
   assert.deepEqual(normalizeManagedDirectories(undefined), []);
   assert.deepEqual(normalizeManagedDirectories(`pr-preview${'/'.repeat(50000)}`), ['pr-preview']);
 });
+
+// A target_directory with a trailing slash put the staging and backup copies inside the target, and
+// every directory deploy failed with EINVAL (second audit #17).
+test('replaceDirectory accepts a target directory written with a trailing slash', async () => {
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'pages-publish-slash-'));
+  const source = await fs.mkdtemp(path.join(os.tmpdir(), 'pages-source-slash-'));
+  try {
+    await fs.mkdir(path.join(repo, 'staging'), { recursive: true });
+    await fs.writeFile(path.join(repo, 'staging', 'old.html'), 'old');
+    await fs.writeFile(path.join(source, 'index.html'), 'new');
+    await replaceDirectory(repo, 'staging/', source);
+    assert.equal(await fs.readFile(path.join(repo, 'staging', 'index.html'), 'utf8'), 'new');
+    await assert.rejects(fs.readFile(path.join(repo, 'staging', 'old.html')));
+    assert.deepEqual((await fs.readdir(repo)).sort(), ['.nojekyll', 'staging']);
+  } finally {
+    await fs.rm(repo, { recursive: true, force: true });
+    await fs.rm(source, { recursive: true, force: true });
+  }
+});
