@@ -246,7 +246,7 @@ export function loadSwissKnifeConfig({ cwd = process.cwd() } = {}) {
     }
     if (legacyProblem) {
       warnings.push(
-        `${LEGACY_CONFIG_PATH} is ignored: ${legacyProblem}. Move its settings under "pages" in ${SWISS_KNIFE_CONFIG_PATH}.`
+        `${LEGACY_CONFIG_PATH} is ignored: ${legacyProblem}${legacyProblem.endsWith('.') ? '' : '.'} Move its settings under "pages" in ${SWISS_KNIFE_CONFIG_PATH}.`
       );
     } else if (legacyPages) {
       raw = { ...raw, pages: legacyPages };

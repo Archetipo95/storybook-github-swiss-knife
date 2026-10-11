@@ -206,4 +206,8 @@ test('a legacy file the loader rejects, next to a JSON file without pages, only 
   });
   assert.equal(invalid.pages, null);
   assert.match(invalid.warnings[0], /is ignored: Unsupported mode/);
+  // The validator's message ends with a period already: one sentence end, not two.
+  assert.doesNotMatch(invalid.warnings[0], /\.\./);
+  assert.match(invalid.warnings[0], /artifact, directory\. Move its settings under "pages"/);
+  assert.match(config.warnings[0], /is not allowed\. Move its settings/);
 });
