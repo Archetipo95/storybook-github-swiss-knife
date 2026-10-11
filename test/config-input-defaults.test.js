@@ -53,7 +53,8 @@ function callerDefaults(specs) {
   return Object.fromEntries(
     Object.entries(specs).map(([name, { type, default: value }]) => [
       name,
-      type === 'boolean' ? value === 'true' : type === 'number' ? Number(value) : (value ?? '')
+      // GitHub sends 0 for a number input without a default, and '' for a string one.
+      type === 'boolean' ? value === 'true' : type === 'number' ? Number(value ?? 0) : (value ?? '')
     ])
   );
 }
@@ -163,8 +164,17 @@ test('pr-preview-publish.yml: the config step gives the publisher resolved, non-
 
 // The defaults each caller's inputs had before they became '' (unset). With no input and no config
 // file, every caller must still resolve to them.
+const PREVIOUS_STRINGS = {
+  badges_directory: 'badges',
+  stats_directory: 'stats',
+  passcode_session_hours: 24,
+  smoke_test_stories: 'all',
+  smoke_test_timeout_ms: 30000,
+  artifact_name: 'github-pages'
+};
 const PREVIOUS_DEFAULTS = {
   'action.yml': {
+    ...PREVIOUS_STRINGS,
     create_deployment: false,
     generate_badges: true,
     generate_stats_graph: true,
@@ -174,6 +184,7 @@ const PREVIOUS_DEFAULTS = {
     audit_bundle_size: false
   },
   '.github/workflows/deploy-storybook.yml': {
+    ...PREVIOUS_STRINGS,
     create_deployment: true,
     preserve_cname: true,
     auto_base_url: true,
@@ -232,4 +243,119 @@ test('resolveConfiguration: caller defaults apply only when neither the input no
   assert.equal(explicit.create_deployment, false);
   // Other settings keep DEFAULT_CONFIG.
   assert.equal(resolveConfiguration({ inputs: {}, configFilePath: noFile, defaults }).smoke_test, false);
+});
+
+// The other settings the config file can set (second audit #16): their inputs used to default to the
+// real value, so the file never applied when an input was left out.
+const FILE_VALUES = {
+  artifact_name: 'file-artifact',
+  environment_name: 'file-environment',
+  badges_directory: 'file-badges',
+  stats_directory: 'file-stats',
+  passcode_session_hours: 12,
+  smoke_test_stories: 'button--primary',
+  smoke_test_timeout_ms: 5000
+};
+
+function valuesFile(t) {
+  const file = path.join(emptyProject(t), '.storybook-pages.yml');
+  fs.writeFileSync(
+    file,
+    Object.entries(FILE_VALUES)
+      .map(([key, value]) => `${key}: ${value}\n`)
+      .join('')
+  );
+  return file;
+}
+
+for (const [file, marker, names] of [
+  ['action.yml', 'inputs:', Object.keys(FILE_VALUES)],
+  [
+    '.github/workflows/deploy-storybook.yml',
+    '    inputs:',
+    Object.keys(FILE_VALUES).filter(name => name !== 'stats_directory')
+  ],
+  [
+    '.github/workflows/pr-preview-publish.yml',
+    '    inputs:',
+    ['badges_directory', 'stats_directory', 'passcode_session_hours']
+  ]
+]) {
+  test(`${file}: the config file's values win over input defaults`, t => {
+    const specs = inputSpecs(file, marker);
+    for (const name of names) assert.ok(specs[name], `${file} has no ${name} input`);
+    const resolved = resolveConfiguration({ inputs: callerDefaults(specs), configFilePath: valuesFile(t) });
+    for (const name of names) {
+      assert.equal(resolved[name], FILE_VALUES[name], `${name}: the input default overrode the config file`);
+    }
+  });
+}
+
+test('every caller passes the resolved values on, never the raw input', () => {
+  const action = fs.readFileSync('action.yml', 'utf8');
+  assert.match(action, /SB_ARTIFACT_NAME: c\.artifact_name \|\| "github-pages"/);
+  assert.doesNotMatch(action, /ARTIFACT_NAME_INPUT/);
+  const publish = fs.readFileSync('.github/workflows/pr-preview-publish.yml', 'utf8');
+  assert.match(publish, /\n\s+passcode_session_hours: \$\{\{ steps\.config\.outputs\.passcode_session_hours \}\}/);
+  // Only the configuration step reads them, to resolve them (an INPUT_* variable, or toJSON(inputs)).
+  for (const [file, names] of [
+    ['action.yml', Object.keys(FILE_VALUES)],
+    ['.github/workflows/deploy-storybook.yml', Object.keys(FILE_VALUES)],
+    // There, artifact_name is the preview build's artifact, not a Pages setting.
+    ['.github/workflows/pr-preview-publish.yml', ['badges_directory', 'stats_directory', 'passcode_session_hours']]
+  ]) {
+    for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+      for (const name of names) {
+        if (!new RegExp(`inputs\\.${name}\\b`).test(line)) continue;
+        assert.match(
+          line,
+          new RegExp(`^\\s+INPUT_[A-Z_]+: \\$\\{\\{ inputs\\.${name} \\}\\}$`),
+          `${file} reads inputs.${name} directly: ${line.trim()}`
+        );
+      }
+    }
+  }
+});
+
+test('pr-preview-publish.yml: the config step resolves the passcode session hours', t => {
+  const file = '.github/workflows/pr-preview-publish.yml';
+  const script = stepScript(file, 'Resolve trusted base configuration');
+  const project = path.dirname(valuesFile(t));
+  const run = env =>
+    Object.fromEntries(
+      execFileSync('node', ['-e', script], {
+        cwd: project,
+        env: { ...process.env, SWISS_KNIFE_ROOT: process.cwd(), ...env },
+        encoding: 'utf8'
+      })
+        .trim()
+        .split('\n')
+        .map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)])
+    );
+  // GitHub sends 0 for the omitted number input.
+  assert.equal(run({ INPUT_PASSCODE_SESSION_HOURS: '0' }).passcode_session_hours, '12');
+  assert.equal(run({ INPUT_PASSCODE_SESSION_HOURS: '6' }).passcode_session_hours, '6');
+});
+
+test('passcode.expiryHours in swiss-knife.json is the session length when pages does not set one', t => {
+  const project = emptyProject(t);
+  fs.mkdirSync(path.join(project, '.storybook'));
+  const write = config => fs.writeFileSync(path.join(project, '.storybook/swiss-knife.json'), JSON.stringify(config));
+  const resolve = inputs => {
+    const previous = process.cwd();
+    process.chdir(project);
+    try {
+      return resolveConfiguration({ inputs }).passcode_session_hours;
+    } finally {
+      process.chdir(previous);
+    }
+  };
+  write({ passcode: { expiryHours: 8 } });
+  assert.equal(resolve({}), 8);
+  assert.equal(resolve({ passcode_session_hours: 0 }), 8);
+  assert.equal(resolve({ passcode_session_hours: '3' }), 3);
+  write({ pages: { passcode_session_hours: 5 }, passcode: { expiryHours: 8 } });
+  assert.equal(resolve({}), 5);
+  write({});
+  assert.equal(resolve({}), 24);
 });

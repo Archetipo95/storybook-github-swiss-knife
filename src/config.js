@@ -334,6 +334,9 @@ export function loadConfigFile(filePath) {
   return parsed;
 }
 
+/** A number input that is set: '' and the 0 an omitted reusable-workflow number input sends are not. */
+const numberInputSet = value => value !== undefined && value !== null && value !== '' && value !== 0;
+
 /**
  * Resolves each setting from the inputs (when non-empty), then the config file, then the defaults.
  * `defaults` replaces DEFAULT_CONFIG values for one caller (the reusable workflows create
@@ -349,11 +352,14 @@ export function resolveConfiguration({
 } = {}) {
   const fallback = { ...DEFAULT_CONFIG, ...defaults };
   let fileConfig = null;
+  // swiss-knife.json's `passcode.expiryHours`: the session length when `pages` sets none.
+  let passcodeSection = null;
   if (configFilePath !== undefined) {
     if (fs.existsSync(configFilePath)) fileConfig = loadConfigFile(configFilePath);
   } else {
-    const { pages, warnings } = loadSwissKnifeConfig();
+    const { pages, passcode, warnings } = loadSwissKnifeConfig();
     fileConfig = pages;
+    passcodeSection = passcode;
     if (process.env.GITHUB_ACTIONS === 'true') warnings.forEach(warning => console.warn(`::warning::${warning}`));
   }
 
@@ -462,10 +468,11 @@ export function resolveConfiguration({
         : fileConfig?.enable_passcode_gate !== undefined
           ? Boolean(fileConfig.enable_passcode_gate)
           : fallback.enable_passcode_gate,
+    // The reusable workflows' number inputs send 0 when omitted.
     passcode_session_hours: Number(
-      inputs.passcode_session_hours !== undefined && inputs.passcode_session_hours !== ''
+      numberInputSet(inputs.passcode_session_hours)
         ? inputs.passcode_session_hours
-        : (fileConfig?.passcode_session_hours ?? fallback.passcode_session_hours)
+        : (fileConfig?.passcode_session_hours ?? passcodeSection?.expiryHours ?? fallback.passcode_session_hours)
     ),
     smoke_test:
       inputs.smoke_test !== undefined && inputs.smoke_test !== ''
@@ -478,7 +485,7 @@ export function resolveConfiguration({
         ? String(inputs.smoke_test_stories)
         : fileConfig?.smoke_test_stories || fallback.smoke_test_stories,
     smoke_test_timeout_ms: Number(
-      inputs.smoke_test_timeout_ms !== undefined && inputs.smoke_test_timeout_ms !== ''
+      numberInputSet(inputs.smoke_test_timeout_ms)
         ? inputs.smoke_test_timeout_ms
         : (fileConfig?.smoke_test_timeout_ms ?? fallback.smoke_test_timeout_ms)
     ),

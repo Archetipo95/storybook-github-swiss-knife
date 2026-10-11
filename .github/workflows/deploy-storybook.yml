@@ -34,25 +34,25 @@ on:
         type: string
         default: ''
       artifact_name:
-        description: 'GitHub Pages artifact name'
+        description: 'GitHub Pages artifact name (default: github-pages; empty uses the config file, then the default)'
         required: false
         type: string
-        default: 'github-pages'
+        default: ''
       environment:
-        description: 'GitHub Pages deployment environment name'
+        description: 'GitHub Pages deployment environment name (default: github-pages; empty uses the config file, then the default)'
         required: false
         type: string
-        default: 'github-pages'
+        default: ''
       create_deployment:
         description: 'Whether to create a native GitHub deployment record and status lifecycle for the Pages deployment (default: true; empty uses the config file, then the default)'
         required: false
         type: string
         default: ''
       environment_name:
-        description: 'GitHub deployment environment name for Pages/native deployment records'
+        description: 'GitHub deployment environment name for Pages/native deployment records (default: github-pages; empty uses the config file, then the default)'
         required: false
         type: string
-        default: 'github-pages'
+        default: ''
       environment_url:
         description: 'Explicit environment URL to expose on the deployment record'
         required: false
@@ -109,10 +109,10 @@ on:
         type: string
         default: ''
       badges_directory:
-        description: 'Directory within the static build output to store generated badges'
+        description: 'Directory within the static build output to store generated badges (default: badges; empty uses the config file, then the default)'
         required: false
         type: string
-        default: 'badges'
+        default: ''
       test_results_path:
         description: 'Optional repository-relative path to a JSON Storybook interaction test results file'
         required: false
@@ -124,25 +124,23 @@ on:
         type: string
         default: ''
       passcode_session_hours:
-        description: 'Hours before the browser session expires'
+        description: 'Hours before the browser session expires (default: 24; omitted or 0 uses the config file, then the default)'
         required: false
         type: number
-        default: 24
       smoke_test:
         description: 'Whether to run an opt-in Playwright smoke test before publishing (default: false; empty uses the config file, then the default)'
         required: false
         type: string
         default: ''
       smoke_test_stories:
-        description: 'Comma-separated story id globs to smoke test, or all'
+        description: 'Comma-separated story id globs to smoke test, or all (default: all; empty uses the config file, then the default)'
         required: false
         type: string
-        default: 'all'
+        default: ''
       smoke_test_timeout_ms:
-        description: 'Per-page Playwright navigation timeout in milliseconds'
+        description: 'Per-page Playwright navigation timeout in milliseconds (default: 30000; omitted or 0 uses the config file, then the default)'
         required: false
         type: number
-        default: 30000
       audit_bundle_size:
         description: 'Whether to audit static asset sizes and append a bundle size scorecard to the job summary (default: false; empty uses the config file, then the default)'
         required: false

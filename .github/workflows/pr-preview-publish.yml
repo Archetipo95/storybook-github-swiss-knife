@@ -112,10 +112,9 @@ on:
         type: string
         default: ''
       passcode_session_hours:
-        description: 'Hours before the browser session expires'
+        description: 'Hours before the browser session expires (default: 24; omitted or 0 uses the config file, then the default)'
         required: false
         type: number
-        default: 24
     secrets:
       passcode_hash:
         description: 'SHA-256 hash of the passcode used by the trusted publisher'
@@ -287,6 +286,7 @@ jobs:
           INPUT_STATS_DIRECTORY: ${{ inputs.stats_directory }}
           INPUT_BADGES_DIRECTORY: ${{ inputs.badges_directory }}
           INPUT_MANAGED_DIRECTORIES: ${{ inputs.managed_directories }}
+          INPUT_PASSCODE_SESSION_HOURS: ${{ inputs.passcode_session_hours }}
           REPOSITORY: ${{ github.repository }}
         run: |
           node -e '
@@ -301,7 +301,8 @@ jobs:
                 enable_passcode_gate: process.env.INPUT_ENABLE_PASSCODE_GATE,
                 stats_directory: process.env.INPUT_STATS_DIRECTORY,
                 badges_directory: process.env.INPUT_BADGES_DIRECTORY,
-                managed_directories: process.env.INPUT_MANAGED_DIRECTORIES
+                managed_directories: process.env.INPUT_MANAGED_DIRECTORIES,
+                passcode_session_hours: Number(process.env.INPUT_PASSCODE_SESSION_HOURS || 0)
               }, defaults: {create_deployment: true}});
               process.stdout.write(formatCommandFile({
                 preview_root: c.preview_root,
@@ -315,7 +316,8 @@ jobs:
                 enable_passcode_gate: Boolean(c.enable_passcode_gate),
                 stats_directory: c.stats_directory,
                 badges_directory: c.badges_directory,
-                managed_directories: Array.isArray(c.managed_directories) ? c.managed_directories.join(",") : c.managed_directories || ""
+                managed_directories: Array.isArray(c.managed_directories) ? c.managed_directories.join(",") : c.managed_directories || "",
+                passcode_session_hours: c.passcode_session_hours
               }));
             });
           ' >> "$GITHUB_OUTPUT"
@@ -398,7 +400,7 @@ jobs:
           environment_url: ${{ inputs.environment_url }}
           enable_passcode_gate: ${{ steps.config.outputs.enable_passcode_gate }}
           passcode_hash: ${{ secrets.passcode_hash }}
-          passcode_session_hours: ${{ inputs.passcode_session_hours }}
+          passcode_session_hours: ${{ steps.config.outputs.passcode_session_hours }}
           trusted_repository: ${{ github.repository }}
           trusted_run_id: ${{ needs.gate.outputs.run_id }}
           trusted_pr_number: ${{ needs.gate.outputs.pr_number }}
