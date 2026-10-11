@@ -127,7 +127,9 @@ export function buildCommentBody({
   hasBadges = false,
   hasStatsGraph = false,
   bundleReport = null,
-  baseBundleReport = null
+  baseBundleReport = null,
+  badgesDirectory = 'badges',
+  statsDirectory = 'stats'
 }) {
   if (typeof previewUrl !== 'string' || previewUrl === '') {
     throw new Error('previewUrl is required to build a preview comment body');
@@ -143,19 +145,20 @@ export function buildCommentBody({
   const runNote = runLink ? `[run ${runId}](${runLink})` : `run ${runId ?? 'unknown'}`;
   const cleanPreviewUrl = previewUrl.replace(/\/+$/, '');
   const vParam = `?v=${shortSha}`;
+  const [badgesPath, statsPath] = [badgesDirectory, statsDirectory].map(dir => String(dir).replace(/^\/+|\/+$/g, ''));
 
   const lines = [marker, '## 📖 Storybook preview', ''];
 
   // Badges row
   if (hasBadges || metrics) {
     const badges = [
-      `[![Coverage](${cleanPreviewUrl}/badges/coverage.svg${vParam})](${cleanPreviewUrl})`,
-      `[![Stories](${cleanPreviewUrl}/badges/stories.svg${vParam})](${cleanPreviewUrl})`,
-      `[![Components](${cleanPreviewUrl}/badges/components.svg${vParam})](${cleanPreviewUrl})`,
+      `[![Coverage](${cleanPreviewUrl}/${badgesPath}/coverage.svg${vParam})](${cleanPreviewUrl})`,
+      `[![Stories](${cleanPreviewUrl}/${badgesPath}/stories.svg${vParam})](${cleanPreviewUrl})`,
+      `[![Components](${cleanPreviewUrl}/${badgesPath}/components.svg${vParam})](${cleanPreviewUrl})`,
       ...(metrics && metrics.tests
-        ? [`[![Tests](${cleanPreviewUrl}/badges/tests.svg${vParam})](${cleanPreviewUrl})`]
+        ? [`[![Tests](${cleanPreviewUrl}/${badgesPath}/tests.svg${vParam})](${cleanPreviewUrl})`]
         : []),
-      `[![Status](${cleanPreviewUrl}/badges/status.svg${vParam})](${cleanPreviewUrl})`
+      `[![Status](${cleanPreviewUrl}/${badgesPath}/status.svg${vParam})](${cleanPreviewUrl})`
     ];
     lines.push(badges.join(' '), '');
   }
@@ -250,7 +253,7 @@ export function buildCommentBody({
       '<summary>📈 <b>Storybook Coverage & Growth Chart</b></summary>',
       '<br />',
       '',
-      `<img src="${cleanPreviewUrl}/stats/history.svg${vParam}" alt="Storybook Coverage History" width="100%" />`,
+      `<img src="${cleanPreviewUrl}/${statsPath}/history.svg${vParam}" alt="Storybook Coverage History" width="100%" />`,
       '',
       '</details>',
       ''

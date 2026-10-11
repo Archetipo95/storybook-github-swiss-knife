@@ -461,3 +461,8 @@ test('external workflow resolution: default empty input falls back to config fil
   });
   assert.equal(res6.preview_root, 'explicit-root');
 });
+
+test('the preview publisher passes the repository default branch to the publish script (#11)', () => {
+  const action = fs.readFileSync(path.join(process.cwd(), 'actions/preview-publisher/action.yml'), 'utf8');
+  assert.match(action, /\n\s+DEFAULT_BRANCH: \$\{\{ github\.event\.repository\.default_branch \}\}\n/);
+});

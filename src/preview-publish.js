@@ -88,7 +88,8 @@ export function resolveBaseMetricsPath({
   baseRef,
   targetDirectory = '',
   defaultBranch = 'main',
-  refToDirectory = {}
+  refToDirectory = {},
+  badgesDirectory = 'badges'
 } = {}) {
   if (!pagesRepo || typeof pagesRepo !== 'string') {
     throw new Error('pagesRepo is required to resolve the Pages base-metrics path');
@@ -101,8 +102,8 @@ export function resolveBaseMetricsPath({
   });
 
   return baseDirectory
-    ? path.join(pagesRepo, baseDirectory, 'badges', 'overview.json')
-    : path.join(pagesRepo, 'badges', 'overview.json');
+    ? path.join(pagesRepo, baseDirectory, badgesDirectory, 'overview.json')
+    : path.join(pagesRepo, badgesDirectory, 'overview.json');
 }
 
 export async function publishPreview({
@@ -119,6 +120,8 @@ export async function publishPreview({
   generateStatsGraph: generateStatsGraphEnabled = true,
   badgesDirectory = 'badges',
   statsDirectory = 'stats',
+  // The repository's default branch: a PR into it compares against the Pages root.
+  defaultBranch = 'main',
   enablePasscodeGate = false,
   passcodeHash = '',
   passcodeSessionHours = 24,
@@ -197,9 +200,11 @@ export async function publishPreview({
   }
 
   const baseRef = trustedContext?.baseRef ?? metadata.baseRef;
-  const baseDirectory = resolveBaseDirectoryForRef(baseRef, { default_branch: 'main' });
+  const baseDirectory = resolveBaseDirectoryForRef(baseRef, { default_branch: defaultBranch });
   const basePagesRepo = baseDirectory ? path.join(pagesRepo, baseDirectory) : pagesRepo;
-  const baseMetricsPath = pagesRepo ? resolveBaseMetricsPath({ pagesRepo, baseRef, defaultBranch: 'main' }) : null;
+  const baseMetricsPath = pagesRepo
+    ? resolveBaseMetricsPath({ pagesRepo, baseRef, defaultBranch, badgesDirectory })
+    : null;
 
   const audits = collectPreviewAudits({
     contentDir,
@@ -292,7 +297,7 @@ export async function publishPreview({
     try {
       // Extract preview metrics and badges if present
       let metrics = null;
-      const overviewPath = path.join(contentDir, 'badges', 'overview.json');
+      const overviewPath = path.join(contentDir, badgesDirectory, 'overview.json');
       if (fs.existsSync(overviewPath)) {
         try {
           metrics = JSON.parse(fs.readFileSync(overviewPath, 'utf8'));
@@ -313,9 +318,9 @@ export async function publishPreview({
       }
 
       const hasBadges =
-        fs.existsSync(path.join(contentDir, 'badges', 'coverage.svg')) ||
-        fs.existsSync(path.join(contentDir, 'badges', 'status.svg'));
-      const hasStatsGraph = fs.existsSync(path.join(contentDir, 'stats', 'history.svg'));
+        fs.existsSync(path.join(contentDir, badgesDirectory, 'coverage.svg')) ||
+        fs.existsSync(path.join(contentDir, badgesDirectory, 'status.svg'));
+      const hasStatsGraph = fs.existsSync(path.join(contentDir, statsDirectory, 'history.svg'));
 
       const body = buildCommentBody({
         prNumber: metadata.prNumber,
@@ -327,6 +332,8 @@ export async function publishPreview({
         baseMetrics,
         hasBadges,
         hasStatsGraph,
+        badgesDirectory,
+        statsDirectory,
         ...audits
       });
       commentResult = await upsertPreviewComment({
@@ -387,6 +394,7 @@ if (process.argv[1] && process.argv[1].endsWith('preview-publish.js')) {
     generateStatsGraph: process.env.GENERATE_STATS_GRAPH !== 'false',
     badgesDirectory: process.env.SB_BADGES_DIRECTORY || 'badges',
     statsDirectory: process.env.SB_STATS_DIRECTORY || 'stats',
+    defaultBranch: process.env.DEFAULT_BRANCH || 'main',
     enablePasscodeGate: process.env.ENABLE_PASSCODE_GATE === 'true',
     passcodeHash: process.env.PASSCODE_HASH || '',
     passcodeSessionHours: process.env.PASSCODE_SESSION_HOURS || 24,

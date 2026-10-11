@@ -719,3 +719,79 @@ test('collectPreviewAudits never throws; a failed audit only drops the comment s
     fs.chmodSync(locked, 0o755);
   }
 });
+
+test('resolveBaseMetricsPath uses the repository default branch and the badges directory (#11, #12)', () => {
+  const pagesRepo = '/pages';
+  // A PR into "master" (the default branch) compares against the Pages root, not a master/ folder.
+  assert.equal(
+    resolveBaseMetricsPath({ pagesRepo, baseRef: 'master', defaultBranch: 'master', badgesDirectory: 'meta/badges' }),
+    path.join(pagesRepo, 'meta/badges', 'overview.json')
+  );
+  assert.equal(
+    resolveBaseMetricsPath({ pagesRepo, baseRef: 'release', defaultBranch: 'master' }),
+    path.join(pagesRepo, 'release', 'badges', 'overview.json')
+  );
+});
+
+test('publishPreview reads and links the configured badges and stats directories, against the default branch (#11, #12)', async () => {
+  const { bundleDir, metadata } = makeBundle({ baseRef: 'master' });
+  const contentDir = path.join(bundleDir, 'storybook');
+  fs.mkdirSync(path.join(contentDir, 'meta/badges'), { recursive: true });
+  fs.mkdirSync(path.join(contentDir, 'meta/stats'), { recursive: true });
+  fs.writeFileSync(path.join(contentDir, 'meta/badges', 'coverage.svg'), '<svg>coverage</svg>');
+  fs.writeFileSync(
+    path.join(contentDir, 'meta/badges', 'overview.json'),
+    JSON.stringify({ storiesCount: 30, componentsCount: 8, totalComponents: 8, coveragePercent: 100 })
+  );
+  fs.writeFileSync(path.join(contentDir, 'meta/stats', 'history.svg'), '<svg>graph</svg>');
+  metadata.contentDigest = digestDirectory(contentDir);
+  fs.writeFileSync(path.join(bundleDir, 'preview-metadata.json'), JSON.stringify(metadata, null, 2));
+
+  // The base metrics of the default branch live at the Pages root.
+  const pagesRepo = initBarePagesRepo();
+  fs.mkdirSync(path.join(pagesRepo, 'meta/badges'), { recursive: true });
+  fs.writeFileSync(
+    path.join(pagesRepo, 'meta/badges', 'overview.json'),
+    JSON.stringify({ storiesCount: 20, componentsCount: 5, totalComponents: 8, coveragePercent: 63 })
+  );
+
+  const originalFetch = global.fetch;
+  const requests = [];
+  global.fetch = async (url, options) => {
+    requests.push({ url, options });
+    if (url.includes('/comments') && (!options || options.method === undefined || options.method === 'GET')) {
+      return { ok: true, status: 200, json: async () => [] };
+    }
+    if (url.includes('/comments') && options.method === 'POST') {
+      return { ok: true, status: 201, json: async () => ({ id: 1 }) };
+    }
+    if (url.includes('/pages/builds')) {
+      return { ok: true, status: 201, json: async () => ({}) };
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  };
+
+  try {
+    const result = await publishPreview({
+      bundleDir,
+      pagesRepo,
+      trustedContext: trustedContextFor(metadata),
+      currentHeadSha: SHA_A,
+      token: 'tok',
+      repository: 'octo/widgets',
+      siteUrl: 'https://octo.github.io/widgets',
+      generateStatsGraph: false,
+      badgesDirectory: 'meta/badges',
+      statsDirectory: 'meta/stats',
+      defaultBranch: 'master'
+    });
+    assert.equal(result.action, 'published');
+    const body = requests.find(r => r.options?.method === 'POST' && r.url.includes('/comments')).options.body;
+    assert.match(body, /\/meta\/badges\/coverage\.svg\?v=/);
+    assert.match(body, /\/meta\/stats\/history\.svg\?v=/);
+    assert.doesNotMatch(body, /pr-\d+\/(?:badges|stats)\//, 'no link to the default directories');
+    assert.ok(body.includes('| 🎯 **Component Coverage** | `63% (5/8)` | `100% (8/8)` | **+37%** 🟢 |'));
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
