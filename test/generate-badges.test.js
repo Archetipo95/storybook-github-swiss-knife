@@ -358,10 +358,14 @@ test('generateBadges rejects path traversal in badgesDirectory', () => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-function packageDir(t, dependencies) {
+function packageDir(t, dependencies, installed = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-badge-version-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ devDependencies: dependencies }));
+  for (const [name, version] of Object.entries(installed)) {
+    fs.mkdirSync(path.join(dir, 'node_modules', name), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'node_modules', name, 'package.json'), JSON.stringify({ name, version }));
+  }
   return dir;
 }
 
@@ -428,4 +432,25 @@ test('extractStorybookMetrics counts Storybook 6 docs-only MDX entries as docs, 
   assert.equal(metrics.componentsCount, 1);
   assert.equal(metrics.storiesCount, 1);
   assert.equal(metrics.docsCount, 1);
+});
+
+test('extractStorybookVersion prefers the installed version and never prints a non-version spec (#14)', t => {
+  // workspace:* / catalog: name no version: the installed package does.
+  assert.equal(
+    extractStorybookVersion(packageDir(t, { storybook: 'workspace:*' }, { storybook: '9.1.20' })),
+    'v9.1.20'
+  );
+  assert.equal(extractStorybookVersion(packageDir(t, { storybook: 'catalog:' }, { storybook: '10.0.1' })), 'v10.0.1');
+  // The installed version wins over the declared range.
+  assert.equal(extractStorybookVersion(packageDir(t, { storybook: '^9.0.0' }, { storybook: '9.1.20' })), 'v9.1.20');
+  // An npm alias declares its version after the last @.
+  assert.equal(extractStorybookVersion(packageDir(t, { storybook: 'npm:storybook@9.1.0' })), 'v9.1.0');
+  // Not installed and no version declared: the next candidate, else "deployed".
+  assert.equal(
+    extractStorybookVersion(packageDir(t, { '@storybook/react-vite': '^9.1.19', storybook: 'catalog:' })),
+    'v9.1.19'
+  );
+  for (const spec of ['latest', 'workspace:*', 'catalog:', '8.x', 'next']) {
+    assert.equal(extractStorybookVersion(packageDir(t, { storybook: spec })), 'deployed', spec);
+  }
 });
