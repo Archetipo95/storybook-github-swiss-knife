@@ -217,7 +217,9 @@ function readJson(filePath) {
 
 /**
  * Loads the repository configuration. `.storybook/swiss-knife.json` wins; the legacy
- * `.storybook-pages.yml` still works for the `pages` section, with a deprecation warning.
+ * `.storybook-pages.yml` still works for the `pages` section, with a deprecation warning, also
+ * next to a JSON file without `pages` (the one `storybook-swiss-knife init` writes for the visual
+ * checks), whose other sections still come from the JSON file.
  * @param {{ cwd?: string }} [options]
  */
 export function loadSwissKnifeConfig({ cwd = process.cwd() } = {}) {
@@ -231,8 +233,15 @@ export function loadSwissKnifeConfig({ cwd = process.cwd() } = {}) {
     raw = readJson(jsonPath);
     validateSwissKnifeConfig(raw);
     source = SWISS_KNIFE_CONFIG_PATH;
-    if (fs.existsSync(legacyPath)) {
-      warnings.push(`${LEGACY_CONFIG_PATH} is ignored because ${SWISS_KNIFE_CONFIG_PATH} exists. Delete it.`);
+    if (fs.existsSync(legacyPath) && raw.pages === undefined) {
+      const pages = parseSimpleYaml(fs.readFileSync(legacyPath, 'utf8'));
+      validateConfig(pages);
+      raw = { ...raw, pages };
+      warnings.push(
+        `${LEGACY_CONFIG_PATH} is deprecated. ${SWISS_KNIFE_CONFIG_PATH} has no "pages", so the Pages settings still come from ${LEGACY_CONFIG_PATH}: move them under "pages" in ${SWISS_KNIFE_CONFIG_PATH}.`
+      );
+    } else if (fs.existsSync(legacyPath)) {
+      warnings.push(`${LEGACY_CONFIG_PATH} is ignored because ${SWISS_KNIFE_CONFIG_PATH} sets "pages". Delete it.`);
     }
   } else if (fs.existsSync(legacyPath)) {
     const pages = parseSimpleYaml(fs.readFileSync(legacyPath, 'utf8'));

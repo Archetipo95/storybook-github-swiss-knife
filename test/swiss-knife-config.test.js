@@ -110,6 +110,25 @@ test('both files: the JSON file wins and the YAML file is reported as ignored', 
   assert.match(config.warnings[0], /ignored/);
 });
 
+// The JSON file `storybook-swiss-knife init` writes has no "pages": a migrating repository kept its
+// Pages settings in the YAML file, which used to be ignored once the JSON file existed.
+test('a JSON file without pages keeps the Pages settings of the YAML file next to it', () => {
+  const dir = repo({
+    [LEGACY_CONFIG_PATH]: LEGACY_YAML,
+    [SWISS_KNIFE_CONFIG_PATH]: { visual: { shards: 2, approvalLabel: 'looks-good' }, a11y: { enabled: false } }
+  });
+  const config = loadSwissKnifeConfig({ cwd: dir });
+  assert.deepEqual(config.pages, LEGACY_AS_JSON);
+  assert.equal(config.visual.shards, 2);
+  assert.equal(config.visual.approvalLabel, 'looks-good');
+  assert.equal(config.a11y.enabled, false);
+  assert.match(config.warnings[0], /has no "pages", so the Pages settings still come from \.storybook-pages\.yml/);
+  const resolved = inRepo(dir, () => resolveConfiguration({ inputs: {} }));
+  assert.equal(resolved.mode, 'directory');
+  assert.equal(resolved.preview_root, 'previews');
+  assert.equal(resolved.package_manager, 'pnpm');
+});
+
 test('a kinboo-like configuration is valid', () => {
   assert.equal(
     validateSwissKnifeConfig({
