@@ -627,3 +627,38 @@ test('visual regression disabled in the trusted configuration gives two neutral 
     ]
   );
 });
+
+// The Pages settings are the repository's: read from its root, while visual and a11y come from the
+// project directory (second audit #20), as the preview publisher reads them.
+test("a monorepo's report goes where the root configuration's Pages settings say", async () => {
+  const root = tmp({
+    '.storybook/swiss-knife.json': { pages: { preview_root: 'previews', pages_branch: 'site' } },
+    'apps/ui/.storybook/swiss-knife.json': { visual: { approvalLabel: 'visual-approved' } }
+  });
+  const github = fakeGitHub({ labeledAt: '2026-10-04T11:00:00Z' });
+  const published = [];
+  const output = await runVisualGate({
+    env: {
+      REPOSITORY: REPO,
+      RUN_ID: String(RUN_ID),
+      PROJECT_DIR: path.join(root, 'apps/ui'),
+      WORKING_DIRECTORY: 'apps/ui',
+      BUNDLE_DIR: bundle(),
+      PAGES_REPO: tmp({ '.nojekyll': '' }),
+      GITHUB_TOKEN: 't'
+    },
+    request: github.request,
+    publish: async options => {
+      published.push(options);
+      return {};
+    },
+    log: () => {}
+  });
+  assert.deepEqual(
+    published.map(({ branch, targetDirectory }) => [branch, targetDirectory]),
+    [['site', 'previews/pr-7/visual']]
+  );
+  assert.equal(output.reportUrl, 'https://acme.github.io/widgets/previews/pr-7/visual/');
+  // The checks still come from the project's configuration (its approval label).
+  assert.equal(checkRuns(github.calls)[0].conclusion, 'success');
+});
