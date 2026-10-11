@@ -29,6 +29,9 @@ You can embed these badges directly into your `README.md`:
 Coverage and the Storybook version come from the source, so badges and the stats snapshot are
 computed where the source is checked out:
 
+- **Reusable workflow:** the read-only build job makes the badges and, in directory mode, the
+  stats snapshot (`stats/history.json` with one entry). The publish job only has the static
+  output: it keeps those badges and adds the snapshot to the Pages branch's history.
 - **`publisher` action:** it keeps badges the build already made (`badges/overview.json` in the
   output) and uses the build's stats snapshot when there is one, if they are for the commit
   being published (a leftover for another commit is ignored with a warning). Otherwise it computes them
