@@ -144,11 +144,9 @@ test('pr-preview-cleanup workflow never checks out the pull request head and sta
     /ref: \$\{\{ github\.event\.pull_request\.head/,
     'cleanup must never check out the PR head ref/sha'
   );
-  assert.doesNotMatch(
-    content,
-    /pull-requests:\s*write/,
-    'cleanup does not need PR write access; it only touches the Pages branch'
-  );
+  // PR write access is for the preview comment only (marking the preview removed); no code from
+  // the pull request runs in this job, as the checkout assertions above ensure.
+  assert.match(content, /pull-requests:\s*write/, 'cleanup writes the preview comment');
   const cleanupJob = extractJobBlock(content, 'cleanup');
   assert.match(cleanupJob, /contents:\s*write/);
   assert.match(cleanupJob, /pages:\s*write/);
@@ -180,7 +178,8 @@ test('pr-preview-janitor workflow supports manual dispatch and schedule, never c
   assert.match(janitorJob, /contents:\s*write/);
   assert.match(janitorJob, /pages:\s*write/);
   assert.match(janitorJob, /deployments:\s*write/);
-  assert.match(janitorJob, /pull-requests:\s*read/);
+  // Lists the live PRs and writes the expiry warning in their preview comments.
+  assert.match(janitorJob, /pull-requests:\s*write/);
   assert.match(
     janitorJob,
     /git ls-remote --exit-code --heads origin/,

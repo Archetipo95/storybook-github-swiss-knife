@@ -164,6 +164,7 @@ jobs:
       contents: write
       deployments: write
       pages: write
+      pull-requests: write
 `;
 
 const previewJanitorWorkflow = ({ ref }) => `name: PR Preview Janitor
@@ -183,7 +184,7 @@ jobs:
       contents: write
       deployments: write
       pages: write
-      pull-requests: read
+      pull-requests: write
 `;
 
 /** Adds the addon to the `addons` array of a Storybook main file; null when it cannot. */
