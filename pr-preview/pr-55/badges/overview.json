@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "status": "published • ddb86b8",
+  "build": "passed • ddb86b8",
+  "commit": "ddb86b8",
+  "storybookVersion": "deployed",
+  "storiesCount": 1,
+  "componentsCount": 1,
+  "totalComponents": 12,
+  "coveragePercent": 8,
+  "docsCount": 0,
+  "hasStoriesData": true,
+  "tests": null,
+  "generatedAt": "2026-10-11T11:22:37.443Z"
+}
