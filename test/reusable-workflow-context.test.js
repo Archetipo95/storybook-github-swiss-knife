@@ -17,3 +17,11 @@ test("reusable workflows do not gate on the repository being private (it is the 
     .filter(file => /github\.event\.repository\.private/.test(fs.readFileSync(path.join(workflowDir, file), 'utf8')));
   assert.deepEqual(offenders, []);
 });
+
+test("reusable workflows do not test for the workflow_call event (github.event_name is the caller's)", () => {
+  const offenders = fs
+    .readdirSync(workflowDir)
+    .filter(file => /\.ya?ml$/.test(file))
+    .filter(file => /event_name\s*[!=]=\s*'workflow_call'/.test(fs.readFileSync(path.join(workflowDir, file), 'utf8')));
+  assert.deepEqual(offenders, []);
+});

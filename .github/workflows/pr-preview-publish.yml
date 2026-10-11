@@ -18,9 +18,8 @@ name: PR Preview Publish
 # artifact name (derived from the immutable `github.event.pull_request.number`
 # of the pull_request event that triggered it), cross-checking it against
 # `pull_requests[]` to confirm GitHub really did associate that PR with this
-# run (src/resolve-run-context.js). It then independently fetches that
-# pull request's *current* head SHA from the API. No PR content is ever
-# checked out by this workflow; only the trusted Pages branch is.
+# run (src/resolve-run-context.js). No PR content is ever checked out by
+# this workflow; only the trusted Pages branch is.
 #
 # `publish` re-validates the build artifact's bundled metadata against this
 # trusted context (repository, run id, PR number, base ref, head repo,
@@ -30,6 +29,11 @@ name: PR Preview Publish
 # while it waited is skipped as `skip-stale`, and one whose pull request was
 # closed meanwhile as `skip-closed`, so it cannot overwrite a newer preview
 # or bring back a removed one.
+#
+# A caller runs it from a workflow on `workflow_run` (types: completed) of
+# its PR Preview Build workflow: in a called workflow `github.event` is the
+# caller's, and the gate reads the completed run from it. From any other
+# event nothing is published, and the `event-check` job says so.
 
 on:
   workflow_run:
@@ -37,10 +41,6 @@ on:
     types: [completed]
   workflow_call:
     inputs:
-      workflow_run_id:
-        description: 'Run ID of the completed workflow_run build to publish (defaults to github.event.workflow_run.id)'
-        required: false
-        type: number
       preview_root:
         description: 'Root directory for previews on the Pages branch'
         required: false
@@ -129,17 +129,29 @@ on:
         value: ${{ jobs.publish.outputs.action }}
 
 jobs:
+  # The gate skips any other event, and publish with it: without this job the run would be green
+  # and silently do nothing.
+  event-check:
+    name: Check the caller's event
+    if: github.event_name != 'workflow_run'
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - name: Warn that nothing is published
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          echo "::warning::pr-preview-publish only publishes from a workflow on workflow_run (types: completed) of the PR Preview Build workflow. This run's event is ${EVENT_NAME}: nothing is published."
+
   gate:
     name: Validate provenance (trusted, read-only)
     if: >-
-      github.event_name == 'workflow_call' || (
-        github.event_name == 'workflow_run' &&
-        github.event.workflow_run.conclusion == 'success' &&
-        github.event.workflow_run.event == 'pull_request' &&
-        github.event.workflow_run.repository.full_name == github.repository &&
-        github.event.workflow_run.head_repository.full_name == github.repository &&
-        github.event.workflow_run.pull_requests[0] != null
-      )
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.repository.full_name == github.repository &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.pull_requests[0] != null
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -164,7 +176,6 @@ jobs:
         id: context
         env:
           WORKFLOW_RUN_EVENT: ${{ toJSON(github.event.workflow_run) }}
-          INPUT_RUN_ID: ${{ inputs.workflow_run_id }}
           INPUT_ARTIFACT_NAME: ${{ inputs.artifact_name }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPOSITORY: ${{ github.repository }}
@@ -173,31 +184,13 @@ jobs:
             async function main() {
               const { resolveTrustedPullRequestContext } = await import(process.env.SWISS_KNIFE_ROOT + "/src/resolve-run-context.js");
 
-              let runData = process.env.WORKFLOW_RUN_EVENT ? JSON.parse(process.env.WORKFLOW_RUN_EVENT) : null;
-              const inputRunId = process.env.INPUT_RUN_ID ? Number(process.env.INPUT_RUN_ID) : null;
-              const targetRunId = inputRunId || (runData && runData.id);
-
-              if (!targetRunId) {
-                console.error("No workflow_run event context or workflow_run_id input provided");
-                process.exit(1);
-              }
-
+              const runData = JSON.parse(process.env.WORKFLOW_RUN_EVENT);
+              const runId = runData.id;
               const repo = process.env.REPOSITORY;
               const authHeaders = {
                 authorization: `token ${process.env.GITHUB_TOKEN}`,
                 accept: "application/vnd.github+json"
               };
-
-              if (!runData || (inputRunId && runData.id !== inputRunId)) {
-                const res = await fetch(`https://api.github.com/repos/${repo}/actions/runs/${targetRunId}`, {
-                  headers: authHeaders
-                });
-                if (!res.ok) {
-                  console.error(`Failed to fetch workflow run ${targetRunId}: ${res.status}`);
-                  process.exit(1);
-                }
-                runData = await res.json();
-              }
 
               if (runData.conclusion !== "success") {
                 console.error(`Workflow run conclusion is "${runData.conclusion}", expected "success"`);
@@ -220,11 +213,11 @@ jobs:
               // unordered and can name a different pull request when the
               // same head SHA/branch is shared by more than one open PR.
               const artifactsRes = await fetch(
-                `https://api.github.com/repos/${repo}/actions/runs/${targetRunId}/artifacts?per_page=100`,
+                `https://api.github.com/repos/${repo}/actions/runs/${runId}/artifacts?per_page=100`,
                 { headers: authHeaders }
               );
               if (!artifactsRes.ok) {
-                console.error(`Failed to list artifacts for workflow run ${targetRunId}: ${artifactsRes.status}`);
+                console.error(`Failed to list artifacts for workflow run ${runId}: ${artifactsRes.status}`);
                 process.exit(1);
               }
               const artifactsData = await artifactsRes.json();
@@ -236,7 +229,7 @@ jobs:
                 expectedArtifactName: process.env.INPUT_ARTIFACT_NAME || undefined
               });
 
-              console.log(`run_id=${targetRunId}`);
+              console.log(`run_id=${runId}`);
               console.log(`pr_number=${prNumber}`);
               console.log(`base_ref=${baseRef}`);
               console.log(`head_sha=${headSha}`);

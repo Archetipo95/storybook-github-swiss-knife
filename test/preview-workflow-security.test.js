@@ -32,7 +32,7 @@ test('pr-preview-publish workflow gates on success/event/repository and requires
 
   assert.match(content, /workflow_run:\s*\n\s*workflows:\s*\[['"]PR Preview Build['"]\]/);
   assert.match(content, /workflow_call:/, 'publish must support reusable workflow_call trigger');
-  assert.match(content, /workflow_run_id:/, 'publish must support workflow_run_id input');
+  assert.doesNotMatch(content, /workflow_run_id:/, 'the run to publish comes from the workflow_run event');
   assert.match(content, /preview_root:/, 'publish must support preview_root input');
   assert.match(content, /pages_branch:/, 'publish must support pages_branch input');
   assert.match(content, /site_url:/, 'publish must support site_url input');
@@ -46,6 +46,21 @@ test('pr-preview-publish workflow gates on success/event/repository and requires
   assert.match(content, /passcode_session_hours:/, 'publish must support passcode session duration');
   assert.match(content, /passcode_hash:/, 'publish must declare the trusted passcode secret');
   const gateJob = extractJobBlock(content, 'gate');
+  // The whole condition: only a workflow_run caller (github.event_name is the caller's in a
+  // called workflow) for a successful same-repository pull_request build.
+  assert.equal(
+    /\n {4}if: >-\n((?: {6}.+\n)+)/.exec(gateJob)?.[1],
+    [
+      "github.event_name == 'workflow_run' &&",
+      "github.event.workflow_run.conclusion == 'success' &&",
+      "github.event.workflow_run.event == 'pull_request' &&",
+      'github.event.workflow_run.repository.full_name == github.repository &&',
+      'github.event.workflow_run.head_repository.full_name == github.repository &&',
+      'github.event.workflow_run.pull_requests[0] != null'
+    ]
+      .map(line => `      ${line}\n`)
+      .join('')
+  );
   assert.match(gateJob, /github\.event\.workflow_run\.conclusion == 'success'/);
   assert.match(gateJob, /github\.event\.workflow_run\.event == 'pull_request'/);
   assert.match(gateJob, /github\.event\.workflow_run\.repository\.full_name == github\.repository/);
@@ -70,6 +85,7 @@ test('pr-preview-publish workflow gates on success/event/repository and requires
   );
 
   const publishJob = extractJobBlock(content, 'publish');
+  assert.match(publishJob, /\n {4}needs: gate\n {4}if: needs\.gate\.result == 'success'\n/);
   assert.match(publishJob, /contents:\s*write/);
   assert.match(publishJob, /pages:\s*write/);
   assert.match(publishJob, /pull-requests:\s*write/);
@@ -282,4 +298,12 @@ test('fork pull request cleanups are skipped before they join the Pages queue', 
     cleanup,
     /if: github\.event\.pull_request == null \|\| github\.event\.pull_request\.head\.repo\.full_name == github\.repository\n\s+concurrency:/
   );
+});
+
+test('pr-preview-publish warns, publishing nothing, when its caller is not on workflow_run', () => {
+  const job = extractJobBlock(read('.github/workflows/pr-preview-publish.yml'), 'event-check');
+  assert.match(job, /\n {4}if: github\.event_name != 'workflow_run'\n/);
+  assert.match(job, /\n {4}permissions: \{\}\n/);
+  assert.match(job, /EVENT_NAME: \$\{\{ github\.event_name \}\}/);
+  assert.match(job, /echo "::warning::pr-preview-publish only publishes from a workflow on workflow_run/);
 });
