@@ -26,9 +26,9 @@ function tmp(files) {
   return dir;
 }
 
-function bundle({ results = changedOnly, shardsReported = 1, prNumber = 7 } = {}) {
+function bundle({ results = changedOnly, shardsReported = 1, prNumber = 7, runId } = {}) {
   return tmp({
-    'meta.json': { version: 1, headSha: HEAD, prNumber, shardsExpected: 1, shardsReported },
+    'meta.json': { version: 1, headSha: HEAD, prNumber, shardsExpected: 1, shardsReported, runId },
     'results/visual-results.json': results,
     'results/a11y/card--default.json': {
       id: 'card--default',
@@ -51,7 +51,15 @@ function fakeGitHub({
   headRepo = REPO,
   labels = ['visual-approved'],
   labeledAt = '2026-10-04T09:00:00Z',
-  firstRunAt = '2026-10-04T10:00:00Z',
+  // When the run that captured the results completed.
+  completedAt = '2026-10-04T10:00:00Z',
+  // When it was created (the capture started).
+  createdAt = completedAt,
+  events = null,
+  sourceRuns = {},
+  existingCheckRuns = [],
+  // GitHub leaves a fork run's pull_requests empty.
+  runPullRequests = [{ number: 7 }],
   artifactRunId = RUN_ID,
   conclusion = 'success',
   baseline = { stories: { 'card--default': { 'color-contrast': 2 } } },
@@ -76,12 +84,19 @@ function fakeGitHub({
         event: 'pull_request',
         head_sha: HEAD,
         workflow_id: 99,
+        status: 'completed',
         conclusion,
+        created_at: createdAt,
+        updated_at: completedAt,
+        pull_requests: runPullRequests,
+        head_branch: 'feature',
         html_url: 'https://github.com/acme/widgets/actions/runs/555',
         path: runPath,
-        head_repository: { full_name: headRepo }
+        head_repository: { full_name: headRepo, owner: { login: headRepo.split('/')[0] } }
       };
     }
+    const sourceRun = /\/actions\/runs\/(\d+)$/.exec(route);
+    if (sourceRun && sourceRuns[sourceRun[1]]) return sourceRuns[sourceRun[1]];
     if (route === `/repos/${REPO}/actions/runs/${RUN_ID}/artifacts`) {
       return { artifacts: [{ name: `swiss-knife-visual-pr-7-run-${artifactRunId}` }] };
     }
@@ -96,6 +111,19 @@ function fakeGitHub({
       };
       return prReads > 1 && prOnRecheck ? { ...pr, ...prOnRecheck } : pr;
     }
+    if (
+      route === `/repos/${REPO}/pulls` &&
+      apiPath.includes(`head=${encodeURIComponent(`${headRepo.split('/')[0]}:feature`)}`)
+    ) {
+      return [
+        {
+          number: 7,
+          state: 'open',
+          head: { sha: prHead, repo: { full_name: headRepo } },
+          labels: labels.map(name => ({ name }))
+        }
+      ];
+    }
     if (route === `/repos/${REPO}`) return { default_branch: 'main' };
     if (route.startsWith(`/repos/${REPO}/contents/.github/`)) {
       if (apiPath.includes(`ref=${HEAD}`)) return callerAtHead;
@@ -105,14 +133,16 @@ function fakeGitHub({
       return JSON.stringify(apiPath.includes(`ref=${BASE}`) ? baseBaseline : baseline);
     }
     if (route === `/repos/${REPO}/issues/7/events`) {
-      return [{ event: 'labeled', created_at: labeledAt, label: { name: 'visual-approved' } }];
+      return events ?? [{ event: 'labeled', created_at: labeledAt, label: { name: 'visual-approved' } }];
     }
     if (route === `/repos/${REPO}/actions/workflows/99/runs`) {
-      const runs = [{ id: RUN_ID, event: 'pull_request', created_at: firstRunAt }];
+      const runs = [{ id: RUN_ID, event: 'pull_request', created_at: createdAt }];
       if (newerRunEvent) runs.push({ id: RUN_ID + 1, event: newerRunEvent, created_at: '2026-10-04T11:00:00Z' });
       return { workflow_runs: runs };
     }
-    if (route === `/repos/${REPO}/commits/${HEAD}/check-runs`) return { total_count: existingChecks };
+    if (route === `/repos/${REPO}/commits/${HEAD}/check-runs`) {
+      return { total_count: existingChecks || existingCheckRuns.length, check_runs: existingCheckRuns };
+    }
     if (route === `/repos/${REPO}/issues/7/comments` && method === 'GET') return comments;
     if (route.startsWith(`/repos/${REPO}/issues/comments/`) && method === 'GET') return readBack.shift() ?? null;
     if (method === 'POST' || method === 'DELETE' || method === 'PATCH') return {};
@@ -442,4 +472,158 @@ test('the results block is written again when the preview publisher put an older
   const writes = commentWrites(calls);
   assert.equal(writes.length, 2);
   assert.ok(writes.every(write => write.method === 'PATCH' && write.body.body.includes('swiss-knife / visual')));
+});
+
+// Approval timing (second audit #7): the label must be newer than the completion of the run that
+// captured the gated results, and than the head's last force-push.
+const labeledEvent = at => ({ event: 'labeled', created_at: at, label: { name: 'visual-approved' } });
+const deleted = calls =>
+  calls.some(call => call.method === 'DELETE' && call.apiPath.endsWith('/labels/visual-approved'));
+
+test('a label added while the commit was still being captured approves nothing, and is withdrawn', async () => {
+  const github = fakeGitHub({
+    createdAt: '2026-10-04T10:00:00Z',
+    labeledAt: '2026-10-04T10:30:00Z',
+    completedAt: '2026-10-04T10:45:00Z'
+  });
+  const { calls, published } = await run({ github });
+  assert.equal(checkRuns(calls)[0].conclusion, 'failure');
+  assert.ok(deleted(calls));
+  assert.equal(published[0].manifest.approved, false);
+});
+
+test('a force-push after the label withdraws it, even back to a commit captured before the label', async () => {
+  const github = fakeGitHub({
+    completedAt: '2026-10-04T10:00:00Z',
+    events: [
+      labeledEvent('2026-10-04T11:00:00Z'),
+      { event: 'head_ref_force_pushed', created_at: '2026-10-04T11:30:00Z' }
+    ]
+  });
+  const { calls } = await run({ github });
+  assert.equal(checkRuns(calls)[0].conclusion, 'failure');
+  assert.ok(deleted(calls));
+  // Labelled again after the force-push: approved.
+  const relabeled = fakeGitHub({
+    completedAt: '2026-10-04T10:00:00Z',
+    events: [
+      labeledEvent('2026-10-04T11:00:00Z'),
+      { event: 'head_ref_force_pushed', created_at: '2026-10-04T11:30:00Z' },
+      labeledEvent('2026-10-04T11:40:00Z')
+    ]
+  });
+  assert.equal(checkRuns((await run({ github: relabeled })).calls)[0].conclusion, 'success');
+});
+
+test('a label run approves against the run that captured the reused results', async () => {
+  const captured = {
+    id: 444,
+    head_sha: HEAD,
+    workflow_id: 99,
+    status: 'completed',
+    conclusion: 'success',
+    updated_at: '2026-10-04T10:30:00Z'
+  };
+  // The label run itself completes after the label; the results it reuses were captured before.
+  const github = fakeGitHub({
+    labeledAt: '2026-10-04T11:00:00Z',
+    completedAt: '2026-10-04T11:05:00Z',
+    sourceRuns: { 444: captured }
+  });
+  const { calls } = await run({ github, bundleDir: bundle({ runId: '444' }) });
+  assert.equal(checkRuns(calls)[0].conclusion, 'success');
+  assert.ok(calls.some(call => call.apiPath === `/repos/${REPO}/actions/runs/444`));
+
+  // A meta.runId that is not a successful run of this workflow for this commit approves nothing.
+  for (const forged of [
+    { ...captured, head_sha: 'c'.repeat(40) },
+    { ...captured, workflow_id: 98 },
+    { ...captured, conclusion: 'failure' },
+    { ...captured, status: 'in_progress' }
+  ]) {
+    const other = fakeGitHub({ labeledAt: '2026-10-04T11:00:00Z', sourceRuns: { 444: forged } });
+    assert.equal(
+      checkRuns((await run({ github: other, bundleDir: bundle({ runId: '444' }) })).calls)[0].conclusion,
+      'failure'
+    );
+  }
+});
+
+// Removing the label must withdraw an approval even when the results are gone (second audit #11).
+test('a label run without results downgrades an approved check once the label is removed', async () => {
+  const approvedCheck = { id: 9, conclusion: 'success', output: { title: 'Visual changes approved' } };
+  const removed = fakeGitHub({
+    conclusion: 'success',
+    artifactRunId: 1,
+    labels: [],
+    existingCheckRuns: [approvedCheck]
+  });
+  const output = await runVisualGate({
+    env: { REPOSITORY: REPO, RUN_ID: String(RUN_ID), PROJECT_DIR: project(), GITHUB_TOKEN: 't' },
+    request: removed.request,
+    log: () => {}
+  });
+  assert.deepEqual(output, { skipped: false, withdrawn: true });
+  assert.deepEqual(
+    checkRuns(removed.calls).map(check => [check.name, check.conclusion, check.output.title]),
+    [['swiss-knife / visual', 'failure', 'Approval withdrawn']]
+  );
+
+  // A fork run (empty pull_requests) finds its pull request by head repository and branch.
+  const fork = fakeGitHub({
+    conclusion: 'success',
+    artifactRunId: 1,
+    labels: [],
+    headRepo: 'someone/widgets',
+    runPullRequests: [],
+    existingCheckRuns: [approvedCheck]
+  });
+  const forkOutput = await runVisualGate({
+    env: { REPOSITORY: REPO, RUN_ID: String(RUN_ID), PROJECT_DIR: project(), GITHUB_TOKEN: 't' },
+    request: fork.request,
+    log: () => {}
+  });
+  assert.deepEqual(forkOutput, { skipped: false, withdrawn: true });
+  assert.ok(fork.calls.some(call => call.apiPath.includes('/pulls?state=open&head=someone%3Afeature')));
+
+  // The label is still there, or the latest check was not an approval: the checks stay.
+  for (const github of [
+    fakeGitHub({ conclusion: 'success', artifactRunId: 1, existingCheckRuns: [approvedCheck] }),
+    fakeGitHub({
+      conclusion: 'success',
+      artifactRunId: 1,
+      labels: [],
+      existingCheckRuns: [
+        approvedCheck,
+        { id: 10, conclusion: 'failure', output: { title: '2 visual changes to review' } }
+      ]
+    })
+  ]) {
+    const kept = await runVisualGate({
+      env: { REPOSITORY: REPO, RUN_ID: String(RUN_ID), PROJECT_DIR: project(), GITHUB_TOKEN: 't' },
+      request: github.request,
+      log: () => {}
+    });
+    assert.deepEqual(kept, { skipped: true });
+    assert.equal(checkRuns(github.calls).length, 0);
+  }
+});
+
+// visual.enabled: false in the trusted configuration (second audit #13).
+test('visual regression disabled in the trusted configuration gives two neutral checks', async () => {
+  const github = fakeGitHub();
+  const disabled = tmp({ '.storybook/swiss-knife.json': { visual: { enabled: false } } });
+  const output = await runVisualGate({
+    env: { REPOSITORY: REPO, RUN_ID: String(RUN_ID), PROJECT_DIR: disabled, GITHUB_TOKEN: 't' },
+    request: github.request,
+    log: () => {}
+  });
+  assert.deepEqual(output, { skipped: false, disabled: true });
+  assert.deepEqual(
+    checkRuns(github.calls).map(check => [check.name, check.conclusion]),
+    [
+      ['swiss-knife / visual', 'neutral'],
+      ['swiss-knife / accessibility', 'neutral']
+    ]
+  );
 });

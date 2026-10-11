@@ -146,15 +146,21 @@ minutes, and fills the sidebar and the panel without a reload.
 
 - **Visual**: changed screenshots and removed stories (a baseline without a story) need the
   approval label; interaction (play function) failures, render errors and incomplete runs always
-  fail. The label counts only if it was added after the current commit's first run, so a later
-  push withdraws it automatically.
+  fail. The label counts only if it was added after the run that captured these results
+  completed, and after the head's last force-push. A label added while a new commit is still
+  being captured, a later push, a force-push (even back to an earlier commit), or a re-run of the
+  capture withdraws it automatically: label the pull request again once the new results are in.
 - **Accessibility**: a violation fails when its rule is enforced (`a11y.enforcedRules`), or
   when it has a blocking impact (`a11y.blockingImpacts`) and fails on more nodes than the
   baseline records for that story and rule. Baseline entries a pull request adds or raises are
   listed in the check, so they are reviewed like code.
 - Adding or removing any label re-evaluates the commit's results in about a minute, with the
   approval label read from the pull request at that moment; nothing is screenshotted again.
-  A label run cancelled by a newer label event leaves the checks to the newer run.
+  A label run cancelled by a newer label event leaves the checks to the newer run. When the
+  commit's results are no longer available (they expire with the workflow artifacts), removing
+  the approval label still withdraws the approval; re-run the visual workflow to check again.
+- `visual.enabled: false` in the default branch's configuration turns both checks neutral
+  (the accessibility scan runs with the visual capture).
 - The report and the Storybook gallery are published to `<preview_root>/pr-<N>/visual/`.
 - Both results are added to the pull request's preview comment (created if the preview has not
   posted one yet); set `visual.prComment: false` to keep them in the checks only.
@@ -188,6 +194,9 @@ when comparing with CI.
     checks cannot tell those apart from the gate's. Rely on review and branch protection.
   - For forks, keep GitHub's "Require approval for fork pull request workflows" on; fork runs
     get checks but nothing is published.
-- The approval label is accepted when added after the head commit's first workflow run; a
-  commit pushed within seconds before the label could still be covered.
+- The approval label is accepted when added after the run that captured the gated results
+  completed and after the head's last force-push, as GitHub reports them. The results bundle
+  names that run (for a label event, the run whose results it reuses); the gate accepts it only as
+  a completed, successful run of the same workflow for the same commit, so it is as trusted as the
+  results themselves.
 - The passcode gate on published reports is client-side only: it hides pages, not files.
