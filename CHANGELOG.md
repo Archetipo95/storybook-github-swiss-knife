@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-11
+
 ### Changed
 
 - **Callers of `pr-preview-cleanup.yml` and `pr-preview-janitor.yml` must grant `pull-requests: write`** (minor release). Their jobs edit the PR's preview comment (marking the preview removed, writing the expiry warning), but asked for no `pull-requests` permission (cleanup) or only `read` (janitor), so every edit failed with 403 `Resource not accessible by integration`, which was logged and skipped: the warnings never appeared. Both jobs now ask for `pull-requests: write`, and a caller that grants less fails at startup. The docs examples and the workflows `storybook-swiss-knife init` writes are updated; the docs' cleanup and preview-publish examples were also missing `deployments: write`. A test now checks every documented caller, and every workflow `init` writes, against the jobs of the reusable workflow it calls.
