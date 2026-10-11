@@ -71,7 +71,7 @@ test('validateArtifactDirectory - fails when no static content is present', () =
 
   assert.throws(() => {
     validateArtifactDirectory('storybook-static', tmpDir);
-  }, /does not appear to contain valid static web content/);
+  }, /has no index\.html at its root/);
 
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
@@ -90,4 +90,25 @@ test('validateArtifactDirectory - fails when artifact root is a symlink pointing
 
   fs.rmSync(workspaceDir, { recursive: true, force: true });
   fs.rmSync(outsideDir, { recursive: true, force: true });
+});
+
+test('validateArtifactDirectory - scripts, styles and JSON without an index.html are not a site (#20)', t => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-art-noindex-'));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  const targetDir = path.join(tmpDir, 'storybook-static');
+  fs.mkdirSync(path.join(targetDir, 'assets'), { recursive: true });
+  fs.writeFileSync(path.join(targetDir, 'assets', 'main.js'), 'console.log(1)');
+  fs.writeFileSync(path.join(targetDir, 'assets', 'main.css'), 'body{}');
+  fs.writeFileSync(path.join(targetDir, 'project.json'), '{}');
+  assert.throws(() => validateArtifactDirectory('storybook-static', tmpDir), /has no index\.html at its root/);
+});
+
+test('validateArtifactDirectory - an index.html only in a subfolder is not enough (#20)', t => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-art-nested-'));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  // For example "path" pointing at the parent of the real build output.
+  fs.mkdirSync(path.join(tmpDir, 'out', 'storybook-static'), { recursive: true });
+  fs.writeFileSync(path.join(tmpDir, 'out', 'storybook-static', 'index.html'), '<html></html>');
+  assert.throws(() => validateArtifactDirectory('out', tmpDir), /has no index\.html at its root/);
+  assert.equal(validateArtifactDirectory('out/storybook-static', tmpDir).valid, true);
 });

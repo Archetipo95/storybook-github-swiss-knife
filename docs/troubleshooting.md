@@ -28,10 +28,11 @@
 
 ### 5. Artifact Validation Failures
 
-- **Symptom**: `validate-artifact.js` fails with `Path escapes workspace root` or `No static content found`.
+- **Symptom**: `validate-artifact.js` fails with `escapes workspace root`, `is empty` or `has no index.html at its root`.
 - **Causes & Solutions**:
   - **Path Escape**: Ensure `path` is relative to the workspace root and contains no `../` traversal or external symlinks.
   - **Empty Output**: Verify that your build command actually produced files in the specified `path` directory before validation runs.
+  - **No `index.html`**: `path` must be the Storybook build output itself (for example `storybook-static`), whose root holds `index.html`; not a parent folder, or a folder of assets only.
 
 ### 6. Missing Pages Branch (`gh-pages`)
 
