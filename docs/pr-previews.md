@@ -74,7 +74,7 @@ The trusted publisher (below) expects a specific artifact contract: a workflow a
 `preview-build` is intended **exclusively** for your unprivileged `pull_request` build job:
 
 - it accepts your build output directory (`source_path`) and reads the pull request's event context (`pr_number`, `base_ref`, `head_sha`, `head_repository`) directly from `github.event.pull_request.*`, so nothing PR-controlled is ever interpolated into a shell command;
-- it validates the output directory (non-empty static content, no nested `.git`, no path traversal, no symlink escapes) using the same `validate-artifact.js` module the main deploy action uses;
+- it validates the output directory (an `index.html` at its root, no nested `.git`, no path traversal, no symlink escapes) using the same `validate-artifact.js` module the main deploy action uses;
 - it stages `preview-metadata.json` + `storybook/` and computes the content digest with the same `preview-metadata.js` module the trusted publisher independently re-validates against;
 - it uploads the artifact under the deterministic name the publisher expects (or returns the name/bundle path as outputs if you set `upload: 'false'` to upload it yourself);
 - it requires **no** `contents: write`, `pages`, `actions: read`, or `pull-requests: write` permission — the job that runs it needs only `contents: read` (the default for `pull_request`-triggered workflows) — and it never checks out or writes to the Pages branch, so it cannot be repurposed as a trusted publisher component even if misconfigured or run in a privileged context.

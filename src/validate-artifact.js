@@ -50,23 +50,11 @@ export function validateArtifactDirectory(targetPath, workspaceRoot = process.cw
     throw new Error(`Artifact validation failed: Directory "${targetPath}" is empty.`);
   }
 
-  // 5. Static content heuristic check (look for html, js, css, json, or standard storybook files)
-  const hasIndexOrStatic = files.some(file => {
-    const ext = path.extname(file).toLowerCase();
-    const name = path.basename(file).toLowerCase();
-    return (
-      name === 'index.html' ||
-      name === 'iframe.html' ||
-      ext === '.html' ||
-      ext === '.js' ||
-      ext === '.json' ||
-      ext === '.css'
-    );
-  });
-
-  if (!hasIndexOrStatic) {
+  // 5. A site to serve: Pages serves index.html at the root, so without it the published
+  // Storybook would be a 404 (a build that failed or wrote elsewhere, or the wrong path).
+  if (!files.includes('index.html')) {
     throw new Error(
-      `Artifact validation failed: Directory "${targetPath}" does not appear to contain valid static web content.`
+      `Artifact validation failed: Directory "${targetPath}" has no index.html at its root. Is "path" the Storybook build output (for example storybook-static)?`
     );
   }
 
