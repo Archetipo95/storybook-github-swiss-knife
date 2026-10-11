@@ -219,6 +219,13 @@ configuration file, and the default in the table applies only when the file
 does not set it either. `create_deployment` defaults to `true` in the reusable
 workflows and `false` in the composite action.
 
+The same goes for `artifact_name`, `environment_name` (and its old alias
+`environment`), `badges_directory`, `stats_directory`, `passcode_session_hours`,
+`smoke_test_stories` and `smoke_test_timeout_ms`: their inputs default to empty
+(the reusable workflows' number inputs to nothing, which GitHub sends as `0`), so
+the configuration file applies when you leave them out. `passcode_session_hours`
+also falls back to `passcode.expiryHours` in `.storybook/swiss-knife.json`.
+
 A configuration file that turns `enable_passcode_gate` on applies to the
 composite action's build-only runs (`publish: 'false'`) too. Without a
 `passcode_hash` (a pull request has no secrets) such a run skips the gate with a

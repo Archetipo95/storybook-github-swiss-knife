@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The configuration file now sets `artifact_name`, `environment_name`, `badges_directory`, `stats_directory`, `passcode_session_hours`, `smoke_test_stories` and `smoke_test_timeout_ms` when the input is left out** (minor release), as it does for the on/off settings since 0.3.0. Their inputs defaulted to the real value (`github-pages`, `badges`, `24` and so on), which always beat the file, so those file settings never applied. To migrate: nothing to change when you pass these inputs or keep the file's values at the defaults; if your configuration file sets one and your workflow relied on the input default instead, the file's value now applies. The reusable workflows' `passcode_session_hours` and `smoke_test_timeout_ms` number inputs have no default (GitHub sends `0`, which counts as unset), and `pr-preview-publish.yml` now resolves `passcode_session_hours` through the configuration too. `passcode.expiryHours` in `.storybook/swiss-knife.json`, validated but never read, is the session length when `pages` sets none.
+
 ### Fixed
 
 - The default Yarn build ran the project's `storybook` script instead of the Storybook binary: `yarn storybook build`, in `visual.yml` and in the workflows `storybook-swiss-knife init` writes, runs a package.json script of that name first, and `storybook init` adds one (`storybook dev -p 6006`), so the build started a dev server and never finished. Yarn 2+ now builds with `corepack yarn run -B storybook build` (binaries only) and Yarn 1 with `npx --no-install storybook build`. `visual.yml` also tells Yarn 1 from Yarn 2+ (`.yarnrc.yml`, or `packageManager: yarn@2` and up) for its default install, which ran Yarn 2's `install --immutable` on Yarn 1 projects; Yarn 1 gets `yarn install --frozen-lockfile`, as `init` and the deploy workflows already did. The fixtures now carry the `storybook` script, and their base build runs `init`'s default command.

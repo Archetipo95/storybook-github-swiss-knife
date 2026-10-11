@@ -44,15 +44,15 @@ inputs:
     required: false
     default: ''
   environment_name:
-    description: 'GitHub deployment environment name for the Pages deployment'
+    description: 'GitHub deployment environment name for the Pages deployment (default: github-pages; empty uses the config file, then the default)'
     required: false
-    default: 'github-pages'
+    default: ''
   environment_url:
     description: 'Explicit URL to expose on the GitHub deployment environment'
     required: false
     default: ''
   artifact_name:
-    description: 'Name of the GitHub Pages artifact'
+    description: 'Name of the GitHub Pages artifact (default: github-pages; empty uses the config file, then the default)'
     required: false
     default: ''
   mode:
@@ -72,9 +72,9 @@ inputs:
     required: false
     default: ''
   badges_directory:
-    description: 'Directory within the static build output to store generated badges'
+    description: 'Directory within the static build output to store generated badges (default: badges; empty uses the config file, then the default)'
     required: false
-    default: 'badges'
+    default: ''
   test_results_path:
     description: 'Optional repository-relative path to a JSON Storybook interaction test results file'
     required: false
@@ -92,9 +92,9 @@ inputs:
     required: false
     default: ''
   stats_directory:
-    description: 'Directory within the static build output to store stats graph and ledger'
+    description: 'Directory within the static build output to store stats graph and ledger (default: stats; empty uses the config file, then the default)'
     required: false
-    default: 'stats'
+    default: ''
   enable_passcode_gate:
     description: 'Whether to inject a client-side passcode gate into the published Storybook (default: false; empty uses the config file, then the default)'
     required: false
@@ -104,21 +104,21 @@ inputs:
     required: false
     default: ''
   passcode_session_hours:
-    description: 'Hours before the browser session expires'
+    description: 'Hours before the browser session expires (default: 24; empty uses the config file, then the default)'
     required: false
-    default: '24'
+    default: ''
   smoke_test:
     description: 'Whether to run an opt-in Playwright smoke test before publishing (default: false; empty uses the config file, then the default)'
     required: false
     default: ''
   smoke_test_stories:
-    description: 'Comma-separated story id globs to smoke test, or all'
+    description: 'Comma-separated story id globs to smoke test, or all (default: all; empty uses the config file, then the default)'
     required: false
-    default: 'all'
+    default: ''
   smoke_test_timeout_ms:
-    description: 'Per-page Playwright navigation timeout in milliseconds'
+    description: 'Per-page Playwright navigation timeout in milliseconds (default: 30000; empty uses the config file, then the default)'
     required: false
-    default: '30000'
+    default: ''
   auto_base_url:
     description: 'Whether to set BASE_URL, PUBLIC_URL and STORYBOOK_BASE_HREF to the deployment base URL for the build command (the command itself runs unchanged; default: true; empty uses the config file, then the default)'
     required: false
@@ -155,7 +155,6 @@ runs:
       env:
         CONFIG_INPUTS: ${{ toJSON(inputs) }}
         PUBLISH_INPUT: ${{ inputs.publish }}
-        ARTIFACT_NAME_INPUT: ${{ inputs.artifact_name }}
       run: |
         node -e 'Promise.all(["config.js", "install-command.js", "command-file.js"].map(file => import(process.env.GITHUB_ACTION_PATH + "/src/" + file))).then(([{resolveConfiguration, COMPOSITE_PACKAGE_MANAGERS}, {resolveInstallCommand}, {appendCommandFile}]) => {
           const c = resolveConfiguration({inputs: JSON.parse(process.env.CONFIG_INPUTS), allowedPackageManagers: COMPOSITE_PACKAGE_MANAGERS});
@@ -166,7 +165,7 @@ runs:
           appendCommandFile(process.env.GITHUB_ENV, {
             SB_MODE: c.mode, SB_PATH: c.path, SB_PACKAGE_MANAGER: c.package_manager,
             SB_INSTALL_COMMAND: install.command, SB_BUILD_COMMAND: c.build.build_command || "",
-            SB_PUBLISH: process.env.PUBLISH_INPUT || "true", SB_ARTIFACT_NAME: process.env.ARTIFACT_NAME_INPUT || "github-pages",
+            SB_PUBLISH: process.env.PUBLISH_INPUT || "true", SB_ARTIFACT_NAME: c.artifact_name || "github-pages",
             SB_CREATE_DEPLOYMENT: String(c.create_deployment ?? false),
             SB_ENVIRONMENT_NAME: c.environment_name || c.environment || "",
             SB_ENVIRONMENT_URL: c.environment_url || "",
