@@ -28,12 +28,17 @@ function updateJson(file, updater) {
   write(file, `${JSON.stringify(data, null, 2)}\n`);
 }
 
+// The addon tarball attached to a release, as the quickstart and init docs link it.
+const ADDON_TARBALL =
+  /(Archetipo95\/storybook-github-swiss-knife\/releases\/download\/)v(\d+\.\d+\.\d+)(\/storybook-swiss-knife-)(\d+\.\d+\.\d+)(\.tgz)/g;
+
 function replaceProjectTags(file) {
   write(
     file,
     read(file)
       .replace(/(Archetipo95\/storybook-github-swiss-knife(?:\/[A-Za-z0-9_.\/-]+)?@)v\d+\.\d+\.\d+/g, `$1${tag}`)
       .replace(/(for example, `@)v\d+\.\d+\.\d+(`\))/g, `$1${tag}$2`)
+      .replace(ADDON_TARBALL, `$1${tag}$3${version}$5`)
   );
 }
 
@@ -50,6 +55,7 @@ function walkFiles(dir) {
 function releaseRefFiles() {
   return [
     'README.md',
+    'packages/addon/README.md',
     ...walkFiles('docs').filter(file => file.endsWith('.md')),
     ...walkFiles('.github').filter(file => /\.(ya?ml|md)$/.test(file))
   ];
@@ -88,7 +94,13 @@ const staleRefs = releaseRefFiles().flatMap(file => {
   const matches = [
     ...read(file).matchAll(/Archetipo95\/storybook-github-swiss-knife(?:\/[A-Za-z0-9_.\/-]+)?@v\d+\.\d+\.\d+/g)
   ];
-  return matches.map(match => ({ file, ref: match[0] })).filter(({ ref }) => !ref.endsWith(`@${tag}`));
+  const tarballs = [...read(file).matchAll(ADDON_TARBALL)].filter(
+    match => match[2] !== version || match[4] !== version
+  );
+  return [
+    ...matches.map(match => ({ file, ref: match[0] })).filter(({ ref }) => !ref.endsWith(`@${tag}`)),
+    ...tarballs.map(match => ({ file, ref: match[0] }))
+  ];
 });
 
 if (staleRefs.length > 0) {

@@ -13,6 +13,13 @@ export { detectPackageManager };
 export const REPOSITORY = 'Archetipo95/storybook-github-swiss-knife';
 export const ADDON = 'storybook-swiss-knife';
 
+/**
+ * The addon tarball attached to a release. The addon is not on npm yet, so the bare package name
+ * would install whatever an unrelated package of that name holds.
+ */
+export const addonTarballUrl = version =>
+  `https://github.com/${REPOSITORY}/releases/download/v${version}/${ADDON}-${version}.tgz`;
+
 const COMMANDS = {
   npm: { install: 'npm ci', build: 'npx storybook build', add: 'npm install --save-dev' },
   pnpm: {
@@ -363,7 +370,7 @@ export function runInit({ argv, cwd = process.cwd(), version, log = console.log 
   }
 
   const steps = [
-    `Install the addon in ${workingDirectory}: ${COMMANDS[packageManager].add} ${ADDON}`,
+    `Install the addon in ${workingDirectory}: ${COMMANDS[packageManager].add} ${addonTarballUrl(version)}`,
     plan.addonRegistered
       ? null
       : `Add '${ADDON}' to the addons of ${mainPath ?? '.storybook/main.js'} (no addons array was found).`,

@@ -19,7 +19,7 @@ The existing PR comment is taken over (rewritten with the new marker) on the nex
 second comment appears. Preview URLs now include `preview_root` in their base URL; previews
 published under a non-default `preview_root` stop 404ing on assets.
 
-To add the visual and accessibility checks, run `npx storybook-swiss-knife init` (it keeps your
+To add the visual and accessibility checks, run `init` from the release tarball (see the [Quickstart](../README.md#quickstart); it keeps your
 existing workflow files unless `--force`), or follow
 [Visual regression and accessibility](visual-regression.md).
 
