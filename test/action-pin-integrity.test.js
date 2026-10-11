@@ -298,10 +298,11 @@ test(
     for (const file of filesToScan()) {
       const relFile = path.relative(repoRoot, file);
       for (const { subaction, sha } of internalActionSteps(fs.readFileSync(file, 'utf8'))) {
-        // runner/ too: visual-capture and visual-report run the runner from their own checkout.
+        // runner/ too: visual-capture and visual-report run the runner from their own checkout;
+        // packages/addon/cli/ because src/ imports from it.
         const changed = execFileSync(
           'git',
-          ['diff', '--name-only', sha, 'HEAD', '--', `${subaction}/`, 'src/', 'runner/'],
+          ['diff', '--name-only', sha, 'HEAD', '--', `${subaction}/`, 'src/', 'runner/', 'packages/addon/cli/'],
           {
             cwd: repoRoot,
             encoding: 'utf8'
@@ -317,3 +318,9 @@ test(
     }
   }
 );
+
+test('the release pin check covers packages/addon/cli, which src/ imports', () => {
+  const source = fs.readFileSync(new URL(import.meta.url), 'utf8');
+  const check = source.slice(source.indexOf("'internal pins run the same action"));
+  assert.match(check, /'--', `\$\{subaction\}\/`, 'src\/', 'runner\/', 'packages\/addon\/cli\/'\]/);
+});

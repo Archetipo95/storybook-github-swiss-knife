@@ -12,10 +12,13 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 const PIN = /(Archetipo95\/storybook-github-swiss-knife\/actions\/[A-Za-z0-9_-]+@)[0-9a-f]{40}/g;
+// The code the pinned actions run: their own files, src/, the runner, and the addon CLI modules
+// src/ imports (package manager detection, the config file parser).
+const PINNED_CODE = ['src', 'actions', 'runner', 'packages/addon/cli'];
 
 /**
  * Moves every internal action pin under `.github/workflows` to the release base and returns its
- * SHA. Throws, changing nothing, when src, actions or runner have uncommitted changes, or when the
+ * SHA. Throws, changing nothing, when the pinned code (PINNED_CODE) has uncommitted changes, or when the
  * branch's own commits change them: the pins would not run that code.
  */
 export function moveInternalPins({ root = process.cwd(), purpose = 'moving the pins' } = {}) {
@@ -27,10 +30,10 @@ export function moveInternalPins({ root = process.cwd(), purpose = 'moving the p
       return '';
     }
   };
-  const uncommitted = git('status', '--porcelain', '--', 'src', 'actions', 'runner');
+  const uncommitted = git('status', '--porcelain', '--', ...PINNED_CODE);
   if (uncommitted) {
     throw new Error(
-      `Commit action, src and runner changes before ${purpose}; internal pins must point at committed code:\n${uncommitted}`
+      `Commit changes to the pinned code (${PINNED_CODE.join(', ')}) before ${purpose}; internal pins must point at committed code:\n${uncommitted}`
     );
   }
   const baseRef = process.env.SWISS_KNIFE_RELEASE_BASE;
@@ -38,7 +41,7 @@ export function moveInternalPins({ root = process.cwd(), purpose = 'moving the p
     ? git('rev-parse', '--verify', `${baseRef}^{commit}`)
     : tryGit('merge-base', 'HEAD', 'origin/main') || git('rev-parse', 'HEAD');
   // The branch's own commits are not pinned, so they must not change code the pins run.
-  const unpinned = git('diff', '--name-only', pinSha, 'HEAD', '--', 'src', 'actions', 'runner');
+  const unpinned = git('diff', '--name-only', pinSha, 'HEAD', '--', ...PINNED_CODE);
   if (unpinned) {
     throw new Error(
       `Commits since ${pinSha.slice(0, 7)} change code the internal pins would not run:\n${unpinned}\n` +

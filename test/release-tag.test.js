@@ -158,3 +158,48 @@ test('releaseNotes fails for a missing or empty section', () => {
   assert.throws(() => releaseNotes(CHANGELOG, '9.9.9'), /no "## \[9\.9\.9\]" section/);
   assert.throws(() => releaseNotes('## [Unreleased]\n\n## [1.0.0] - x\n\n## [0.9.0] - y\n', '1.0.0'), /is empty/);
 });
+
+// A stray version tag pushed off main (a branch, a fork's commit) must not become the major tag's
+// target or the latest release (second audit #14): the plan only sees tags reachable from the
+// commit being released.
+test('the release plan only counts version tags merged into the released commit', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const workflow = fs.readFileSync('.github/workflows/release-tags.yml', 'utf8');
+  const listing = /EXISTING_TAGS="\$\((git tag [^)]*)\)"/.exec(workflow)?.[1];
+  assert.equal(listing, "git tag --list --merged HEAD 'v*.*.*'");
+
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'sk-release-tags-'));
+  const git = (...args) =>
+    execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.invalid', ...args], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH, HOME: process.env.HOME }
+    });
+  try {
+    git('init', '-q', '-b', 'main');
+    git('commit', '-q', '--allow-empty', '-m', 'one');
+    git('tag', 'v0.5.0');
+    git('checkout', '-q', '-b', 'stray');
+    git('commit', '-q', '--allow-empty', '-m', 'off main');
+    git('tag', 'v0.9.0');
+    git('checkout', '-q', 'main');
+    git('commit', '-q', '--allow-empty', '-m', 'release');
+    const existingTags = execFileSync('bash', ['-c', listing], { cwd: repo, encoding: 'utf8' })
+      .split(/\s+/)
+      .filter(Boolean);
+    assert.deepEqual(existingTags, ['v0.5.0']);
+    const plan = planRelease({ ref: 'refs/heads/main', packageVersion: '0.6.0', existingTags });
+    assert.equal(plan.majorTarget, 'v0.6.0');
+    assert.equal(plan.latest, true);
+    // Every tag, as before, would have moved v0 to the stray v0.9.0.
+    assert.equal(
+      planRelease({ ref: 'refs/heads/main', packageVersion: '0.6.0', existingTags: ['v0.5.0', 'v0.9.0'] }).majorTarget,
+      'v0.9.0'
+    );
+  } finally {
+    fs.rmSync(repo, { recursive: true, force: true });
+  }
+});
