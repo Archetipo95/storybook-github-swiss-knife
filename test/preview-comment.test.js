@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  buildMarker,
   buildCommentBody,
   buildExpirationStatus,
+  buildMarker,
+  commentMetrics,
   extractChecksSection,
   previewCommentMarkers,
   updatePreviewCommentStatus,
@@ -189,17 +190,57 @@ test('upsertPreviewComment paginates through comment listings to find the marker
   }
 });
 
-test('upsertPreviewComment fails closed when a user claims the preview marker', async () => {
+test('a user comment with the preview marker is left alone, and the bot posts its own (#9)', async () => {
   const marker = buildMarker(10);
   const mock = mockFetchSequence([
-    () => jsonResponse(200, [{ id: 901, body: `${marker}\nmalicious`, user: { login: 'octocat', type: 'User' } }])
+    () => jsonResponse(200, [{ id: 901, body: `${marker}\nmalicious`, user: { login: 'octocat', type: 'User' } }]),
+    (url, options) => {
+      assert.match(url, /\/issues\/10\/comments$/);
+      assert.equal(options.method, 'POST');
+      return jsonResponse(201, { id: 556 });
+    }
   ]);
   try {
-    await assert.rejects(
-      upsertPreviewComment({ token: 't', repository: 'octo/widgets', prNumber: 10, body: `${marker}\nnew` }),
-      /Refusing to update comment 901: preview marker is owned by a non-github-actions\[bot\] account/
+    const result = await upsertPreviewComment({
+      token: 't',
+      repository: 'octo/widgets',
+      prNumber: 10,
+      body: `${marker}\nnew`
+    });
+    assert.deepEqual(result, { action: 'created', commentId: 556 });
+    assert.ok(
+      mock.calls.every(call => !String(call.url).includes('/issues/comments/901')),
+      "the user's comment is never edited"
     );
-    assert.equal(mock.calls.length, 1, 'must not patch or create after a marker conflict');
+  } finally {
+    mock.restore();
+  }
+});
+
+test('a user marker next to the bot comment does not stop the update (#9)', async () => {
+  const marker = buildMarker(10);
+  const bot = { login: 'github-actions[bot]', type: 'Bot' };
+  const mock = mockFetchSequence([
+    () =>
+      jsonResponse(200, [
+        { id: 901, body: `${marker}\nmalicious`, user: { login: 'octocat', type: 'User' } },
+        { id: 777, body: `${marker}\nold`, user: bot },
+        { id: 902, body: `${marker}\nanother app`, user: { login: 'other-app[bot]', type: 'Bot' } }
+      ]),
+    (url, options) => {
+      assert.match(url, /\/issues\/comments\/777$/);
+      assert.equal(options.method, 'PATCH');
+      return jsonResponse(200, { id: 777 });
+    }
+  ]);
+  try {
+    const result = await upsertPreviewComment({
+      token: 't',
+      repository: 'octo/widgets',
+      prNumber: 10,
+      body: `${marker}\nnew`
+    });
+    assert.deepEqual(result, { action: 'updated', commentId: 777 });
   } finally {
     mock.restore();
   }
@@ -332,17 +373,25 @@ test('upsertPreviewComment prefers the swiss-knife comment when both markers are
   }
 });
 
-test('a legacy marker claimed by a user still fails closed', async () => {
+test('a legacy marker in a user comment is left alone too', async () => {
   const marker = buildMarker(7);
   const mock = mockFetchSequence([
-    () => jsonResponse(200, [{ id: 902, body: `${LEGACY_MARKER}\nspoof`, user: { login: 'octocat', type: 'User' } }])
+    () => jsonResponse(200, [{ id: 902, body: `${LEGACY_MARKER}\nspoof`, user: { login: 'octocat', type: 'User' } }]),
+    (url, options) => {
+      assert.match(url, /\/issues\/7\/comments$/);
+      assert.equal(options.method, 'POST');
+      return jsonResponse(201, { id: 557 });
+    }
   ]);
   try {
-    await assert.rejects(
-      upsertPreviewComment({ token: 't', repository: 'octo/widgets', prNumber: 7, body: `${marker}\nnew` }),
-      /Refusing to update comment 902/
-    );
-    assert.equal(mock.calls.length, 1);
+    const result = await upsertPreviewComment({
+      token: 't',
+      repository: 'octo/widgets',
+      prNumber: 7,
+      body: `${marker}\nnew`
+    });
+    assert.equal(result.action, 'created');
+    assert.equal(mock.calls.length, 2);
   } finally {
     mock.restore();
   }
@@ -436,4 +485,51 @@ test('upsertPreviewComment writes again when the gate put an older preview part 
   } finally {
     mock.restore();
   }
+});
+
+// #10: the PR's metrics come from its untrusted build artifact (badges/overview.json).
+const HOSTILE = '[Approve now](https://evil.example) <img src=x onerror=alert(1)>';
+
+test('commentMetrics keeps only finite, non-negative numbers', () => {
+  assert.deepEqual(
+    commentMetrics({
+      storiesCount: 12,
+      componentsCount: HOSTILE,
+      totalComponents: -3,
+      coveragePercent: 50,
+      docsCount: Infinity,
+      extra: 'ignored',
+      tests: { total: 4, passed: 3, failed: 1 }
+    }),
+    { storiesCount: 12, coveragePercent: 50, tests: { total: 4, passed: 3, failed: 1 } }
+  );
+  // One non-numeric test count drops the whole test block.
+  assert.deepEqual(commentMetrics({ storiesCount: 1, tests: { total: 4, passed: HOSTILE, failed: 0 } }), {
+    storiesCount: 1
+  });
+  assert.equal(commentMetrics(null), null);
+  assert.equal(commentMetrics('text'), null);
+});
+
+test('buildCommentBody never writes text from the artifact metrics into the comment', () => {
+  const body = buildCommentBody({
+    prNumber: 3,
+    previewUrl: 'https://octo.github.io/widgets/pr-preview/pr-3/',
+    headSha: SHA,
+    runId: 1,
+    repository: 'octo/widgets',
+    metrics: {
+      storiesCount: 7,
+      componentsCount: HOSTILE,
+      totalComponents: HOSTILE,
+      coveragePercent: HOSTILE,
+      tests: { total: 2, passed: HOSTILE, failed: HOSTILE }
+    },
+    baseMetrics: { storiesCount: 5, componentsCount: HOSTILE }
+  });
+  assert.doesNotMatch(body, /evil\.example|onerror|Approve now/);
+  assert.doesNotMatch(body, /undefined|NaN/);
+  assert.doesNotMatch(body, /Interaction Test Results/);
+  assert.ok(body.includes('| 📚 **Stories** | 5 | 7 | +2 📈 |'));
+  assert.ok(body.includes('| 🧩 **Documented Components** | - | - | - |'));
 });

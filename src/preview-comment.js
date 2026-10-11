@@ -94,6 +94,28 @@ function formatDiff(baseVal, prVal, isPercent = false) {
   return `0${unit}`;
 }
 
+const nonNegative = value => (Number.isFinite(value) && value >= 0 ? value : undefined);
+
+/**
+ * The metrics a comment may show. The PR's come from its untrusted build artifact
+ * (badges/overview.json), so only finite, non-negative numbers are kept: anything else (text,
+ * markdown, HTML) is dropped and shows as "-" rather than reaching the comment.
+ */
+export function commentMetrics(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const metrics = {};
+  for (const key of ['storiesCount', 'componentsCount', 'totalComponents', 'coveragePercent', 'docsCount']) {
+    const value = nonNegative(raw[key]);
+    if (value !== undefined) metrics[key] = value;
+  }
+  const tests = raw.tests;
+  if (tests && typeof tests === 'object') {
+    const [total, passed, failed] = [tests.total, tests.passed, tests.failed].map(nonNegative);
+    if (total !== undefined && passed !== undefined && failed !== undefined) metrics.tests = { total, passed, failed };
+  }
+  return metrics;
+}
+
 export function buildCommentBody({
   prNumber,
   previewUrl,
@@ -113,6 +135,8 @@ export function buildCommentBody({
   if (typeof headSha !== 'string' || !/^[0-9a-f]{40}$/.test(headSha)) {
     throw new Error(`Invalid headSha "${headSha}" for preview comment body`);
   }
+  metrics = commentMetrics(metrics);
+  baseMetrics = commentMetrics(baseMetrics);
   const marker = buildMarker(prNumber);
   const shortSha = headSha.slice(0, 7);
   const runLink = repository && runId ? `https://github.com/${repository}/actions/runs/${runId}` : null;
@@ -194,7 +218,7 @@ export function buildCommentBody({
 
       const compDiff = formatDiff(baseMetrics.componentsCount, metrics.componentsCount);
       lines.push(
-        `| 🧩 **Documented Components** | ${baseMetrics.componentsCount} | ${metrics.componentsCount} | ${compDiff} |`
+        `| 🧩 **Documented Components** | ${baseMetrics.componentsCount ?? '-'} | ${metrics.componentsCount ?? '-'} | ${compDiff} |`
       );
     } else {
       lines.push('| Metric | PR Preview |');
@@ -210,7 +234,7 @@ export function buildCommentBody({
 
       lines.push(`| 🎯 **Component Coverage** | \`${prCompCov}\` |`);
       lines.push(`| 📚 **Stories** | ${metrics.storiesCount} |`);
-      lines.push(`| 🧩 **Documented Components** | ${metrics.componentsCount} |`);
+      lines.push(`| 🧩 **Documented Components** | ${metrics.componentsCount ?? '-'} |`);
     }
     lines.push('');
   }
@@ -258,21 +282,18 @@ async function githubRequest(url, { token, method = 'GET', body } = {}) {
 }
 
 /**
- * This PR's preview comment among `comments`: the one with the current marker, else a legacy
- * one. Throws when a marker sits in a comment the bot did not write.
+ * This PR's preview comment among `comments`: the bot's comment with the current marker, else
+ * the bot's legacy one. A marker in a comment the bot did not write is ignored: anyone can post
+ * the marker text, and it must neither be edited nor stop the bot's own comment.
  */
 export function pickPreviewComment(comments, markers) {
   const marked = comments.filter(
-    comment => typeof comment.body === 'string' && markers.some(value => comment.body.includes(value))
+    comment =>
+      typeof comment.body === 'string' &&
+      markers.some(value => comment.body.includes(value)) &&
+      comment.user?.login === PREVIEW_COMMENT_AUTHOR &&
+      comment.user?.type === 'Bot'
   );
-  const conflicting = marked.find(
-    comment => comment.user?.login !== PREVIEW_COMMENT_AUTHOR || comment.user?.type !== 'Bot'
-  );
-  if (conflicting) {
-    throw new Error(
-      `Refusing to update comment ${conflicting.id}: preview marker is owned by a non-${PREVIEW_COMMENT_AUTHOR} account`
-    );
-  }
   return marked.find(comment => comment.body.includes(markers[0])) ?? marked[0] ?? null;
 }
 
