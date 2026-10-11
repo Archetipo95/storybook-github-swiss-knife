@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { detectPackageManager, planInit, registerAddon, runInit } from '../packages/addon/cli/init.js';
+import { addonTarballUrl, detectPackageManager, planInit, registerAddon, runInit } from '../packages/addon/cli/init.js';
 
 const REF = 'f'.repeat(40);
 const defaults = {
@@ -165,7 +165,12 @@ test('runInit writes the files, registers the addon and keeps existing files', (
   const output = lines.join('\n');
   assert.match(output, /kept {5}\.github\/workflows\/visual\.yml/);
   assert.match(output, /gh label create visual-approved/);
-  assert.match(output, /pnpm add --save-dev storybook-swiss-knife/);
+  // The addon is not on npm: the bare name would install an unrelated package of that name.
+  assert.ok(
+    output.includes(`pnpm add --save-dev ${addonTarballUrl('0.1.0')}`),
+    `init prints the release tarball for its own version:\n${output}`
+  );
+  assert.doesNotMatch(output, /add --save-dev storybook-swiss-knife\b/);
   assert.match(output, /required status checks/);
 });
 
@@ -196,4 +201,23 @@ test('runInit never overwrites the configuration, even with --force', () => {
 test('planInit installs Yarn 1 projects with a frozen lockfile', () => {
   const { files } = planInit({ ...defaults, packageManager: 'yarn-classic' });
   assert.match(files['.github/workflows/preview-build.yml'], /yarn install --frozen-lockfile/);
+});
+
+test('the docs install the addon and run init only from a release tarball', () => {
+  // `npx storybook-swiss-knife` or `npm install storybook-swiss-knife` would fetch whatever an
+  // unrelated npm package of that name holds, until the addon is published.
+  const bare =
+    /npx (?:--yes |-y )?storybook-swiss-knife\b|(?:npm install|npm i|add)(?: --save-dev| --dev| -D)? storybook-swiss-knife\b/;
+  const files = ['README.md', 'packages/addon/README.md', ...fs.readdirSync('docs').map(name => `docs/${name}`)].filter(
+    file => file.endsWith('.md')
+  );
+  for (const file of files) {
+    const text = fs.readFileSync(file, 'utf8');
+    const line = text.split('\n').find(candidate => bare.test(candidate));
+    assert.equal(line, undefined, `${file} installs or runs the bare package name: ${line}`);
+  }
+  assert.match(
+    fs.readFileSync('README.md', 'utf8'),
+    /npx --yes https:\/\/github\.com\/Archetipo95\/storybook-github-swiss-knife\/releases\/download\/v[\d.]+\/storybook-swiss-knife-[\d.]+\.tgz init/
+  );
 });

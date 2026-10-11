@@ -5,8 +5,11 @@ Pages deploys, PR previews, and visual regression plus accessibility checks on e
 Storybook 8.6, 9 and 10.
 
 ```sh
-npx storybook-swiss-knife init
+npx --yes https://github.com/Archetipo95/storybook-github-swiss-knife/releases/download/v0.5.0/storybook-swiss-knife-0.5.0.tgz init
 ```
+
+The addon isn't on npm yet: run `init`, and install the addon, from the tarball attached to each
+release.
 
 `init` writes the caller workflows pinned to this package's release, `.storybook/swiss-knife.json`
 and the addon registration, creates the approval label, and prints the remaining steps.

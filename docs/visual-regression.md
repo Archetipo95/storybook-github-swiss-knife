@@ -6,8 +6,14 @@ branch, scans it with axe, and posts two required checks: `swiss-knife / visual`
 
 ## Setup
 
-`npx storybook-swiss-knife init` writes all of this (and the PR preview workflows) and creates
-the label; see `--help`. By hand:
+`init` writes all of this (and the PR preview workflows) and creates the label; see `--help`. The
+addon isn't on npm yet, so run it from the release tarball:
+
+```bash
+npx --yes https://github.com/Archetipo95/storybook-github-swiss-knife/releases/download/v0.5.0/storybook-swiss-knife-0.5.0.tgz init
+```
+
+By hand:
 
 Two small workflow files. A `workflow_run` trigger cannot live in a reusable workflow, so the
 trusted half needs its own caller.
@@ -98,11 +104,8 @@ baseline cache key.
 
 ## Storybook addon
 
-```bash
-npm install --save-dev storybook-swiss-knife
-```
-
-Every release also carries the addon as an npm tarball, built from the release's commit:
+The addon isn't on npm yet. Every release carries it as an npm tarball, built from the release's
+commit:
 
 ```bash
 npm install --save-dev https://github.com/Archetipo95/storybook-github-swiss-knife/releases/download/v<version>/storybook-swiss-knife-<version>.tgz

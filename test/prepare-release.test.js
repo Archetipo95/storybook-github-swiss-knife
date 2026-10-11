@@ -66,6 +66,16 @@ test('a release made by prepare-release passes the release pin check', t => {
   const worktree = worktreeOfHead(t);
   const prepared = prepareRelease(worktree, 'HEAD');
   assert.equal(prepared.status, 0, prepared.stderr);
+  // The quickstart's addon tarball moves with the release.
+  for (const file of ['README.md', 'packages/addon/README.md', 'docs/visual-regression.md']) {
+    const tarballs = [
+      ...fs
+        .readFileSync(path.join(worktree, file), 'utf8')
+        .matchAll(/releases\/download\/v([\d.]+)\/storybook-swiss-knife-([\d.]+)\.tgz/g)
+    ];
+    assert.ok(tarballs.length > 0, `${file} links no addon tarball`);
+    for (const match of tarballs) assert.deepEqual([match[1], match[2]], ['99.0.0', '99.0.0'], file);
+  }
   git([...IDENTITY, 'commit', '-qam', 'release'], worktree);
 
   const check = releasePinCheck(worktree);

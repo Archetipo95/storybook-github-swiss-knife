@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `pr-preview-publish.yml` gate job no longer asks for `pull-requests: read`. It reads the pull request from the `workflow_run` event and the run's artifacts, and lists the artifacts with `actions: read`; the step that fetched the pull request's head SHA went in #45. Callers need no change: granting more than a job asks for is fine.
 
+### Security
+
+- The quickstart, the docs and `init`'s remaining steps no longer run or install the bare `storybook-swiss-knife` package name. The addon isn't on npm yet, so `npx storybook-swiss-knife init` or `npm install storybook-swiss-knife` would run whatever an unrelated package of that name holds. `init` now runs from the release tarball (`npx --yes <release tarball URL> init`), and prints the tarball of its own version as the addon to install. `prepare-release` moves the quickstart's tarball URL with each release, and a test fails on docs that use the bare name.
+
 ## [0.5.0] - 2026-10-11
 
 ### Removed
