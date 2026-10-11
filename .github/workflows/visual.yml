@@ -169,17 +169,27 @@ jobs:
           BUILD_COMMAND: ${{ inputs.build_command }}
           STORYBOOK_DIR: ${{ inputs.storybook_dir }}
         run: |
+          # A monorepo package without its own lockfile installs from the repository root's.
+          has_lockfile() {
+            for file in pnpm-lock.yaml yarn.lock bun.lock bun.lockb package-lock.json npm-shrinkwrap.json; do
+              [ -f "$1/$file" ] && return 0
+            done
+            return 1
+          }
+          lockdir=.
+          if ! has_lockfile . && has_lockfile "$GITHUB_WORKSPACE"; then lockdir="$GITHUB_WORKSPACE"; fi
           if [ -z "$INSTALL_COMMAND" ]; then
-            if [ -f pnpm-lock.yaml ]; then INSTALL_COMMAND='corepack pnpm install --frozen-lockfile'
-            elif [ -f yarn.lock ]; then INSTALL_COMMAND='corepack yarn install --immutable'
-            elif [ -f bun.lock ] || [ -f bun.lockb ]; then INSTALL_COMMAND='bun install --frozen-lockfile'
+            if [ -f "$lockdir/pnpm-lock.yaml" ]; then INSTALL_COMMAND='corepack pnpm install --frozen-lockfile'
+            elif [ -f "$lockdir/yarn.lock" ]; then INSTALL_COMMAND='corepack yarn install --immutable'
+            elif [ -f "$lockdir/bun.lock" ] || [ -f "$lockdir/bun.lockb" ]; then INSTALL_COMMAND='bun install --frozen-lockfile'
             else INSTALL_COMMAND='npm ci'
             fi
+            if [ "$lockdir" != . ]; then INSTALL_COMMAND="(cd \"$lockdir\" && $INSTALL_COMMAND)"; fi
           fi
           eval "$INSTALL_COMMAND"
           if [ -z "$BUILD_COMMAND" ]; then
-            if [ -f pnpm-lock.yaml ]; then BUILD_COMMAND='corepack pnpm exec storybook build --quiet --output-dir "$STORYBOOK_DIR"'
-            elif [ -f yarn.lock ]; then BUILD_COMMAND='corepack yarn storybook build --quiet --output-dir "$STORYBOOK_DIR"'
+            if [ -f "$lockdir/pnpm-lock.yaml" ]; then BUILD_COMMAND='corepack pnpm exec storybook build --quiet --output-dir "$STORYBOOK_DIR"'
+            elif [ -f "$lockdir/yarn.lock" ]; then BUILD_COMMAND='corepack yarn storybook build --quiet --output-dir "$STORYBOOK_DIR"'
             else BUILD_COMMAND='npx --no-install storybook build --quiet --output-dir "$STORYBOOK_DIR"'
             fi
           fi
@@ -221,17 +231,27 @@ jobs:
           BUILD_COMMAND: ${{ inputs.build_command }}
           STORYBOOK_DIR: ${{ inputs.storybook_dir }}
         run: |
+          # A monorepo package without its own lockfile installs from the repository root's.
+          has_lockfile() {
+            for file in pnpm-lock.yaml yarn.lock bun.lock bun.lockb package-lock.json npm-shrinkwrap.json; do
+              [ -f "$1/$file" ] && return 0
+            done
+            return 1
+          }
+          lockdir=.
+          if ! has_lockfile . && has_lockfile "$GITHUB_WORKSPACE"; then lockdir="$GITHUB_WORKSPACE"; fi
           if [ -z "$INSTALL_COMMAND" ]; then
-            if [ -f pnpm-lock.yaml ]; then INSTALL_COMMAND='corepack pnpm install --frozen-lockfile'
-            elif [ -f yarn.lock ]; then INSTALL_COMMAND='corepack yarn install --immutable'
-            elif [ -f bun.lock ] || [ -f bun.lockb ]; then INSTALL_COMMAND='bun install --frozen-lockfile'
+            if [ -f "$lockdir/pnpm-lock.yaml" ]; then INSTALL_COMMAND='corepack pnpm install --frozen-lockfile'
+            elif [ -f "$lockdir/yarn.lock" ]; then INSTALL_COMMAND='corepack yarn install --immutable'
+            elif [ -f "$lockdir/bun.lock" ] || [ -f "$lockdir/bun.lockb" ]; then INSTALL_COMMAND='bun install --frozen-lockfile'
             else INSTALL_COMMAND='npm ci'
             fi
+            if [ "$lockdir" != . ]; then INSTALL_COMMAND="(cd \"$lockdir\" && $INSTALL_COMMAND)"; fi
           fi
           eval "$INSTALL_COMMAND"
           if [ -z "$BUILD_COMMAND" ]; then
-            if [ -f pnpm-lock.yaml ]; then BUILD_COMMAND='corepack pnpm exec storybook build --quiet --output-dir "$STORYBOOK_DIR"'
-            elif [ -f yarn.lock ]; then BUILD_COMMAND='corepack yarn storybook build --quiet --output-dir "$STORYBOOK_DIR"'
+            if [ -f "$lockdir/pnpm-lock.yaml" ]; then BUILD_COMMAND='corepack pnpm exec storybook build --quiet --output-dir "$STORYBOOK_DIR"'
+            elif [ -f "$lockdir/yarn.lock" ]; then BUILD_COMMAND='corepack yarn storybook build --quiet --output-dir "$STORYBOOK_DIR"'
             else BUILD_COMMAND='npx --no-install storybook build --quiet --output-dir "$STORYBOOK_DIR"'
             fi
           fi
