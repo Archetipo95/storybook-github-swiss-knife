@@ -233,10 +233,23 @@ export function loadSwissKnifeConfig({ cwd = process.cwd() } = {}) {
     raw = readJson(jsonPath);
     validateSwissKnifeConfig(raw);
     source = SWISS_KNIFE_CONFIG_PATH;
+    let legacyPages;
+    let legacyProblem = '';
     if (fs.existsSync(legacyPath) && raw.pages === undefined) {
-      const pages = parseSimpleYaml(fs.readFileSync(legacyPath, 'utf8'));
-      validateConfig(pages);
-      raw = { ...raw, pages };
+      // A broken legacy file next to the JSON file only warns, as it did while it was ignored.
+      try {
+        legacyPages = parseSimpleYaml(fs.readFileSync(legacyPath, 'utf8'));
+        validateConfig(legacyPages);
+      } catch (error) {
+        legacyProblem = error.message;
+      }
+    }
+    if (legacyProblem) {
+      warnings.push(
+        `${LEGACY_CONFIG_PATH} is ignored: ${legacyProblem}. Move its settings under "pages" in ${SWISS_KNIFE_CONFIG_PATH}.`
+      );
+    } else if (legacyPages) {
+      raw = { ...raw, pages: legacyPages };
       warnings.push(
         `${LEGACY_CONFIG_PATH} is deprecated. ${SWISS_KNIFE_CONFIG_PATH} has no "pages", so the Pages settings still come from ${LEGACY_CONFIG_PATH}: move them under "pages" in ${SWISS_KNIFE_CONFIG_PATH}.`
       );

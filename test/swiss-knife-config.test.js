@@ -193,3 +193,17 @@ test('schema documents every storybook-github-pages default key', () => {
   const documented = Object.keys(schema.properties.pages.properties);
   for (const key of Object.keys(DEFAULT_CONFIG)) assert.ok(documented.includes(key), `pages.${key}`);
 });
+
+test('a legacy file the loader rejects, next to a JSON file without pages, only warns', () => {
+  const config = loadSwissKnifeConfig({
+    cwd: repo({ [LEGACY_CONFIG_PATH]: '__proto__: x\n', [SWISS_KNIFE_CONFIG_PATH]: { visual: { shards: 2 } } })
+  });
+  assert.equal(config.pages, null);
+  assert.equal(config.visual.shards, 2);
+  assert.match(config.warnings[0], /\.storybook-pages\.yml is ignored: Configuration key "__proto__" is not allowed/);
+  const invalid = loadSwissKnifeConfig({
+    cwd: repo({ [LEGACY_CONFIG_PATH]: 'mode: bogus\n', [SWISS_KNIFE_CONFIG_PATH]: { visual: { shards: 2 } } })
+  });
+  assert.equal(invalid.pages, null);
+  assert.match(invalid.warnings[0], /is ignored: Unsupported mode/);
+});
