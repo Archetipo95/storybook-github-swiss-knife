@@ -172,6 +172,7 @@ on:
 permissions:
   contents: write
   pages: write
+  deployments: write
   pull-requests: write
   actions: read
 
@@ -262,6 +263,8 @@ on:
 permissions:
   contents: write
   pages: write
+  deployments: write
+  pull-requests: write
 
 jobs:
   cleanup:
@@ -290,8 +293,9 @@ steps:
       pr_number: ${{ github.event.pull_request.number }}
 ```
 
-The job running this composite action also needs `deployments: write` because
-cleanup deactivates the deployment associated with a removed preview.
+The job running this composite action also needs `deployments: write`, because
+cleanup deactivates the deployment associated with a removed preview, and
+`pull-requests: write` to mark the PR's preview comment as removed.
 
 #### 3. Reusable Stale-Preview Janitor
 
@@ -309,7 +313,7 @@ permissions:
   contents: write
   pages: write
   deployments: write
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   janitor:
@@ -339,8 +343,9 @@ steps:
       retention_days: '30'
 ```
 
-The job running this composite action needs `deployments: write` and
-`pull-requests: read` to deactivate deployments and identify live PRs.
+The job running this composite action needs `deployments: write` to deactivate
+deployments, and `pull-requests: write` to find the live PRs and write the expiry
+warning in their preview comments.
 
 ### Adapting the templates to another repository
 
