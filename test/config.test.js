@@ -531,3 +531,44 @@ test('computeBaseUrl puts PR previews under preview_root, where the publisher wr
   );
   assert.equal(computeBaseUrl({ repository: 'acme/design-system', previewRoot: 'pr-preview' }), '/design-system/');
 });
+
+// Every directory deploy replaces target_directory whole, so previews inside it were wiped by each
+// deploy of the base branch (second audit #18).
+test('validateConfig rejects a preview_root inside the directory-mode target_directory', () => {
+  for (const [target, previewRoot] of [
+    ['site', 'site/pr-preview'],
+    ['site', 'site'],
+    ['site/', 'site/previews/'],
+    ['./site', 'site/pr-preview']
+  ]) {
+    assert.throws(
+      () => validateConfig({ mode: 'directory', target_directory: target, preview_root: previewRoot }),
+      /preview_root ".*" is inside target_directory ".*"/,
+      `${target} / ${previewRoot}`
+    );
+  }
+  for (const [target, previewRoot] of [
+    ['site', 'pr-preview'],
+    ['site', 'site-previews'],
+    ['', 'pr-preview'],
+    ['site', '']
+  ]) {
+    assert.doesNotThrow(() =>
+      validateConfig({ mode: 'directory', target_directory: target, preview_root: previewRoot })
+    );
+  }
+  // Artifact mode has no target directory on the Pages branch.
+  assert.doesNotThrow(() =>
+    validateConfig({ mode: 'artifact', target_directory: 'site', preview_root: 'site/pr-preview' })
+  );
+});
+
+test('resolveDeploymentTarget drops a trailing slash from the target directory', () => {
+  const target = resolveDeploymentTarget({
+    mode: 'directory',
+    target_directory: 'staging/',
+    site_url: 'https://example.com'
+  });
+  assert.equal(target.directory, 'staging');
+  assert.equal(target.url, 'https://example.com/staging');
+});

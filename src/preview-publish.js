@@ -247,8 +247,8 @@ export async function publishPreview({
       managedDirectories,
       // The visual regression report is published into the same PR directory by the visual gate.
       preserveEntries: ['visual'],
+      // The preview is served from its own folder: base_path is the production Storybook's.
       siteUrl,
-      basePath,
       triggerPagesRebuild,
       token,
       repository
