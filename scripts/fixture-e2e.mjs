@@ -22,6 +22,7 @@ import { evaluateVisualGate } from '../src/visual/gate.js';
 import { buildGalleryManifest } from '../src/visual/manifest.js';
 import { readVisualResults, storyIdOf } from '../src/visual/results.js';
 import { createStaticServer } from '../runner/lib/serve.js';
+import { detectPackageManager, storybookBuildCommand } from '../packages/addon/cli/init.js';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const runnerDir = path.join(repoRoot, 'runner');
@@ -53,6 +54,22 @@ function buildStorybook(projectDir, outputDir) {
   run(path.join(fixtureDir, 'node_modules/.bin/storybook'), ['build', '--quiet', '--output-dir', outputDir], {
     cwd: projectDir,
     env: { ...process.env, STORYBOOK_DISABLE_TELEMETRY: '1' }
+  });
+}
+
+/**
+ * The base build runs the default build command `storybook-swiss-knife init` writes for the
+ * fixture's package manager, so it is checked on a real install. The fixtures carry the
+ * `storybook` script `storybook init` adds, which `yarn storybook build` would run instead.
+ */
+function buildWithDefaultCommand(outputDir) {
+  fs.rmSync(outputDir, { recursive: true, force: true });
+  const command = `${storybookBuildCommand(detectPackageManager(fixtureDir))} --quiet --output-dir "${outputDir}"`;
+  run('bash', ['-c', command], {
+    cwd: fixtureDir,
+    env: { ...process.env, STORYBOOK_DISABLE_TELEMETRY: '1' },
+    // A dev server started by mistake never exits.
+    timeout: 10 * 60 * 1000
   });
 }
 
@@ -141,7 +158,7 @@ fs.mkdirSync(work, { recursive: true });
 run('node', [path.join(repoRoot, 'packages/addon/build.js')]);
 const baseBuild = path.join(work, 'storybook-base');
 const headBuild = path.join(work, 'storybook-head');
-buildStorybook(fixtureDir, baseBuild);
+buildWithDefaultCommand(baseBuild);
 const head = mutatedCopy();
 try {
   buildStorybook(head, headBuild);

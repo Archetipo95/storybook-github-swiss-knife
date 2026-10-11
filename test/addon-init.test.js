@@ -5,7 +5,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { addonTarballUrl, detectPackageManager, planInit, registerAddon, runInit } from '../packages/addon/cli/init.js';
+import {
+  addonTarballUrl,
+  detectPackageManager,
+  planInit,
+  registerAddon,
+  runInit,
+  storybookBuildCommand
+} from '../packages/addon/cli/init.js';
 
 const REF = 'f'.repeat(40);
 const defaults = {
@@ -250,4 +257,18 @@ test('runInit finds the root lockfile of a monorepo package', () => {
     fs.readFileSync(path.join(dir, '.github/workflows/visual.yml'), 'utf8'),
     /install_command: '\(cd \.\.\/\.\. && corepack pnpm install --frozen-lockfile\)'/
   );
+});
+
+test("init's Yarn builds run the Storybook binary, never a package.json storybook script", () => {
+  // `storybook init` adds a `storybook` script (`storybook dev -p 6006`), which `yarn storybook`
+  // runs before the binary.
+  const berry = planInit({ ...defaults, packageManager: 'yarn' }).files['.github/workflows/preview-build.yml'];
+  const classic = planInit({ ...defaults, packageManager: 'yarn-classic' }).files[
+    '.github/workflows/preview-build.yml'
+  ];
+  assert.match(berry, /corepack yarn run -B storybook build --quiet/);
+  assert.match(classic, /npx --no-install storybook build --quiet/);
+  for (const manager of ['npm', 'pnpm', 'yarn', 'yarn-classic', 'bun']) {
+    assert.doesNotMatch(storybookBuildCommand(manager), /(?:^|\s)(?:corepack )?yarn storybook\b/, manager);
+  }
 });

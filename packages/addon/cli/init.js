@@ -20,6 +20,9 @@ export const ADDON = 'storybook-swiss-knife';
 export const addonTarballUrl = version =>
   `https://github.com/${REPOSITORY}/releases/download/v${version}/${ADDON}-${version}.tgz`;
 
+// The Storybook binary, never `<pm> storybook`: Yarn runs a package.json `storybook` script before
+// a binary of that name, and `storybook init` adds one (`storybook dev -p 6006`). Yarn 2+ has
+// `run -B` (binaries only); Yarn 1 installs node_modules/.bin, which npx runs.
 const COMMANDS = {
   npm: { install: 'npm ci', build: 'npx storybook build', add: 'npm install --save-dev' },
   pnpm: {
@@ -27,10 +30,21 @@ const COMMANDS = {
     build: 'corepack pnpm exec storybook build',
     add: 'pnpm add --save-dev'
   },
-  yarn: { install: 'corepack yarn install --immutable', build: 'corepack yarn storybook build', add: 'yarn add --dev' },
-  'yarn-classic': { install: 'yarn install --frozen-lockfile', build: 'yarn storybook build', add: 'yarn add --dev' },
+  yarn: {
+    install: 'corepack yarn install --immutable',
+    build: 'corepack yarn run -B storybook build',
+    add: 'yarn add --dev'
+  },
+  'yarn-classic': {
+    install: 'yarn install --frozen-lockfile',
+    build: 'npx --no-install storybook build',
+    add: 'yarn add --dev'
+  },
   bun: { install: 'bun install --frozen-lockfile', build: 'bunx storybook build', add: 'bun add --dev' }
 };
+
+/** The default Storybook build command for a package manager (`detectPackageManager`'s names). */
+export const storybookBuildCommand = packageManager => COMMANDS[packageManager].build;
 
 const yamlString = value => `'${String(value).replaceAll("'", "''")}'`;
 
