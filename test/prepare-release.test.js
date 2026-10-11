@@ -113,6 +113,23 @@ test('prepare-release refuses when the branch changes code its pins would not ru
   assert.equal(git(['status', '--porcelain'], worktree), '', 'nothing may be written before refusing');
 });
 
+// src/ imports packages/addon/cli (the package-manager detection, the config parser), so the pins
+// run that code too (second audit #15).
+test('prepare-release refuses when the branch changes packages/addon/cli, which src/ imports', t => {
+  const worktree = worktreeOfHead(t);
+  const base = git(['rev-parse', 'HEAD'], worktree);
+  fs.appendFileSync(path.join(worktree, 'packages/addon/cli/package-manager.js'), '\n// A release-branch change.\n');
+  git([...IDENTITY, 'commit', '-qam', 'cli code on the release branch'], worktree);
+
+  const prepared = prepareRelease(worktree, base);
+  assert.notEqual(prepared.status, 0);
+  assert.match(
+    prepared.stderr,
+    /change code the internal pins would not run:\npackages\/addon\/cli\/package-manager\.js/
+  );
+  assert.equal(git(['status', '--porcelain'], worktree), '', 'nothing may be written before refusing');
+});
+
 const bumpPins = (worktree, base) =>
   spawnSync('node', [path.join(repoRoot, 'scripts/bump-pins.js')], {
     cwd: worktree,

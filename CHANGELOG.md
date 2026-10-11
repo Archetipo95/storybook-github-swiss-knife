@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - With `base_path` set, a PR preview's URL (in the preview comment, its deployment and the `page_url` output) was the production site's, `<site_url><base_path>`. The preview was published to the right folder; its URL is now that folder, `<site_url>/<preview_root>/pr-<N>`.
 - A `target_directory` written with a trailing slash (`staging/`) failed every directory deploy with EINVAL: the staging and backup copies were made inside the target. The slash is now dropped, in the configuration and in the publisher.
 - A `preview_root` inside the directory-mode `target_directory` (for example `site` and `site/pr-preview`) was accepted, and every deploy of the base branch replaced the target, previews included. The configuration is now rejected with a message to move the previews.
+- The Release Tags workflow planned against every version tag in the repository, so a stray `vX.Y.Z` tag pushed off main could become the major tag's target and the latest release. It now only counts tags reachable from the commit being released.
+- The release checks that keep the internal action pins on the code being released (`prepare-release`, `bump-pins`, and the release pin check) watched `src/`, `actions/` and `runner/`, but not `packages/addon/cli/`, which `src/` imports (package manager detection, the configuration parser). A change there could ship with pins that run older code; they now watch it too.
 
 ## [0.5.1] - 2026-10-11
 

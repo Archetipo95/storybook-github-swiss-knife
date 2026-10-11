@@ -90,7 +90,9 @@ jobs:
         id: plan
         env:
           RELEASE_REF: ${{ github.ref }}
-        run: EXISTING_TAGS="$(git tag --list 'v*.*.*')" node scripts/release-tag.js
+        # Only tags reachable from this commit: a stray version tag pushed off main must never
+        # become the major tag's target or the latest release.
+        run: EXISTING_TAGS="$(git tag --list --merged HEAD 'v*.*.*')" node scripts/release-tag.js
 
       - name: Set up Node.js
         if: steps.plan.outputs.verify == 'true'
