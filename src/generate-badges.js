@@ -101,6 +101,15 @@ export function renderBadgeSvg({
   ].join('\n');
 }
 
+// The packages that carry Storybook's own version, in order of preference. Addons and tools with
+// their own versions (@storybook/addon-coverage, @storybook/test-runner, ...) are not used.
+const STORYBOOK_VERSION_PACKAGES = [
+  /^storybook$/,
+  /^@storybook\/core$/,
+  /^@storybook\/(?:react|vue3|vue|angular|svelte|web-components|html|preact|ember|server|nextjs|sveltekit|react-native-web)(?:-(?:vite|webpack5|rsbuild))?$/,
+  /^@storybook\/(?:builder-vite|builder-webpack5|blocks|addon-essentials|addon-docs|manager-api|preview-api|components|theming)$/
+];
+
 /**
  * Reads Storybook version from package.json if available.
  */
@@ -112,7 +121,8 @@ export function extractStorybookVersion(workspaceRoot = process.cwd()) {
       try {
         const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
         const deps = { ...pkg.devDependencies, ...pkg.dependencies };
-        const sbKey = Object.keys(deps).find(k => k === 'storybook' || k.startsWith('@storybook/'));
+        const names = Object.keys(deps).filter(name => deps[name]);
+        const sbKey = STORYBOOK_VERSION_PACKAGES.map(pattern => names.find(name => pattern.test(name))).find(Boolean);
         if (sbKey && deps[sbKey]) {
           const rawVersion = deps[sbKey].replace(/^[\^~>=<]+/, '');
           return rawVersion.startsWith('v') ? rawVersion : `v${rawVersion}`;
@@ -286,10 +296,11 @@ export function extractStorybookMetrics(
       for (const entry of Object.values(entries)) {
         if (!entry) continue;
         if (entry.type === 'docs') {
+          // Docs pages are not components: a standalone MDX page would count as a covered one.
           docsCount++;
-        } else {
-          storiesCount++;
+          continue;
         }
+        storiesCount++;
         if (entry.title) {
           components.add(entry.title);
         } else if (entry.id) {
@@ -311,6 +322,11 @@ export function extractStorybookMetrics(
 
       for (const story of Object.values(stories)) {
         if (!story) continue;
+        // Storybook 6's MDX docs-only pages are entries too; they are docs, not components.
+        if (story.parameters?.docsOnly) {
+          docsCount++;
+          continue;
+        }
         storiesCount++;
         if (story.title) {
           components.add(story.title);

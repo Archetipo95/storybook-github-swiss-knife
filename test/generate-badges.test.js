@@ -357,3 +357,75 @@ test('generateBadges rejects path traversal in badgesDirectory', () => {
   }, /escapes static output directory/);
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
+
+function packageDir(t, dependencies) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-badge-version-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ devDependencies: dependencies }));
+  return dir;
+}
+
+test("extractStorybookVersion takes Storybook's own version, not a separately versioned addon (#14)", t => {
+  // The addon is listed first, as package.json files are sorted alphabetically.
+  const withCore = packageDir(t, {
+    '@storybook/addon-coverage': '^2.0.0',
+    '@storybook/react-vite': '^9.1.20',
+    storybook: '^9.1.20'
+  });
+  assert.equal(extractStorybookVersion(withCore), 'v9.1.20');
+  // Without the storybook package, a framework package carries the version.
+  const frameworkOnly = packageDir(t, { '@storybook/test-runner': '^0.23.0', '@storybook/vue3-vite': '~8.6.14' });
+  assert.equal(extractStorybookVersion(frameworkOnly), 'v8.6.14');
+  // Only separately versioned tools: no Storybook version, rather than a wrong one.
+  assert.equal(
+    extractStorybookVersion(
+      packageDir(t, { '@storybook/addon-coverage': '^2.0.0', '@storybook/test-runner': '^0.23.0' })
+    ),
+    'deployed'
+  );
+});
+
+test('extractStorybookMetrics does not count standalone MDX docs pages as components (#15)', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-badge-mdx-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  fs.writeFileSync(
+    path.join(dir, 'index.json'),
+    JSON.stringify({
+      v: 5,
+      entries: {
+        'introduction--docs': {
+          type: 'docs',
+          id: 'introduction--docs',
+          title: 'Introduction',
+          tags: ['unattached-mdx']
+        },
+        'guides-theming--docs': { type: 'docs', id: 'guides-theming--docs', title: 'Guides/Theming' },
+        'button--docs': { type: 'docs', id: 'button--docs', title: 'Components/Button', tags: ['autodocs'] },
+        'button--primary': { type: 'story', id: 'button--primary', title: 'Components/Button' }
+      }
+    })
+  );
+  const metrics = extractStorybookMetrics(dir, dir);
+  assert.equal(metrics.componentsCount, 1);
+  assert.equal(metrics.storiesCount, 1);
+  assert.equal(metrics.docsCount, 3);
+});
+
+test('extractStorybookMetrics counts Storybook 6 docs-only MDX entries as docs, not components (#15)', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-badge-docsonly-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  fs.writeFileSync(
+    path.join(dir, 'stories.json'),
+    JSON.stringify({
+      v: 3,
+      stories: {
+        'intro--page': { id: 'intro--page', title: 'Intro', parameters: { docsOnly: true } },
+        'header--logged-in': { id: 'header--logged-in', title: 'UI/Header' }
+      }
+    })
+  );
+  const metrics = extractStorybookMetrics(dir, dir);
+  assert.equal(metrics.componentsCount, 1);
+  assert.equal(metrics.storiesCount, 1);
+  assert.equal(metrics.docsCount, 1);
+});
