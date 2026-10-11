@@ -4,6 +4,7 @@ import { classifyVisualResults } from '../visual/results.js';
 
 export const VISUAL_CHECK = 'swiss-knife / visual';
 export const A11Y_CHECK = 'swiss-knife / accessibility';
+export const APPROVED_TITLE = 'Visual changes approved';
 // GitHub truncates check run summaries above 65535 characters.
 const MAX_SUMMARY = 60000;
 
@@ -55,7 +56,7 @@ export function evaluateGate({ bundle, config, baseline, approved, headSha, prNu
         const count = gate.counts.changed + gate.counts.removed;
         return `${count} visual change${count === 1 ? '' : 's'} to review`;
       })(),
-      approved: 'Visual changes approved',
+      approved: APPROVED_TITLE,
       clean: 'No visual changes'
     }[gate.reason],
     summary: truncate(

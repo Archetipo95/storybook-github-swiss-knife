@@ -23,7 +23,7 @@ import {
 } from '../preview-comment.js';
 import { loadSwissKnifeConfig } from '../swiss-knife-config.js';
 import { evaluateApproval } from './approval.js';
-import { evaluateGate, renderChecksComment } from './core.js';
+import { A11Y_CHECK, APPROVED_TITLE, VISUAL_CHECK, evaluateGate, renderChecksComment } from './core.js';
 
 export const VISUAL_ARTIFACT_PATTERN = /^swiss-knife-visual-pr-(\d+)-run-(\d+)$/;
 
@@ -132,6 +132,36 @@ async function resolvePullRequest(request, repository, run) {
 }
 
 /**
+ * When the run that captured the gated results completed: this run, or for a label event the run
+ * whose bundle it reused (the bundle's meta.runId; the reuse job uploads the bundle as it was).
+ * That run must be a completed run of the same visual workflow for the same commit, as GitHub
+ * reports it; null otherwise, which approves nothing.
+ */
+async function resultsCompletedAt(request, { repository, run, bundle }) {
+  const id = Number(bundle?.meta?.runId);
+  const source = !id || id === run.id ? run : await request(`/repos/${repository}/actions/runs/${id}`);
+  if (!source || source.status !== 'completed' || source.conclusion !== 'success') return null;
+  if (source.head_sha !== run.head_sha || source.workflow_id !== run.workflow_id) return null;
+  return source.updated_at ?? null;
+}
+
+/** Posts a completed check run for the head commit. */
+async function postCheck(request, { repository, headSha, run, log }, check) {
+  await request(`/repos/${repository}/check-runs`, {
+    method: 'POST',
+    body: {
+      name: check.name,
+      head_sha: headSha,
+      status: 'completed',
+      conclusion: check.conclusion,
+      details_url: run.html_url,
+      output: { title: check.title, summary: check.summary }
+    }
+  });
+  log(`${check.name}: ${check.conclusion} (${check.title})`);
+}
+
+/**
  * When the caller names its visual workflow (CALLER_WORKFLOW) and the files that define the
  * capture (PROTECTED_PATHS), the run must come from that workflow and those files must be
  * unchanged from the default branch: a pull request cannot then replace the capture with one
@@ -237,15 +267,50 @@ export async function runVisualGate({
   }
 
   const config = loadSwissKnifeConfig({ cwd: projectDir });
+  const posting = { repository, headSha, run, log };
+  // Turned off in the trusted configuration: the capture (and the accessibility scan, which runs
+  // with it) is skipped, so both checks say so instead of failing every pull request.
+  if (!config.visual.enabled) {
+    await postCheck(request, posting, {
+      name: VISUAL_CHECK,
+      conclusion: 'neutral',
+      title: 'Visual regression disabled',
+      summary: 'Disabled by `visual.enabled` in the configuration.'
+    });
+    await postCheck(request, posting, {
+      name: A11Y_CHECK,
+      conclusion: 'neutral',
+      title: 'Accessibility scan disabled',
+      summary: 'The scan runs with the visual capture, which `visual.enabled` turns off in the configuration.'
+    });
+    return { skipped: false, disabled: true };
+  }
   const { pr, found, problem: prProblem } = await resolvePullRequest(request, repository, run);
   // A successful run without results did nothing on purpose (an unrelated label event): keep
   // the checks already posted for this commit. A commit without swiss-knife checks yet gets
   // failing ones, so editing the caller to skip the capture cannot produce a green PR.
   if (found === 0 && run.conclusion === 'success') {
     const existing = await request(
-      `/repos/${repository}/commits/${headSha}/check-runs?check_name=${encodeURIComponent('swiss-knife / visual')}`
+      `/repos/${repository}/commits/${headSha}/check-runs?check_name=${encodeURIComponent(VISUAL_CHECK)}`
     );
     if ((existing?.total_count ?? 0) > 0) {
+      // An approval the checks show must still hold. Without the results (expired, or not found)
+      // nothing can be checked again, so removing the label withdraws it.
+      const latest = (existing.check_runs ?? []).reduce((a, b) => (Number(b.id) > Number(a?.id ?? -1) ? b : a), null);
+      if (latest?.conclusion === 'success' && latest.output?.title === APPROVED_TITLE) {
+        const number = run.pull_requests?.[0]?.number;
+        const current = number ? await request(`/repos/${repository}/pulls/${number}`) : null;
+        const labelPresent = (current?.labels ?? []).some(label => label.name === config.visual.approvalLabel);
+        if (current && current.head?.sha === headSha && !labelPresent) {
+          await postCheck(request, posting, {
+            name: VISUAL_CHECK,
+            conclusion: 'failure',
+            title: 'Approval withdrawn',
+            summary: `:x: The \`${config.visual.approvalLabel}\` label was removed, and this commit's results are no longer available to check again.\n\nRe-run the visual workflow for this commit.`
+          });
+          return { skipped: false, withdrawn: true };
+        }
+      }
       log('The visual run produced no results to gate; this commit is already gated, so the checks stay.');
       return { skipped: true };
     }
@@ -274,23 +339,22 @@ export async function runVisualGate({
   const baseline = pr ? await readBaseline(headSha) : {};
   const raised = pr && pr.base?.sha ? raisedBaselineEntries(await readBaseline(pr.base.sha), baseline) : [];
 
+  const read = readBundle(env.BUNDLE_DIR);
+  const bundle = read?.unsafe ? null : read;
+
   let approval = { approved: false, stale: false };
   // Approval is read only from the pull request whose head is this very commit.
   if (pr && pr.head.sha === headSha) {
     const labelName = config.visual.approvalLabel;
-    const [events, runs] = await Promise.all([
+    const [events, completedAt] = await Promise.all([
       paginate(request, `/repos/${repository}/issues/${prNumber}/events`),
-      paginate(
-        request,
-        `/repos/${repository}/actions/workflows/${run.workflow_id}/runs?head_sha=${headSha}`,
-        'workflow_runs'
-      )
+      resultsCompletedAt(request, { repository, run, bundle })
     ]);
     approval = evaluateApproval({
       labelName,
       labelPresent: (pr.labels ?? []).some(label => label.name === labelName),
       labelEvents: events,
-      headRunTimes: runs.map(item => item.created_at)
+      resultsCompletedAt: completedAt
     });
   }
 
@@ -309,8 +373,6 @@ export async function runVisualGate({
   const canPublish = Boolean(pr && !isFork && isCurrentHead && env.PAGES_REPO);
   const reportUrl = canPublish ? `${siteUrl}/${visualDir}/` : '';
 
-  const read = readBundle(env.BUNDLE_DIR);
-  const bundle = read?.unsafe ? null : read;
   const runProblem =
     callerProblem ??
     (read?.unsafe ? `The results bundle contains ${read.unsafe}, which is not allowed.` : null) ??
@@ -335,20 +397,7 @@ export async function runVisualGate({
       .join('\n')}\n`;
   }
 
-  for (const check of [result.visual, result.a11y]) {
-    await request(`/repos/${repository}/check-runs`, {
-      method: 'POST',
-      body: {
-        name: check.name,
-        head_sha: headSha,
-        status: 'completed',
-        conclusion: check.conclusion,
-        details_url: run.html_url,
-        output: { title: check.title, summary: check.summary }
-      }
-    });
-    log(`${check.name}: ${check.conclusion} (${check.title})`);
-  }
+  for (const check of [result.visual, result.a11y]) await postCheck(request, posting, check);
 
   // Results for an older commit would overwrite the current ones.
   if (pr && isCurrentHead && config.visual.prComment) {
@@ -368,7 +417,7 @@ export async function runVisualGate({
     await request(`/repos/${repository}/issues/${prNumber}/labels/${encodeURIComponent(config.visual.approvalLabel)}`, {
       method: 'DELETE'
     });
-    log(`Withdrew the stale "${config.visual.approvalLabel}" label: it was added before the current commit.`);
+    log(`Withdrew the stale "${config.visual.approvalLabel}" label: it was added before these results were captured.`);
   }
 
   let published = false;

@@ -106,54 +106,44 @@ test('accessibility disabled in the trusted config gives a neutral check', () =>
 
 const labeled = at => ({ event: 'labeled', created_at: at, label: { name: 'visual-approved' } });
 
-test('approval: the label must be added after the current commit was first built', () => {
-  const runs = ['2026-10-04T10:00:00Z', '2026-10-04T10:05:00Z'];
-  assert.deepEqual(
-    evaluateApproval({
-      labelName: 'visual-approved',
-      labelPresent: true,
-      labelEvents: [labeled('2026-10-04T10:03:00Z')],
-      headRunTimes: runs
-    }),
-    { approved: true, stale: false }
-  );
-  // Approved an earlier commit, then a new commit was pushed: stale, must be withdrawn.
-  assert.deepEqual(
-    evaluateApproval({
-      labelName: 'visual-approved',
-      labelPresent: true,
-      labelEvents: [labeled('2026-10-04T09:00:00Z')],
-      headRunTimes: runs
-    }),
-    { approved: false, stale: true }
-  );
+const approval = (labelEvents, resultsCompletedAt = '2026-10-04T10:00:00Z', labelPresent = true) =>
+  evaluateApproval({ labelName: 'visual-approved', labelPresent, labelEvents, resultsCompletedAt });
+
+test('approval: the label must be newer than the completion of the run that captured the results', () => {
+  assert.deepEqual(approval([labeled('2026-10-04T10:03:00Z')]), { approved: true, stale: false });
+  // Added after the push but before the capture finished: nobody saw these results yet.
+  assert.deepEqual(approval([labeled('2026-10-04T09:59:00Z')]), { approved: false, stale: true });
+  assert.deepEqual(approval([labeled('2026-10-04T10:00:00Z')]), { approved: false, stale: true });
+  // Re-running the capture of an approved commit completes after the label: approve again.
+  assert.deepEqual(approval([labeled('2026-10-04T10:03:00Z')], '2026-10-04T10:20:00Z'), {
+    approved: false,
+    stale: true
+  });
+});
+
+test('approval: a force-push after the label withdraws it, even to a commit captured earlier', () => {
+  const forcePush = { event: 'head_ref_force_pushed', created_at: '2026-10-04T11:00:00Z' };
+  // A was captured at 10:00; B was labelled at 10:30; the head was force-pushed back to A at 11:00.
+  assert.deepEqual(approval([labeled('2026-10-04T10:30:00Z'), forcePush]), { approved: false, stale: true });
+  assert.deepEqual(approval([labeled('2026-10-04T10:30:00Z'), forcePush, labeled('2026-10-04T11:05:00Z')]), {
+    approved: true,
+    stale: false
+  });
 });
 
 test('approval: the most recent labeled event counts; other labels and missing data never approve', () => {
-  const runs = ['2026-10-04T10:00:00Z'];
   const events = [
     labeled('2026-10-04T09:00:00Z'),
     labeled('2026-10-04T11:00:00Z'),
     { event: 'labeled', created_at: '2026-10-04T12:00:00Z', label: { name: 'other' } }
   ];
+  assert.equal(approval(events).approved, true);
+  assert.deepEqual(approval(events, undefined, false), { approved: false, stale: false });
+  assert.equal(approval([]).approved, false);
   assert.equal(
-    evaluateApproval({ labelName: 'visual-approved', labelPresent: true, labelEvents: events, headRunTimes: runs })
-      .approved,
-    true
-  );
-  assert.equal(
-    evaluateApproval({ labelName: 'visual-approved', labelPresent: false, labelEvents: events, headRunTimes: runs })
-      .approved,
+    approval([{ event: 'labeled', created_at: '2026-10-04T12:00:00Z', label: { name: 'other' } }]).approved,
     false
   );
-  assert.equal(
-    evaluateApproval({ labelName: 'visual-approved', labelPresent: true, labelEvents: [], headRunTimes: runs })
-      .approved,
-    false
-  );
-  assert.equal(
-    evaluateApproval({ labelName: 'visual-approved', labelPresent: true, labelEvents: events, headRunTimes: [] })
-      .approved,
-    false
-  );
+  // Unknown capture time: nothing to approve against.
+  assert.deepEqual(approval(events, null), { approved: false, stale: true });
 });
