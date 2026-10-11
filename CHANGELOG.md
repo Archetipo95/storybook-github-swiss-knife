@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The janitor never ran on a private repository's schedule: its job skipped scheduled runs of private repositories, a gate meant for this repository's own private phase, but in a called workflow `github.event` is the caller's. The gate is removed (this repository is public); a test keeps reusable workflows from gating on `github.event.repository.private`.
+
 ## [0.4.0] - 2026-10-11
 
 ### Changed
