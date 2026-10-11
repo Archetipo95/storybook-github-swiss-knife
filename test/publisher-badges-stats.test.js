@@ -106,9 +106,9 @@ test('publisher: without the source and without the build badges, it warns', t =
 });
 
 // The build and publish jobs of one run see the same commit.
-function stats(t, { staticFiles, pagesFiles = null, sha = 'abc1234def' }) {
+function stats(t, { staticFiles, pagesFiles = null, sha = 'abc1234def', targetDirectory = '' }) {
   const staticDir = tempDir(t, staticFiles);
-  const env = { GITHUB_SHA: sha, SB_STATS_DIRECTORY: 'stats' };
+  const env = { GITHUB_SHA: sha, SB_STATS_DIRECTORY: 'stats', SB_TARGET_DIRECTORY: targetDirectory };
   const args = [path.join(process.cwd(), 'src/generate-stats.js'), staticDir, tempDir(t, {})];
   if (pagesFiles) env.PAGES_REPO = tempDir(t, pagesFiles);
   const fullEnv = { ...process.env, ...env };
@@ -211,3 +211,51 @@ test('deploy-storybook.yml: the build job stats step writes the snapshot with th
   assert.equal(snapshot.version, 'v9.1.20');
   assert.equal(snapshot.commit, 'abc1234');
 });
+
+test('stats for a directory deploy add to the history in that directory, not the root (#13)', t => {
+  const older = { ...BUILD_SNAPSHOT, commit: '0000001', date: '2026-10-01', coveragePercent: 40 };
+  const rootSite = { ...BUILD_SNAPSHOT, commit: '0000009', coveragePercent: 99 };
+  const { history } = stats(t, {
+    staticFiles: { ...STATIC, 'stats/history.json': [BUILD_SNAPSHOT] },
+    pagesFiles: { 'preprod/stats/history.json': [older], 'stats/history.json': [rootSite] },
+    targetDirectory: 'preprod'
+  });
+  assert.deepEqual(
+    history.map(entry => entry.commit),
+    ['0000001', 'abc1234']
+  );
+});
+
+test('stats refuse a target directory outside the Pages branch (#13)', t => {
+  const staticDir = tempDir(t, { ...STATIC, 'stats/history.json': [BUILD_SNAPSHOT] });
+  const env = {
+    ...process.env,
+    GITHUB_SHA: 'abc1234def',
+    SB_STATS_DIRECTORY: 'stats',
+    SB_TARGET_DIRECTORY: '../outside',
+    PAGES_REPO: tempDir(t, {})
+  };
+  delete env.GITHUB_ACTIONS;
+  const result = spawnSync('node', [path.join(process.cwd(), 'src/generate-stats.js'), staticDir, tempDir(t, {})], {
+    env,
+    encoding: 'utf8'
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /target_directory "\.\.\/outside" is unsafe/);
+});
+
+test('the publisher passes its target_directory to the stats step (#13)', () => {
+  assert.match(
+    stepEnv('actions/publisher/action.yml', 'Generate Storybook growth graph'),
+    /\n\s+SB_TARGET_DIRECTORY: \$\{\{ inputs\.target_directory \}\}\n/
+  );
+});
+
+/** The env block of a step, as text. */
+function stepEnv(file, name) {
+  const text = fs.readFileSync(path.join(process.cwd(), file), 'utf8');
+  const start = text.indexOf(`- name: ${name}`);
+  assert.notEqual(start, -1, `${file} has no step "${name}"`);
+  const next = text.indexOf('- name: ', start + 1);
+  return text.slice(start, next === -1 ? undefined : next);
+}

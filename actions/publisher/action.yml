@@ -115,6 +115,8 @@ runs:
       env:
         SOURCE_PATH: ${{ inputs.source_directory }}
         PAGES_REPO: ${{ inputs.pages_repo }}
+        # The history of a directory deploy is in that directory on the Pages branch.
+        SB_TARGET_DIRECTORY: ${{ inputs.target_directory }}
         SB_STATS_DIRECTORY: ${{ inputs.stats_directory || 'stats' }}
         SB_COVERAGE_INCLUDE_PATHS: ${{ inputs.coverage_include_paths || '' }}
         SB_COVERAGE_IGNORE_PATHS: ${{ inputs.coverage_ignore_paths || '' }}

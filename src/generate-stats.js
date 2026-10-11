@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { extractStorybookMetrics, escapeXml } from './generate-badges.js';
+import { validateRelativeDirectory } from './config.js';
 
 /**
  * Seedable pseudo-random number generator for consistent organic jitter.
@@ -655,7 +656,11 @@ export function generateStatsGraph({
 if (process.argv[1] && process.argv[1].endsWith('generate-stats.js')) {
   const staticDir = process.argv[2] || process.env.SB_PATH || 'storybook-static';
   const workspaceRoot = process.argv[3] || process.env.WORKSPACE_ROOT || process.cwd();
-  const pagesRepo = process.env.PAGES_REPO || process.argv[4] || '';
+  const pagesRoot = process.env.PAGES_REPO || process.argv[4] || '';
+  // A directory deploy keeps its history next to it on the Pages branch, not at the root.
+  const targetDirectory = (process.env.SB_TARGET_DIRECTORY || '').trim();
+  if (targetDirectory) validateRelativeDirectory(targetDirectory, 'target_directory', { allowEmpty: true });
+  const pagesRepo = pagesRoot && targetDirectory ? path.join(pagesRoot, targetDirectory) : pagesRoot;
   const statsDir = process.env.SB_STATS_DIRECTORY || 'stats';
   const siteUrl = process.env.SB_SITE_URL || '';
   const basePath = process.env.SB_BASE_PATH || '';
