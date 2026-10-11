@@ -24,7 +24,7 @@ test('both Storybook builds (head and base) run the same install and build scrip
 });
 
 /** Runs the step in `workspace/<workingDirectory>` with stub package managers; returns their calls. */
-function runInstall(t, files, workingDirectory) {
+function runInstall(t, files, workingDirectory, { buildCommand } = {}) {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'sk-visual-install-'));
   t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
   for (const [file, content] of Object.entries(files)) {
@@ -35,7 +35,13 @@ function runInstall(t, files, workingDirectory) {
   const log = path.join(workspace, '.stub-calls');
   fs.mkdirSync(bin);
   for (const tool of ['corepack', 'npm', 'bun']) {
-    fs.writeFileSync(path.join(bin, tool), `#!/bin/sh\necho "$PWD ${tool} $*" >> "${log}"\n`, { mode: 0o755 });
+    // A build (`--output-dir <dir>`) leaves the index.json the step checks for.
+    fs.writeFileSync(
+      path.join(bin, tool),
+      `#!/bin/sh\necho "$PWD ${tool} $*" >> "${log}"\n` +
+        'while [ $# -gt 0 ]; do [ "$1" = --output-dir ] && mkdir -p "$2" && echo "{}" > "$2/index.json"; shift; done\n',
+      { mode: 0o755 }
+    );
   }
   const cwd = path.join(workspace, workingDirectory);
   execFileSync('bash', ['-c', stepRun(WORKFLOW, 'Install and build')], {
@@ -45,7 +51,7 @@ function runInstall(t, files, workingDirectory) {
       PATH: `${bin}:${process.env.PATH}`,
       GITHUB_WORKSPACE: workspace,
       INSTALL_COMMAND: '',
-      BUILD_COMMAND: 'mkdir -p "$STORYBOOK_DIR" && echo "{}" > "$STORYBOOK_DIR/index.json"',
+      BUILD_COMMAND: buildCommand ?? 'mkdir -p "$STORYBOOK_DIR" && echo "{}" > "$STORYBOOK_DIR/index.json"',
       STORYBOOK_DIR: 'storybook-static'
     },
     stdio: 'pipe'
@@ -70,5 +76,17 @@ test('a package with its own lockfile, or a repository without one, installs in 
   assert.deepEqual(runInstall(t, { 'apps/ui/package.json': '{}' }, 'apps/ui'), ['<workspace>/apps/ui npm ci']);
   assert.deepEqual(runInstall(t, { 'package.json': '{}', 'yarn.lock': '' }, '.'), [
     '<workspace> corepack yarn install --immutable'
+  ]);
+});
+
+test('the default build follows the same lockfile and runs in the package', t => {
+  const files = { 'package.json': '{}', 'apps/ui/package.json': '{}' };
+  assert.deepEqual(runInstall(t, { ...files, 'pnpm-lock.yaml': '' }, 'apps/ui', { buildCommand: '' }), [
+    '<workspace> corepack pnpm install --frozen-lockfile',
+    '<workspace>/apps/ui corepack pnpm exec storybook build --quiet --output-dir storybook-static'
+  ]);
+  assert.deepEqual(runInstall(t, { ...files, 'yarn.lock': '' }, 'apps/ui', { buildCommand: '' }), [
+    '<workspace> corepack yarn install --immutable',
+    '<workspace>/apps/ui corepack yarn storybook build --quiet --output-dir storybook-static'
   ]);
 });
