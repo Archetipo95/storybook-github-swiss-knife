@@ -402,12 +402,15 @@ test('the results replace their block in the preview comment and keep the previe
   assert.match(writes[0].body.body, /<\/details>\n<!-- \/swiss-knife-checks -->\n<sub>footer<\/sub>$/);
 });
 
-test('a marker in a comment the bot did not write is left alone and the checks still post', async () => {
+test('a marker in a comment the bot did not write is left alone, and the bot posts its own', async () => {
   const github = fakeGitHub({
     comments: [{ id: 3, body: '<!-- swiss-knife:pr-7 -->', user: { login: 'mallory', type: 'User' } }]
   });
   const { calls } = await run({ github });
-  assert.equal(commentWrites(calls).length, 0);
+  const writes = commentWrites(calls);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].method, 'POST');
+  assert.ok(!writes[0].apiPath.includes('/comments/3'), "mallory's comment is never edited");
   assert.equal(checkRuns(calls).length, 2);
 });
 
