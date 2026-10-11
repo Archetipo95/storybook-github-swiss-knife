@@ -303,6 +303,10 @@ build:
 
 _Note: Explicit workflow inputs override file configuration, which in turn overrides default values. An input you leave out (or set to `''`) does not override the file._
 
+The same settings can live under `pages` in `.storybook/swiss-knife.json`, which also holds the visual and accessibility checks' `visual` and `a11y` sections. A `.storybook/swiss-knife.json` without `pages` keeps the `.storybook-pages.yml` next to it working, with a warning to move its settings under `pages`; one that sets `pages` wins over it.
+
+Every workflow reads the Pages settings at the repository root, the visual gate included. In a monorepo, `visual` and `a11y` come from the project's `.storybook/swiss-knife.json` (in `working_directory`), and `pages` from the root's.
+
 For Bun projects, use the reusable workflow and set `package_manager: bun`. It provisions Bun in its read-only build job; the deploy-capable composite action intentionally rejects Bun so installation never runs in a job with Pages, OIDC, or write privileges. When omitted, the commands default to `bun install --frozen-lockfile` and `bun run build-storybook`:
 
 ```yaml

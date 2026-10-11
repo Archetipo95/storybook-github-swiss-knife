@@ -110,6 +110,25 @@ test('both files: the JSON file wins and the YAML file is reported as ignored', 
   assert.match(config.warnings[0], /ignored/);
 });
 
+// The JSON file `storybook-swiss-knife init` writes has no "pages": a migrating repository kept its
+// Pages settings in the YAML file, which used to be ignored once the JSON file existed.
+test('a JSON file without pages keeps the Pages settings of the YAML file next to it', () => {
+  const dir = repo({
+    [LEGACY_CONFIG_PATH]: LEGACY_YAML,
+    [SWISS_KNIFE_CONFIG_PATH]: { visual: { shards: 2, approvalLabel: 'looks-good' }, a11y: { enabled: false } }
+  });
+  const config = loadSwissKnifeConfig({ cwd: dir });
+  assert.deepEqual(config.pages, LEGACY_AS_JSON);
+  assert.equal(config.visual.shards, 2);
+  assert.equal(config.visual.approvalLabel, 'looks-good');
+  assert.equal(config.a11y.enabled, false);
+  assert.match(config.warnings[0], /has no "pages", so the Pages settings still come from \.storybook-pages\.yml/);
+  const resolved = inRepo(dir, () => resolveConfiguration({ inputs: {} }));
+  assert.equal(resolved.mode, 'directory');
+  assert.equal(resolved.preview_root, 'previews');
+  assert.equal(resolved.package_manager, 'pnpm');
+});
+
 test('a kinboo-like configuration is valid', () => {
   assert.equal(
     validateSwissKnifeConfig({
@@ -173,4 +192,18 @@ test('schema lists exactly the validated keys with the same defaults', () => {
 test('schema documents every storybook-github-pages default key', () => {
   const documented = Object.keys(schema.properties.pages.properties);
   for (const key of Object.keys(DEFAULT_CONFIG)) assert.ok(documented.includes(key), `pages.${key}`);
+});
+
+test('a legacy file the loader rejects, next to a JSON file without pages, only warns', () => {
+  const config = loadSwissKnifeConfig({
+    cwd: repo({ [LEGACY_CONFIG_PATH]: '__proto__: x\n', [SWISS_KNIFE_CONFIG_PATH]: { visual: { shards: 2 } } })
+  });
+  assert.equal(config.pages, null);
+  assert.equal(config.visual.shards, 2);
+  assert.match(config.warnings[0], /\.storybook-pages\.yml is ignored: Configuration key "__proto__" is not allowed/);
+  const invalid = loadSwissKnifeConfig({
+    cwd: repo({ [LEGACY_CONFIG_PATH]: 'mode: bogus\n', [SWISS_KNIFE_CONFIG_PATH]: { visual: { shards: 2 } } })
+  });
+  assert.equal(invalid.pages, null);
+  assert.match(invalid.warnings[0], /is ignored: Unsupported mode/);
 });

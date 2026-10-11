@@ -99,13 +99,13 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" > "$RUNNER_TEMP/swiss-knife-bundle.zip"
           unzip -q "$RUNNER_TEMP/swiss-knife-bundle.zip" -d "$bundle"
 
+      # The Pages settings are read at the repository root, as the preview publisher reads them.
       - name: Resolve Pages branch
         id: pages
         env:
           GH_TOKEN: ${{ github.token }}
-          WORKING_DIRECTORY: ${{ inputs.working_directory }}
         run: |
-          branch="$(cd "$WORKING_DIRECTORY" && node -e 'import(process.env.SWISS_KNIFE_ROOT + "/src/config.js").then(({resolveConfiguration}) => console.log(resolveConfiguration({inputs: {}}).pages_branch))')"
+          branch="$(node -e 'import(process.env.SWISS_KNIFE_ROOT + "/src/config.js").then(({resolveConfiguration}) => console.log(resolveConfiguration({inputs: {}}).pages_branch))')"
           if gh api "repos/$GITHUB_REPOSITORY/branches/$branch" --silent 2>/dev/null; then
             echo "branch=$branch" >> "$GITHUB_OUTPUT"
           else

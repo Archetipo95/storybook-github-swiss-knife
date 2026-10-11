@@ -373,9 +373,14 @@ export async function runVisualGate({
     });
   }
 
+  // The Pages settings (`pages`) are the repository's, read at its root like the preview publisher
+  // reads them; `visual` and `a11y` come from the project directory.
+  const repoRoot = path.resolve(
+    env.GITHUB_WORKSPACE || path.join(projectDir, path.posix.relative(workingDirectory, '.'))
+  );
   const pages = (() => {
     const previous = process.cwd();
-    process.chdir(projectDir);
+    process.chdir(repoRoot);
     try {
       return resolveConfiguration({ inputs: { site_url: env.SITE_URL, base_path: env.BASE_PATH } });
     } finally {

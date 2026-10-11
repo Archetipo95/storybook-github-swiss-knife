@@ -79,8 +79,10 @@ Then:
 4. Optionally commit `.storybook/a11y-baseline.json` with today's known violations
    (`swiss-knife a11y --update-baseline`, see below).
 
-Settings live in `.storybook/swiss-knife.json` (`visual`, `a11y`); see
-`schema/swiss-knife.schema.json`. Per story: `parameters.swissKnife.visual` (`skip`,
+Settings live in `.storybook/swiss-knife.json` (`visual`, `a11y`) in the project directory
+(`working_directory`); see `schema/swiss-knife.schema.json`. The Pages settings (`pages`, where
+the report is published) are the repository's: they are read from the root's
+`.storybook/swiss-knife.json` (or `.storybook-pages.yml`), as the preview workflows read them. Per story: `parameters.swissKnife.visual` (`skip`,
 `maxDiffPixels`, `delay`), Storybook's own viewport parameters/globals, and the a11y
 parameters (`a11y.disable` / `a11y.test: 'off'`, `a11y.config.rules`, `a11y.options.rules`,
 `a11y.context` / `a11y.element`). Tag a story `skip-visual` to leave it out entirely.
