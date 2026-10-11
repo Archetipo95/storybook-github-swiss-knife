@@ -196,6 +196,16 @@ runs:
           });
         })'
 
+    # Before anything is installed or built. Only a publish needs the reusable workflow: a
+    # build-only run (publish: 'false') in a directory-mode project leaves the output for the
+    # caller's own steps.
+    - name: Reject directory-mode publishing in the composite action
+      if: ${{ env.SB_MODE == 'directory' && env.SB_PUBLISH == 'true' }}
+      shell: bash
+      run: |
+        echo "::error::Directory mode publishes through the reusable workflow (deploy-storybook.yml), which serializes writes to the Pages branch. Use it, or set publish: 'false' to only build with this action."
+        exit 1
+
     - name: Set up Node.js
       if: ${{ env.SB_PACKAGE_MANAGER == 'npm' || env.SB_PACKAGE_MANAGER == 'yarn' || env.SB_PACKAGE_MANAGER == 'pnpm' }}
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -367,11 +377,6 @@ runs:
         LOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         DEPLOYMENT_DESCRIPTION: ${{ env.SB_ENVIRONMENT_NAME || 'github-pages' }} deployment failed
       run: node "$GITHUB_ACTION_PATH/src/github-deployments.js"
-
-    - name: Reject directory mode in composite action
-      if: ${{ env.SB_MODE == 'directory' }}
-      shell: bash
-      run: echo 'Directory mode requires the reusable workflow for repository-wide serialization.' >&2; exit 1
 
     - name: Set deployment status output
       id: set-status
