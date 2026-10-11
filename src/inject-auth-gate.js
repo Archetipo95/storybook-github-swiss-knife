@@ -2,7 +2,6 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const HTML_FILES = new Set(['index.html', 'iframe.html']);
-const GATE_SCRIPT_TAG = '<script id="storybook-passcode-gate-script">';
 
 function validateOptions({ passcodeHash, sessionHours }) {
   if (!passcodeHash) {
@@ -40,7 +39,7 @@ body > *:not(#storybook-passcode-gate) { visibility: hidden !important; }
     <div role="alert" aria-live="polite"></div>
   </form>
 </div>
-${GATE_SCRIPT_TAG}
+<script id="storybook-passcode-gate-script">
 (() => {
   const config = ${config};
   // Scope the unlock to this passcode so other gated Storybooks on the same origin stay locked.
@@ -104,6 +103,44 @@ ${GATE_SCRIPT_TAG}
 const ROBOTS_TXT = 'User-agent: *\nDisallow: /\n';
 const NO_INDEX_META = '<meta name="robots" content="noindex, nofollow, noarchive">\n';
 
+// An element carrying one of the gate's ids: the overlay, its style or its script.
+const GATE_ID = String.raw`storybook-passcode-gate(?:-script|-style)?`;
+const GATE_ELEMENT = new RegExp(
+  String.raw`<(script|style|div)\b[^>]*\bid\s*=\s*(?:"${GATE_ID}"|'${GATE_ID}'|${GATE_ID}(?=[\s/>]))[^>]*>`,
+  'i'
+);
+
+/**
+ * The page without any element that carries a gate id, with the whitespace after it. Nothing in
+ * the page counts as a gate: the output being published is the pull request's own build, so it
+ * could ship an empty gate script to look gated. Removing the elements also keeps a re-run on the
+ * same output from stacking gates.
+ */
+function withoutGate(html) {
+  let result = html;
+  for (let match = GATE_ELEMENT.exec(result); match; match = GATE_ELEMENT.exec(result)) {
+    const tag = match[1].toLowerCase();
+    let end = match.index + match[0].length;
+    if (tag === 'div') {
+      const tags = /<div\b[^>]*>|<\/div\s*>/gi;
+      tags.lastIndex = end;
+      for (let depth = 1, next = tags.exec(result); next; next = tags.exec(result)) {
+        depth += next[0][1] === '/' ? -1 : 1;
+        if (depth === 0) {
+          end = next.index + next[0].length;
+          break;
+        }
+      }
+    } else {
+      const close = new RegExp(String.raw`<\/${tag}\s*>`, 'i').exec(result.slice(end));
+      if (close) end += close.index + close[0].length;
+    }
+    end += /^\s*/.exec(result.slice(end))[0].length;
+    result = result.slice(0, match.index) + result.slice(end);
+  }
+  return result;
+}
+
 async function findHtmlFiles(staticDir) {
   const files = [];
   for (const entry of await fs.readdir(staticDir, { withFileTypes: true })) {
@@ -121,14 +158,11 @@ export async function injectAuthGate(staticDir, { passcodeHash, sessionHours = 2
   const markup = gateMarkup(passcodeHash, sessionHours);
   await fs.writeFile(path.join(staticDir, 'robots.txt'), ROBOTS_TXT, 'utf8');
   for (const file of files) {
-    const html = await fs.readFile(file, 'utf8');
-    // Already gated (a re-run on the same output). The gate's script element, not just its id
-    // somewhere in the page's text.
-    if (html.includes(GATE_SCRIPT_TAG)) continue;
-    let withMeta = html;
+    let withMeta = withoutGate(await fs.readFile(file, 'utf8'));
     const robotsMeta = /<meta\b(?=[^>]*\bname\s*=\s*(['"])robots\1)[^>]*>/i;
     if (robotsMeta.test(withMeta)) {
-      withMeta = withMeta.replace(robotsMeta, NO_INDEX_META);
+      // In place, so a re-run leaves the page as it was.
+      withMeta = withMeta.replace(robotsMeta, NO_INDEX_META.trimEnd());
     } else {
       if (/<head\b[^>]*>/i.test(withMeta)) {
         withMeta = withMeta.replace(/<head\b[^>]*>/i, match => `${match}\n${NO_INDEX_META}`);

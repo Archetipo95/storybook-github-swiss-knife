@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- The composite action failed every build-only run (`publish: 'false'`, such as a pull request build without secrets) when the configuration file turned on `enable_passcode_gate`: since 0.3.0 the file's setting applies to the action too, and the gate step exited with "passcode_hash must be a 64-character SHA-256 hexadecimal hash". A build-only run without a hash now skips the gate with a notice; a run with a hash, or one that publishes, still injects it, and a publishing run without a hash fails with "enable_passcode_gate is on, but no passcode_hash was given". The gate is also no longer skipped on a page that only mentions its element id: only the gate's own script element counts as already gated.
+- The composite action failed every build-only run (`publish: 'false'`, such as a pull request build without secrets) when the configuration file turned on `enable_passcode_gate`: since 0.3.0 the file's setting applies to the action too, and the gate step exited with "passcode_hash must be a 64-character SHA-256 hexadecimal hash". A build-only run without a hash now skips the gate with a notice; a run with a hash, or one that publishes, still injects it, and a publishing run without a hash fails with "enable_passcode_gate is on, but no passcode_hash was given". The injector also no longer takes markup in the page for a gate: it skipped any page containing the gate script's id, so a pull request's preview build could ship an empty `<script id="storybook-passcode-gate-script">` and be published ungated. It now removes every element carrying a gate id and injects a fresh gate; a re-run on the same output leaves the pages unchanged.
 
 ### Security
 
