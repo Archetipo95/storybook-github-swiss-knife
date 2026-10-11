@@ -69,19 +69,12 @@ test('pr-preview-publish workflow gates on success/event/repository and requires
     /github\.event\.workflow_run\.pull_requests\[0\] != null/,
     'fork PRs (empty pull_requests[]) must be excluded by the gate condition'
   );
-  assert.match(gateJob, /contents:\s*read/, 'the gate job must grant contents: read');
+  // The gate reads the pull request from the event payload and the run's artifacts, so it needs
+  // actions: read (the artifact listing) and nothing that writes: no pull-requests scope at all.
   assert.match(
     gateJob,
-    /pull-requests:\s*read/,
-    'the gate job must grant pull-requests: read to fetch current PR head SHA'
-  );
-  assert.match(gateJob, /actions:\s*read/, 'the gate job must grant actions: read to fetch workflow run context');
-  assert.doesNotMatch(gateJob, /contents:\s*write/, 'the read-only gate job must not hold write permissions');
-  assert.doesNotMatch(gateJob, /pages:\s*write/, 'the read-only gate job must not hold pages write permissions');
-  assert.doesNotMatch(
-    gateJob,
-    /pull-requests:\s*write/,
-    'the read-only gate job must not hold pull-requests write permissions'
+    /\n {4}permissions:\n {6}contents: read\n {6}actions: read\n {4}outputs:/,
+    'the gate job asks for contents: read and actions: read only'
   );
 
   const publishJob = extractJobBlock(content, 'publish');

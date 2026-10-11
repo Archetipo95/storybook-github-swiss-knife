@@ -155,7 +155,6 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
-      pull-requests: read
       actions: read
     outputs:
       run_id: ${{ steps.context.outputs.run_id }}

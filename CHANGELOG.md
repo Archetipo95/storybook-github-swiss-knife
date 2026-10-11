@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The `pr-preview-publish.yml` gate job no longer asks for `pull-requests: read`. It reads the pull request from the `workflow_run` event and the run's artifacts, and lists the artifacts with `actions: read`; the step that fetched the pull request's head SHA went in #45. Callers need no change: granting more than a job asks for is fine.
+
 ## [0.5.0] - 2026-10-11
 
 ### Removed
