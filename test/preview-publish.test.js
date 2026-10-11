@@ -825,7 +825,11 @@ test('publishPreview reports the preview folder as its URL, whatever base_path t
       basePath: '/storybook'
     });
     assert.equal(result.publishResult.url, 'https://octo.github.io/widgets/pr-preview/pr-42');
-    assert.ok(posted[0].includes('https://octo.github.io/widgets/pr-preview/pr-42'));
+    // The comment links the preview by its full URL, and to nothing under the production base path.
+    const { body } = JSON.parse(posted[0]);
+    const links = [...body.matchAll(/https:\/\/[^\s)"'\]]+/g)].map(match => new URL(match[0]));
+    assert.ok(links.some(link => link.href.replace(/\/$/, '') === 'https://octo.github.io/widgets/pr-preview/pr-42'));
+    assert.ok(links.every(link => !link.pathname.startsWith('/widgets/storybook')));
     assert.ok(fs.existsSync(path.join(pagesRepo, 'pr-preview', 'pr-42', 'index.html')));
   } finally {
     global.fetch = originalFetch;

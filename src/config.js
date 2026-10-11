@@ -84,7 +84,10 @@ const BUN_DEFAULT_BUILD = {
 export function normalizeRelativeDirectory(value) {
   let directory = String(value ?? '').trim();
   while (directory.startsWith('./')) directory = directory.slice(2);
-  directory = directory.replace(/\/+$/, '');
+  // A loop, not /\/+$/: that regex backtracks polynomially on a long run of slashes.
+  let end = directory.length;
+  while (end > 0 && directory[end - 1] === '/') end -= 1;
+  directory = directory.slice(0, end);
   return directory === '.' ? '' : directory;
 }
 
