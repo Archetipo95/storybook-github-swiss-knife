@@ -61,26 +61,30 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  tag:
-    name: Create release tag and update major tag
-    needs: addon
-    # Off until the repository variable SWISS_KNIFE_RELEASES is 'true', so pushes during
-    # the private phase never tag or publish a release.
+  # Plans the release and runs the validation suite without a write token: the tests run this
+  # commit's code, so they stay out of the job that can push tags and publish the release.
+  verify:
+    name: Plan and verify the release
     if: vars.SWISS_KNIFE_RELEASES == 'true'
     runs-on: ubuntu-24.04
     permissions:
-      # Required to push the release and major tags and publish the release.
-      contents: write
+      contents: read
+    outputs:
+      release_tag: ${{ steps.plan.outputs.release_tag }}
+      create_tag: ${{ steps.plan.outputs.create_tag }}
+      verify: ${{ steps.plan.outputs.verify }}
+      major_tag: ${{ steps.plan.outputs.major_tag }}
+      major_target: ${{ steps.plan.outputs.major_target }}
+      latest: ${{ steps.plan.outputs.latest }}
     steps:
       - name: Checkout pushed commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
-          # Full history and tags are needed to check ancestry against main
-          # and to compare against the existing release tags.
+          # Full history and tags are needed to check ancestry against main, compare against
+          # the existing release tags, and read the commits the internal action pins name.
           fetch-depth: 0
-          # Credentials persist so the tag steps can push.
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Plan release tags
         id: plan
@@ -94,14 +98,13 @@ jobs:
         with:
           node-version: '24'
 
+      # The tests use only Node built-ins, so nothing is installed.
       - name: Run release validation suite
         if: steps.plan.outputs.verify == 'true'
         env:
           # Fails the release when an internal action pin runs older code.
           RELEASE_PIN_CHECK: '1'
-        run: |
-          npm ci
-          npm test
+        run: npm test
 
       - name: Verify release commit is on main
         if: steps.plan.outputs.verify == 'true'
@@ -111,28 +114,54 @@ jobs:
             exit 1
           fi
 
+  tag:
+    name: Create release tag and update major tag
+    needs: [addon, verify]
+    # Off until the repository variable SWISS_KNIFE_RELEASES is 'true', so pushes during
+    # the private phase never tag or publish a release.
+    if: vars.SWISS_KNIFE_RELEASES == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      # Required to push the release and major tags and publish the release.
+      contents: write
+    steps:
+      - name: Checkout pushed commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          # Full history and tags are needed to move the major tag only forwards.
+          fetch-depth: 0
+          # Credentials persist so the tag steps can push.
+          persist-credentials: true
+
+      - name: Set up Node.js
+        if: needs.verify.outputs.verify == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
       - name: Download the addon tarball
-        if: steps.plan.outputs.verify == 'true'
+        if: needs.verify.outputs.verify == 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: storybook-swiss-knife-addon
           path: ${{ runner.temp }}/addon
 
       - name: Create release tag
-        if: steps.plan.outputs.create_tag == 'true'
+        if: needs.verify.outputs.create_tag == 'true'
         env:
-          RELEASE_TAG: ${{ steps.plan.outputs.release_tag }}
+          RELEASE_TAG: ${{ needs.verify.outputs.release_tag }}
         run: |
           git tag "$RELEASE_TAG" "$GITHUB_SHA"
           git push origin "refs/tags/$RELEASE_TAG"
           echo "Created $RELEASE_TAG at $GITHUB_SHA."
 
       - name: Publish GitHub release
-        if: steps.plan.outputs.verify == 'true'
+        if: needs.verify.outputs.verify == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ steps.plan.outputs.release_tag }}
-          LATEST: ${{ steps.plan.outputs.latest }}
+          RELEASE_TAG: ${{ needs.verify.outputs.release_tag }}
+          LATEST: ${{ needs.verify.outputs.latest }}
         run: |
           if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
             echo "Release $RELEASE_TAG already exists."
@@ -146,8 +175,8 @@ jobs:
 
       - name: Move major tag to the newest release
         env:
-          MAJOR_TAG: ${{ steps.plan.outputs.major_tag }}
-          MAJOR_TARGET: ${{ steps.plan.outputs.major_target }}
+          MAJOR_TAG: ${{ needs.verify.outputs.major_tag }}
+          MAJOR_TARGET: ${{ needs.verify.outputs.major_target }}
         run: |
           TARGET_SHA="$(git rev-parse "refs/tags/$MAJOR_TARGET^{commit}")"
           CURRENT_SHA="$(git rev-parse --verify --quiet "refs/tags/$MAJOR_TAG^{commit}" || true)"
