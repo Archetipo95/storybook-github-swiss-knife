@@ -126,6 +126,8 @@ runs:
         GENERATE_STATS_GRAPH: ${{ inputs.generate_stats_graph }}
         SB_STATS_DIRECTORY: ${{ inputs.stats_directory }}
         SB_BADGES_DIRECTORY: ${{ inputs.badges_directory }}
+        # A PR into the default branch compares against the Pages root (workflow_run carries the repository).
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         MANAGED_DIRECTORIES: ${{ inputs.managed_directories }}
         TRUSTED_REPOSITORY: ${{ inputs.trusted_repository }}
         TRUSTED_RUN_ID: ${{ inputs.trusted_run_id }}
