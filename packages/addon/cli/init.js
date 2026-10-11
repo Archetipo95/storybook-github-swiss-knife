@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { detectPackageManager, lockfileDirectory } from './package-manager.js';
+import { parseSimpleYaml } from './simple-yaml.js';
 
 export { detectPackageManager };
 
@@ -45,6 +46,9 @@ const COMMANDS = {
 
 /** The default Storybook build command for a package manager (`detectPackageManager`'s names). */
 export const storybookBuildCommand = packageManager => COMMANDS[packageManager].build;
+
+const ROOT_CONFIG = '.storybook/swiss-knife.json';
+export const LEGACY_CONFIG = '.storybook-pages.yml';
 
 const yamlString = value => `'${String(value).replaceAll("'", "''")}'`;
 
@@ -252,7 +256,8 @@ export function planInit({
   installDirectory = '',
   previews,
   approvalLabel,
-  main
+  main,
+  pages = null
 }) {
   const options = { ref, branch, workingDirectory, packageManager, installDirectory };
   const files = {
@@ -267,18 +272,28 @@ export function planInit({
       '.github/workflows/preview-janitor.yml': previewJanitorWorkflow(options)
     });
   }
-  files[path.posix.join(workingDirectory, '.storybook/swiss-knife.json')] = `${JSON.stringify(
-    {
-      $schema: `https://raw.githubusercontent.com/${REPOSITORY}/${ref}/schema/swiss-knife.schema.json`,
-      visual: { baselineBranches: [branch], approvalLabel },
-      a11y: { blockingImpacts: ['critical', 'serious'] }
-    },
-    null,
-    2
-  )}\n`;
+  const configFile = sections =>
+    `${JSON.stringify(
+      { $schema: `https://raw.githubusercontent.com/${REPOSITORY}/${ref}/schema/swiss-knife.schema.json`, ...sections },
+      null,
+      2
+    )}\n`;
+  const checks = {
+    visual: { baselineBranches: [branch], approvalLabel },
+    a11y: { blockingImpacts: ['critical', 'serious'] }
+  };
+  // The Pages settings are the repository's, read at its root: in a monorepo they go to the root's
+  // configuration, the checks' to the project's.
+  const pagesFile = pages ? ROOT_CONFIG : null;
+  if (workingDirectory === '.') {
+    files[ROOT_CONFIG] = configFile(pages ? { pages, ...checks } : checks);
+  } else {
+    files[path.posix.join(workingDirectory, ROOT_CONFIG)] = configFile(checks);
+    if (pages) files[ROOT_CONFIG] = configFile({ pages });
+  }
   const updated = main ? registerAddon(main.source) : null;
   if (main && updated && updated !== main.source) files[main.path] = updated;
-  return { files, addonRegistered: Boolean(main && updated), mainPath: main?.path ?? null };
+  return { files, addonRegistered: Boolean(main && updated), mainPath: main?.path ?? null, pagesFile };
 }
 
 const git = (args, cwd) => {
@@ -353,7 +368,20 @@ export function runInit({ argv, cwd = process.cwd(), version, log = console.log 
   const lockDir = lockfileDirectory(projectDir, root);
   const installDirectory =
     lockDir && lockDir !== projectDir ? path.relative(projectDir, lockDir).split(path.sep).join('/') : '';
+  // The legacy Pages configuration moves under "pages" in the root's .storybook/swiss-knife.json.
+  const legacyPath = path.join(root, LEGACY_CONFIG);
+  let pages = null;
+  let legacyProblem = '';
+  if (fs.existsSync(legacyPath)) {
+    try {
+      const parsed = parseSimpleYaml(fs.readFileSync(legacyPath, 'utf8'));
+      if (Object.keys(parsed).length > 0) pages = parsed;
+    } catch (error) {
+      legacyProblem = error.message;
+    }
+  }
   const plan = planInit({
+    pages,
     ref: options.ref ?? `v${version}`,
     branch,
     workingDirectory,
@@ -364,6 +392,7 @@ export function runInit({ argv, cwd = process.cwd(), version, log = console.log 
     main: mainPath ? { path: mainPath, source: fs.readFileSync(path.join(root, mainPath), 'utf8') } : undefined
   });
 
+  const written = new Set();
   for (const [file, content] of Object.entries(plan.files)) {
     const target = path.join(root, file);
     const exists = fs.existsSync(target);
@@ -383,6 +412,7 @@ export function runInit({ argv, cwd = process.cwd(), version, log = console.log 
     }
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, content);
+    written.add(file);
     log(`${exists ? 'updated ' : 'wrote   '} ${file}`);
   }
 
@@ -412,8 +442,18 @@ export function runInit({ argv, cwd = process.cwd(), version, log = console.log 
     }
   }
 
+  const legacyStep = (() => {
+    if (legacyProblem)
+      return `Move the settings of ${LEGACY_CONFIG} under "pages" in ${ROOT_CONFIG} (${legacyProblem}).`;
+    if (!plan.pagesFile) return null;
+    if (written.has(plan.pagesFile)) {
+      return `The settings of ${LEGACY_CONFIG} are now under "pages" in ${plan.pagesFile}: delete ${LEGACY_CONFIG}.`;
+    }
+    return `Move the settings of ${LEGACY_CONFIG} under "pages" in ${plan.pagesFile}, which init left as it was.`;
+  })();
   const steps = [
     `Install the addon in ${workingDirectory}: ${COMMANDS[packageManager].add} ${addonTarballUrl(version)}`,
+    legacyStep,
     plan.addonRegistered
       ? null
       : `Add '${ADDON}' to the addons of ${mainPath ?? '.storybook/main.js'} (no addons array was found).`,

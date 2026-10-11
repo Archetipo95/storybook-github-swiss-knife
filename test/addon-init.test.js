@@ -272,3 +272,66 @@ test("init's Yarn builds run the Storybook binary, never a package.json storyboo
     assert.doesNotMatch(storybookBuildCommand(manager), /(?:^|\s)(?:corepack )?yarn storybook\b/, manager);
   }
 });
+
+// A repository with the legacy .storybook-pages.yml (second audit #5): init moves its settings under
+// "pages", in the root's configuration, where every workflow reads them (#20).
+const LEGACY =
+  'mode: directory\npreview_root: previews\npackage_manager: pnpm\nbuild:\n  build_command: pnpm build-storybook\n';
+const LEGACY_PAGES = {
+  mode: 'directory',
+  preview_root: 'previews',
+  package_manager: 'pnpm',
+  build: { build_command: 'pnpm build-storybook' }
+};
+
+test('runInit moves .storybook-pages.yml under pages in the configuration it writes', async () => {
+  const { loadSwissKnifeConfig } = await import('../src/swiss-knife-config.js');
+  const dir = project({
+    'package.json': '{}',
+    '.storybook-pages.yml': LEGACY,
+    '.storybook/main.ts': 'export default { addons: [] };\n'
+  });
+  const lines = [];
+  runInit({ argv: ['--no-label'], cwd: dir, version: '0.1.0', log: line => lines.push(line) });
+  const written = JSON.parse(fs.readFileSync(path.join(dir, '.storybook/swiss-knife.json'), 'utf8'));
+  assert.deepEqual(written.pages, LEGACY_PAGES);
+  assert.equal(written.visual.approvalLabel, 'visual-approved');
+  // The loader takes the JSON's pages, and reports the YAML file as left over.
+  const loaded = loadSwissKnifeConfig({ cwd: dir });
+  assert.deepEqual(loaded.pages, LEGACY_PAGES);
+  assert.match(loaded.warnings[0], /ignored because .* sets "pages"/);
+  assert.match(lines.join('\n'), /now under "pages" in \.storybook\/swiss-knife\.json: delete \.storybook-pages\.yml/);
+});
+
+test('in a monorepo, the Pages settings go to the root configuration and the checks to the project', async () => {
+  const { loadSwissKnifeConfig } = await import('../src/swiss-knife-config.js');
+  const dir = project({
+    'package.json': '{}',
+    '.storybook-pages.yml': LEGACY,
+    'apps/ui/package.json': '{}',
+    'apps/ui/.storybook/main.ts': 'export default { addons: [] };\n'
+  });
+  runInit({ argv: ['--working-directory', 'apps/ui', '--no-label'], cwd: dir, version: '0.1.0', log: () => {} });
+  const root = JSON.parse(fs.readFileSync(path.join(dir, '.storybook/swiss-knife.json'), 'utf8'));
+  const projectConfig = JSON.parse(fs.readFileSync(path.join(dir, 'apps/ui/.storybook/swiss-knife.json'), 'utf8'));
+  assert.deepEqual(Object.keys(root), ['$schema', 'pages']);
+  assert.deepEqual(root.pages, LEGACY_PAGES);
+  assert.equal(projectConfig.pages, undefined);
+  assert.equal(loadSwissKnifeConfig({ cwd: path.join(dir, 'apps/ui') }).visual.approvalLabel, 'visual-approved');
+});
+
+test('runInit leaves an existing root configuration as it is and says to move the settings', () => {
+  const dir = project({
+    'package.json': '{}',
+    '.storybook-pages.yml': LEGACY,
+    '.storybook/swiss-knife.json': '{"visual":{"shards":2}}\n',
+    '.storybook/main.ts': 'export default { addons: [] };\n'
+  });
+  const lines = [];
+  runInit({ argv: ['--no-label'], cwd: dir, version: '0.1.0', log: line => lines.push(line) });
+  assert.equal(fs.readFileSync(path.join(dir, '.storybook/swiss-knife.json'), 'utf8'), '{"visual":{"shards":2}}\n');
+  assert.match(
+    lines.join('\n'),
+    /Move the settings of \.storybook-pages\.yml under "pages" in \.storybook\/swiss-knife\.json, which init left as it was/
+  );
+});
