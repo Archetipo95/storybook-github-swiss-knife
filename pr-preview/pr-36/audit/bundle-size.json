@@ -56,13 +56,13 @@
       "path": "badges/status.svg",
       "category": "image",
       "bytes": 1256,
-      "gzipBytes": 514
+      "gzipBytes": 516
     },
     {
       "path": "badges/build.svg",
       "category": "image",
       "bytes": 1228,
-      "gzipBytes": 509
+      "gzipBytes": 507
     },
     {
       "path": "badges/coverage.svg",
