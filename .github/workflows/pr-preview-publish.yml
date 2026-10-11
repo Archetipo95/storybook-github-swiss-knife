@@ -151,7 +151,6 @@ jobs:
       base_ref: ${{ steps.context.outputs.base_ref }}
       head_sha: ${{ steps.context.outputs.head_sha }}
       head_repository: ${{ steps.context.outputs.head_repository }}
-      current_head_sha: ${{ steps.current.outputs.head_sha }}
     steps:
       # The trusted, unit-tested pull-request-identity resolver
       # (src/resolve-run-context.js) comes from this repository's toolkit action, pinned
@@ -245,27 +244,6 @@ jobs:
             }
             main().catch(err => { console.error(err.message); process.exit(1); });
           ' >> "$GITHUB_OUTPUT"
-
-      - name: Fetch current pull request head SHA
-        id: current
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPOSITORY: ${{ github.repository }}
-          PR_NUMBER: ${{ steps.context.outputs.pr_number }}
-        run: |
-          response=$(curl -sf \
-            -H "authorization: token $GITHUB_TOKEN" \
-            -H "accept: application/vnd.github+json" \
-            "https://api.github.com/repos/$REPOSITORY/pulls/$PR_NUMBER")
-          node -e '
-            const data = JSON.parse(process.argv[1]);
-            const sha = data && data.head && data.head.sha;
-            if (typeof sha !== "string" || !/^[0-9a-f]{40}$/.test(sha)) {
-              console.error("Pull request API response did not contain a valid head SHA");
-              process.exit(1);
-            }
-            console.log(`head_sha=${sha}`);
-          ' "$response" >> "$GITHUB_OUTPUT"
 
   publish:
     name: Publish preview (trusted)
@@ -377,7 +355,7 @@ jobs:
       - name: Check Pages branch existence
         id: branch_check
         env:
-          PAGES_BRANCH: ${{ steps.config.outputs.pages_branch || inputs.pages_branch || 'gh-pages' }}
+          PAGES_BRANCH: ${{ steps.config.outputs.pages_branch }}
         run: |
           if git ls-remote --exit-code --heads origin "$PAGES_BRANCH" > /dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
@@ -402,7 +380,7 @@ jobs:
         if: steps.branch_check.outputs.exists == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ steps.config.outputs.pages_branch || inputs.pages_branch || 'gh-pages' }}
+          ref: ${{ steps.config.outputs.pages_branch }}
           path: pages-repo
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -414,7 +392,7 @@ jobs:
         with:
           bundle_dir: ${{ runner.temp }}/preview-bundle
           pages_repo: ${{ github.workspace }}/pages-repo
-          pages_branch: ${{ steps.config.outputs.pages_branch || inputs.pages_branch || 'gh-pages' }}
+          pages_branch: ${{ steps.config.outputs.pages_branch }}
           preview_root: ${{ steps.config.outputs.preview_root }}
           site_url: ${{ steps.config.outputs.site_url }}
           base_path: ${{ steps.config.outputs.base_path }}

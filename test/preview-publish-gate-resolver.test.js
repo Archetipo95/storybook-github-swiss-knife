@@ -6,6 +6,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { execFileSync } from 'node:child_process';
 
+import { stepRun } from './helpers/workflow-step.js';
+
 // The `gate` job of `pr-preview-publish.yml` imports the trusted pull-request-identity
 // resolver (src/resolve-run-context.js). Inside a reusable workflow a plain checkout is the
 // *caller's* repository (the storybook-github-pages v1.9.1 bug), and a private swiss-knife
@@ -39,12 +41,7 @@ function gateJob() {
 }
 
 function extractGateResolverStep() {
-  const content = fs.readFileSync(workflowPath, 'utf8');
-  const stepMatch = content.match(
-    /- name: Extract trusted pull request context[\s\S]*?run: \|\n([\s\S]*?)\n\n {6}- name: Fetch current pull request head SHA/
-  );
-  assert.ok(stepMatch, 'could not locate the "Extract trusted pull request context" step script');
-  return stepMatch[1];
+  return stepRun('.github/workflows/pr-preview-publish.yml', 'Extract trusted pull request context');
 }
 
 function runStep({ cwd, env }) {

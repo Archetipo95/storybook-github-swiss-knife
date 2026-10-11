@@ -106,7 +106,7 @@ jobs:
       - name: Check Pages branch existence
         id: branch_check
         env:
-          PAGES_BRANCH: ${{ steps.config.outputs.pages_branch || inputs.pages_branch || 'gh-pages' }}
+          PAGES_BRANCH: ${{ steps.config.outputs.pages_branch }}
         run: |
           if git ls-remote --exit-code --heads origin "$PAGES_BRANCH" > /dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
@@ -122,7 +122,7 @@ jobs:
         if: steps.branch_check.outputs.exists == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ steps.config.outputs.pages_branch || inputs.pages_branch || 'gh-pages' }}
+          ref: ${{ steps.config.outputs.pages_branch }}
           path: pages-repo
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -132,7 +132,7 @@ jobs:
         uses: Archetipo95/storybook-github-swiss-knife/actions/preview-janitor@65990e88db9ea7317f50fb9709d69225dd83d577
         with:
           pages_repo: ${{ github.workspace }}/pages-repo
-          pages_branch: ${{ steps.config.outputs.pages_branch || inputs.pages_branch || 'gh-pages' }}
+          pages_branch: ${{ steps.config.outputs.pages_branch }}
           preview_root: ${{ steps.config.outputs.preview_root }}
           retention_days: ${{ steps.config.outputs.retention_days }}
           warning_days_before_cleanup: ${{ steps.config.outputs.warning_days_before_cleanup }}
