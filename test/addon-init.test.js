@@ -68,7 +68,9 @@ test('planInit passes a monorepo working directory to every workflow', () => {
 
 test('the generated workflows pass actionlint', { skip: !hasActionlint() }, () => {
   const dir = project({});
-  for (const [file, content] of Object.entries(planInit({ ...defaults, workingDirectory: 'apps/ui' }).files)) {
+  for (const [file, content] of Object.entries(
+    planInit({ ...defaults, workingDirectory: 'apps/ui', installDirectory: '../..' }).files
+  )) {
     fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
     fs.writeFileSync(path.join(dir, file), content);
   }
@@ -219,5 +221,33 @@ test('the docs install the addon and run init only from a release tarball', () =
   assert.match(
     fs.readFileSync('README.md', 'utf8'),
     /npx --yes https:\/\/github\.com\/Archetipo95\/storybook-github-swiss-knife\/releases\/download\/v[\d.]+\/storybook-swiss-knife-[\d.]+\.tgz init/
+  );
+});
+
+test('a monorepo package without its own lockfile installs from the root lockfile', () => {
+  const { files } = planInit({ ...defaults, workingDirectory: 'apps/ui', installDirectory: '../..' });
+  const install = '(cd ../.. && corepack pnpm install --frozen-lockfile)';
+  assert.match(
+    files['.github/workflows/visual.yml'],
+    /\n {4}with:\n {6}working_directory: 'apps\/ui'\n {6}install_command: '\(cd \.\.\/\.\. && corepack pnpm install --frozen-lockfile\)'\n/
+  );
+  assert.ok(files['.github/workflows/preview-build.yml'].includes(`run: |\n          ${install}\n`));
+  // A package with its own lockfile installs where it is, as before.
+  const own = planInit({ ...defaults, workingDirectory: 'apps/ui' }).files;
+  assert.doesNotMatch(own['.github/workflows/visual.yml'], /install_command/);
+  assert.match(own['.github/workflows/preview-build.yml'], /run: \|\n {10}corepack pnpm install --frozen-lockfile\n/);
+});
+
+test('runInit finds the root lockfile of a monorepo package', () => {
+  const dir = project({
+    'pnpm-lock.yaml': '',
+    'package.json': '{}',
+    'apps/ui/package.json': '{}',
+    'apps/ui/.storybook/main.ts': 'export default { addons: [] };\n'
+  });
+  runInit({ argv: ['--working-directory', 'apps/ui', '--no-label'], cwd: dir, version: '0.1.0', log: () => {} });
+  assert.match(
+    fs.readFileSync(path.join(dir, '.github/workflows/visual.yml'), 'utf8'),
+    /install_command: '\(cd \.\.\/\.\. && corepack pnpm install --frozen-lockfile\)'/
   );
 });

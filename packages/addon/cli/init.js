@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { detectPackageManager } from './package-manager.js';
+import { detectPackageManager, lockfileDirectory } from './package-manager.js';
 
 export { detectPackageManager };
 
@@ -34,7 +34,22 @@ const COMMANDS = {
 
 const yamlString = value => `'${String(value).replaceAll("'", "''")}'`;
 
-function visualWorkflow({ ref, branch, workingDirectory }) {
+/**
+ * The frozen install, run from `installDirectory` (relative to the working directory) when the
+ * lockfile is there: a monorepo package without its own lockfile installs from the root's.
+ */
+const installCommand = ({ packageManager, installDirectory = '' }) =>
+  installDirectory
+    ? `(cd ${installDirectory} && ${COMMANDS[packageManager].install})`
+    : COMMANDS[packageManager].install;
+
+function visualWorkflow({ ref, branch, workingDirectory, packageManager, installDirectory }) {
+  const withInputs = [
+    workingDirectory === '.' ? null : `      working_directory: ${yamlString(workingDirectory)}`,
+    installDirectory
+      ? `      install_command: ${yamlString(installCommand({ packageManager, installDirectory }))}`
+      : null
+  ].filter(Boolean);
   return `name: Visual
 
 on:
@@ -59,7 +74,7 @@ jobs:
     permissions:
       contents: read
       actions: read
-${workingDirectory === '.' ? '' : `    with:\n      working_directory: ${yamlString(workingDirectory)}\n`}`;
+${withInputs.length ? `    with:\n${withInputs.join('\n')}\n` : ''}`;
 }
 
 function gateWorkflow({ ref, workingDirectory }) {
@@ -93,8 +108,9 @@ ${workingDirectory === '.' ? '' : `      working_directory: ${yamlString(working
 `;
 }
 
-function previewBuildWorkflow({ ref, workingDirectory, packageManager }) {
-  const { install, build } = COMMANDS[packageManager];
+function previewBuildWorkflow({ ref, workingDirectory, packageManager, installDirectory }) {
+  const { build } = COMMANDS[packageManager];
+  const install = installCommand({ packageManager, installDirectory });
   const output = path.posix.join(workingDirectory, 'storybook-static');
   return `name: PR Preview Build
 
@@ -214,8 +230,17 @@ export function registerAddon(source) {
  * @param {{ ref: string, branch: string, workingDirectory: string, packageManager: string,
  *   previews: boolean, approvalLabel: string, main?: { path: string, source: string } }} options
  */
-export function planInit({ ref, branch, workingDirectory, packageManager, previews, approvalLabel, main }) {
-  const options = { ref, branch, workingDirectory, packageManager };
+export function planInit({
+  ref,
+  branch,
+  workingDirectory,
+  packageManager,
+  installDirectory = '',
+  previews,
+  approvalLabel,
+  main
+}) {
+  const options = { ref, branch, workingDirectory, packageManager, installDirectory };
   const files = {
     '.github/workflows/visual.yml': visualWorkflow(options),
     '.github/workflows/visual-gate.yml': gateWorkflow(options)
@@ -311,11 +336,15 @@ export function runInit({ argv, cwd = process.cwd(), version, log = console.log 
     : undefined;
   const mainPath = mainFile ? path.posix.join(workingDirectory, '.storybook', mainFile) : undefined;
   const packageManager = detectPackageManager(projectDir, root);
+  const lockDir = lockfileDirectory(projectDir, root);
+  const installDirectory =
+    lockDir && lockDir !== projectDir ? path.relative(projectDir, lockDir).split(path.sep).join('/') : '';
   const plan = planInit({
     ref: options.ref ?? `v${version}`,
     branch,
     workingDirectory,
     packageManager,
+    installDirectory,
     previews: options.previews,
     approvalLabel,
     main: mainPath ? { path: mainPath, source: fs.readFileSync(path.join(root, mainPath), 'utf8') } : undefined
