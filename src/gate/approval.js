@@ -1,7 +1,9 @@
-// Decides whether the visual approval label applies to the results being gated, using only data
-// from the GitHub API (trusted): the pull request's issue events and the run that captured the
-// results. Nothing produced by the pull request's own workflow run is involved, so a pushed
-// commit cannot claim an earlier approval.
+// Decides whether the visual approval label applies to the results being gated. The times come
+// from the GitHub API: the pull request's issue events, and the run that captured the results.
+// That run is named by the results bundle (meta.runId, written by swiss-knife's own report step and
+// carried along when a label event reuses the bundle) and checked through the API: a completed,
+// successful run of the same workflow for the same commit. It is as trusted as the results it
+// travels with, and a pushed commit cannot claim an earlier approval.
 //
 // The label counts only when it was added after:
 // - the run that captured the results completed. Before that, nobody could have seen its report:

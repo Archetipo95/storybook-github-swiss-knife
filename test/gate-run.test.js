@@ -58,6 +58,8 @@ function fakeGitHub({
   events = null,
   sourceRuns = {},
   existingCheckRuns = [],
+  // GitHub leaves a fork run's pull_requests empty.
+  runPullRequests = [{ number: 7 }],
   artifactRunId = RUN_ID,
   conclusion = 'success',
   baseline = { stories: { 'card--default': { 'color-contrast': 2 } } },
@@ -86,10 +88,11 @@ function fakeGitHub({
         conclusion,
         created_at: createdAt,
         updated_at: completedAt,
-        pull_requests: [{ number: 7 }],
+        pull_requests: runPullRequests,
+        head_branch: 'feature',
         html_url: 'https://github.com/acme/widgets/actions/runs/555',
         path: runPath,
-        head_repository: { full_name: headRepo }
+        head_repository: { full_name: headRepo, owner: { login: headRepo.split('/')[0] } }
       };
     }
     const sourceRun = /\/actions\/runs\/(\d+)$/.exec(route);
@@ -107,6 +110,19 @@ function fakeGitHub({
         labels: labels.map(name => ({ name }))
       };
       return prReads > 1 && prOnRecheck ? { ...pr, ...prOnRecheck } : pr;
+    }
+    if (
+      route === `/repos/${REPO}/pulls` &&
+      apiPath.includes(`head=${encodeURIComponent(`${headRepo.split('/')[0]}:feature`)}`)
+    ) {
+      return [
+        {
+          number: 7,
+          state: 'open',
+          head: { sha: prHead, repo: { full_name: headRepo } },
+          labels: labels.map(name => ({ name }))
+        }
+      ];
     }
     if (route === `/repos/${REPO}`) return { default_branch: 'main' };
     if (route.startsWith(`/repos/${REPO}/contents/.github/`)) {
@@ -552,6 +568,23 @@ test('a label run without results downgrades an approved check once the label is
     checkRuns(removed.calls).map(check => [check.name, check.conclusion, check.output.title]),
     [['swiss-knife / visual', 'failure', 'Approval withdrawn']]
   );
+
+  // A fork run (empty pull_requests) finds its pull request by head repository and branch.
+  const fork = fakeGitHub({
+    conclusion: 'success',
+    artifactRunId: 1,
+    labels: [],
+    headRepo: 'someone/widgets',
+    runPullRequests: [],
+    existingCheckRuns: [approvedCheck]
+  });
+  const forkOutput = await runVisualGate({
+    env: { REPOSITORY: REPO, RUN_ID: String(RUN_ID), PROJECT_DIR: project(), GITHUB_TOKEN: 't' },
+    request: fork.request,
+    log: () => {}
+  });
+  assert.deepEqual(forkOutput, { skipped: false, withdrawn: true });
+  assert.ok(fork.calls.some(call => call.apiPath.includes('/pulls?state=open&head=someone%3Afeature')));
 
   // The label is still there, or the latest check was not an approval: the checks stay.
   for (const github of [

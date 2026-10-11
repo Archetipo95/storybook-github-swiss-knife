@@ -195,6 +195,8 @@ when comparing with CI.
   - For forks, keep GitHub's "Require approval for fork pull request workflows" on; fork runs
     get checks but nothing is published.
 - The approval label is accepted when added after the run that captured the gated results
-  completed (for a label event, the run whose results it reuses) and after the head's last
-  force-push, both as GitHub reports them.
+  completed and after the head's last force-push, as GitHub reports them. The results bundle
+  names that run (for a label event, the run whose results it reuses); the gate accepts it only as
+  a completed, successful run of the same workflow for the same commit, so it is as trusted as the
+  results themselves.
 - The passcode gate on published reports is client-side only: it hides pages, not files.

@@ -145,6 +145,22 @@ async function resultsCompletedAt(request, { repository, run, bundle }) {
   return source.updated_at ?? null;
 }
 
+/**
+ * The open pull request a run was for, as GitHub reports it: from the run's `pull_requests`, which
+ * GitHub leaves empty for forks, else the open pull request from its head repository and branch
+ * at its commit.
+ */
+async function pullRequestOfRun(request, { repository, run }) {
+  const number = run.pull_requests?.[0]?.number;
+  if (number) return request(`/repos/${repository}/pulls/${number}`);
+  const owner = run.head_repository?.owner?.login;
+  if (!owner || !run.head_branch) return null;
+  const pulls = await request(
+    `/repos/${repository}/pulls?state=open&head=${encodeURIComponent(`${owner}:${run.head_branch}`)}`
+  );
+  return (Array.isArray(pulls) ? pulls : []).find(pull => pull.head?.sha === run.head_sha) ?? null;
+}
+
 /** Posts a completed check run for the head commit. */
 async function postCheck(request, { repository, headSha, run, log }, check) {
   await request(`/repos/${repository}/check-runs`, {
@@ -298,8 +314,7 @@ export async function runVisualGate({
       // nothing can be checked again, so removing the label withdraws it.
       const latest = (existing.check_runs ?? []).reduce((a, b) => (Number(b.id) > Number(a?.id ?? -1) ? b : a), null);
       if (latest?.conclusion === 'success' && latest.output?.title === APPROVED_TITLE) {
-        const number = run.pull_requests?.[0]?.number;
-        const current = number ? await request(`/repos/${repository}/pulls/${number}`) : null;
+        const current = await pullRequestOfRun(request, { repository, run });
         const labelPresent = (current?.labels ?? []).some(label => label.name === config.visual.approvalLabel);
         if (current && current.head?.sha === headSha && !labelPresent) {
           await postCheck(request, posting, {
