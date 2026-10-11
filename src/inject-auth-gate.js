@@ -2,9 +2,15 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const HTML_FILES = new Set(['index.html', 'iframe.html']);
+const GATE_SCRIPT_TAG = '<script id="storybook-passcode-gate-script">';
 
 function validateOptions({ passcodeHash, sessionHours }) {
-  if (!/^[a-f0-9]{64}$/i.test(passcodeHash || '')) {
+  if (!passcodeHash) {
+    throw new Error(
+      'enable_passcode_gate is on, but no passcode_hash was given: pass the SHA-256 hash of the passcode (from a secret), or turn the gate off.'
+    );
+  }
+  if (!/^[a-f0-9]{64}$/i.test(passcodeHash)) {
     throw new Error('passcode_hash must be a 64-character SHA-256 hexadecimal hash');
   }
   if (!Number.isFinite(sessionHours) || sessionHours <= 0) {
@@ -34,7 +40,7 @@ body > *:not(#storybook-passcode-gate) { visibility: hidden !important; }
     <div role="alert" aria-live="polite"></div>
   </form>
 </div>
-<script id="storybook-passcode-gate-script">
+${GATE_SCRIPT_TAG}
 (() => {
   const config = ${config};
   // Scope the unlock to this passcode so other gated Storybooks on the same origin stay locked.
@@ -116,7 +122,9 @@ export async function injectAuthGate(staticDir, { passcodeHash, sessionHours = 2
   await fs.writeFile(path.join(staticDir, 'robots.txt'), ROBOTS_TXT, 'utf8');
   for (const file of files) {
     const html = await fs.readFile(file, 'utf8');
-    if (html.includes('storybook-passcode-gate-script')) continue;
+    // Already gated (a re-run on the same output). The gate's script element, not just its id
+    // somewhere in the page's text.
+    if (html.includes(GATE_SCRIPT_TAG)) continue;
     let withMeta = html;
     const robotsMeta = /<meta\b(?=[^>]*\bname\s*=\s*(['"])robots\1)[^>]*>/i;
     if (robotsMeta.test(withMeta)) {

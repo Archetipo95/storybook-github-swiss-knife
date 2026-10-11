@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `pr-preview-publish.yml` gate job no longer asks for `pull-requests: read`. It reads the pull request from the `workflow_run` event and the run's artifacts, and lists the artifacts with `actions: read`; the step that fetched the pull request's head SHA went in #45. Callers need no change: granting more than a job asks for is fine.
 
+### Fixed
+
+- The composite action failed every build-only run (`publish: 'false'`, such as a pull request build without secrets) when the configuration file turned on `enable_passcode_gate`: since 0.3.0 the file's setting applies to the action too, and the gate step exited with "passcode_hash must be a 64-character SHA-256 hexadecimal hash". A build-only run without a hash now skips the gate with a notice; a run with a hash, or one that publishes, still injects it, and a publishing run without a hash fails with "enable_passcode_gate is on, but no passcode_hash was given". The gate is also no longer skipped on a page that only mentions its element id: only the gate's own script element counts as already gated.
+
 ### Security
 
 - The quickstart, the docs and `init`'s remaining steps no longer run or install the bare `storybook-swiss-knife` package name. The addon isn't on npm yet, so `npx storybook-swiss-knife init` or `npm install storybook-swiss-knife` would run whatever an unrelated package of that name holds. `init` now runs from the release tarball (`npx --yes <release tarball URL> init`), and prints the tarball of its own version as the addon to install. `prepare-release` moves the quickstart's tarball URL with each release, and a test fails on docs that use the bare name.

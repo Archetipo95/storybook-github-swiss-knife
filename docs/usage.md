@@ -219,6 +219,12 @@ configuration file, and the default in the table applies only when the file
 does not set it either. `create_deployment` defaults to `true` in the reusable
 workflows and `false` in the composite action.
 
+A configuration file that turns `enable_passcode_gate` on applies to the
+composite action's build-only runs (`publish: 'false'`) too. Without a
+`passcode_hash` (a pull request has no secrets) such a run skips the gate with a
+notice, and whatever publishes its output must inject it. A publishing run
+without a hash fails.
+
 When `smoke_test` is enabled, the action serves the static output only on
 `127.0.0.1`, opens the manager and canvas with Playwright, and fails on
 uncaught page errors, console errors, failed requests, HTTP errors, or a

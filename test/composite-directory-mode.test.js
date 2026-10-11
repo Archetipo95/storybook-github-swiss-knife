@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { parseCommandFile, stepRun } from './helpers/workflow-step.js';
+import { compositeInputDefaults, parseCommandFile, stepRun } from './helpers/workflow-step.js';
 
 // The composite action cannot publish directory mode (the reusable workflow serializes Pages
 // writes), but it can build for a directory-mode project when it does not publish (#19).
@@ -39,14 +39,7 @@ test('the directory-mode settings come only from the config file, which the acti
   for (const name of ['pages_branch', 'target_directory', 'managed_directories']) {
     assert.doesNotMatch(action, new RegExp(`\\n  ${name}:`), `action.yml has a ${name} input`);
   }
-  const inputs = {};
-  let current;
-  for (const line of action.slice(action.indexOf('\ninputs:\n'), action.indexOf('\noutputs:\n')).split('\n')) {
-    const name = /^ {2}(\w+):$/.exec(line);
-    if (name) inputs[(current = name[1])] = '';
-    const value = /^ {4}default: '(.*)'$/.exec(line);
-    if (value && current) inputs[current] = value[1];
-  }
+  const inputs = compositeInputDefaults();
   const project = fs.mkdtempSync(path.join(os.tmpdir(), 'sk-composite-directory-'));
   t.after(() => fs.rmSync(project, { recursive: true, force: true }));
   fs.writeFileSync(

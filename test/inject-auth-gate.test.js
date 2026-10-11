@@ -45,7 +45,27 @@ test('injectAuthGate rejects invalid configuration and missing entry files', asy
   const staticDir = await fs.mkdtemp(path.join(os.tmpdir(), 'storybook-gate-empty-'));
   try {
     await assert.rejects(injectAuthGate(staticDir, { passcodeHash: 'not-a-hash' }), /64-character SHA-256/);
+    // A publish with the gate on and no hash says what is missing.
+    await assert.rejects(injectAuthGate(staticDir, { passcodeHash: '' }), /no passcode_hash was given/);
+    await assert.rejects(injectAuthGate(staticDir, { passcodeHash: undefined }), /no passcode_hash was given/);
     await assert.rejects(injectAuthGate(staticDir, { passcodeHash: 'a'.repeat(64) }), /No index.html/);
+  } finally {
+    await fs.rm(staticDir, { recursive: true, force: true });
+  }
+});
+
+test("injectAuthGate gates a page that only mentions the gate's id", async () => {
+  const staticDir = await fs.mkdtemp(path.join(os.tmpdir(), 'storybook-gate-mention-'));
+  await fs.writeFile(
+    path.join(staticDir, 'index.html'),
+    '<html><head></head><body><p>See storybook-passcode-gate-script.</p></body></html>'
+  );
+  try {
+    await injectAuthGate(staticDir, { passcodeHash: 'a'.repeat(64) });
+    assert.match(
+      await fs.readFile(path.join(staticDir, 'index.html'), 'utf8'),
+      /<script id="storybook-passcode-gate-script">/
+    );
   } finally {
     await fs.rm(staticDir, { recursive: true, force: true });
   }
