@@ -22,7 +22,7 @@
     "image": {
       "files": 7,
       "bytes": 17811,
-      "gzipBytes": 6687
+      "gzipBytes": 6686
     },
     "html": {
       "files": 2,
@@ -32,7 +32,7 @@
     "data": {
       "files": 9,
       "bytes": 1375,
-      "gzipBytes": 1139
+      "gzipBytes": 1140
     },
     "sourcemap": {
       "files": 0,
@@ -56,7 +56,7 @@
       "path": "badges/status.svg",
       "category": "image",
       "bytes": 1256,
-      "gzipBytes": 515
+      "gzipBytes": 514
     },
     {
       "path": "badges/build.svg",
@@ -104,7 +104,7 @@
       "path": "stats/history.json",
       "category": "data",
       "bytes": 240,
-      "gzipBytes": 166
+      "gzipBytes": 167
     }
   ],
   "budget": null
