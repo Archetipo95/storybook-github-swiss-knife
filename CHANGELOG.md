@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Workflow leftovers removed, none of them visible to callers: four `deploy-storybook.yml` build-job outputs nothing read, the publisher step's `env:` block that repeated its inputs, the preview gate's "Fetch current pull request head SHA" step and its output (the publish job re-reads the PR itself), and nine `|| inputs.pages_branch || 'gh-pages'` fallbacks that could never apply. A test now fails on any job output that no later job reads and the workflow does not re-export.
 - The Pages branch writer drops its write lock and its rebase between retries. The lock (`.storybook-pages-write.lock` in the job's own checkout) was never contended: every job has its own checkout, and one process makes one write. The rebase ran on a stale ref and the next attempt's fetch and checkout discarded it. Retries start from a fresh fetch as before.
 - Badge generation is one table for the SVGs and the shields.io JSON endpoints, which were written out twice (about 190 lines less); a golden test pins every badge file byte for byte. The status and build badges' "building" and "failed" states are gone: no workflow ever set `SB_BUILD_STATE`, `SB_STATUS_STATE`, `SB_BUILD_MESSAGE` or `SB_STATUS_MESSAGE`, and a failed build publishes no badges, so they always read `published • <sha>` and `passed • <sha>`, as before.
 

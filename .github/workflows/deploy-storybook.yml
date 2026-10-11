@@ -192,7 +192,6 @@ jobs:
       target_directory: ${{ steps.config.outputs.target_directory }}
       site_url: ${{ steps.config.outputs.site_url }}
       base_path: ${{ steps.config.outputs.base_path }}
-      auto_base_url: ${{ steps.config.outputs.auto_base_url }}
       cname: ${{ steps.config.outputs.cname }}
       preserve_cname: ${{ steps.config.outputs.preserve_cname }}
       managed_directories: ${{ steps.config.outputs.managed_directories }}
@@ -202,9 +201,6 @@ jobs:
       badges_directory: ${{ steps.config.outputs.badges_directory }}
       generate_stats_graph: ${{ steps.config.outputs.generate_stats_graph }}
       stats_directory: ${{ steps.config.outputs.stats_directory }}
-      test_results_path: ${{ steps.config.outputs.test_results_path }}
-      enable_passcode_gate: ${{ steps.config.outputs.enable_passcode_gate }}
-      passcode_session_hours: ${{ steps.config.outputs.passcode_session_hours }}
 
     steps:
       - name: Checkout repository
@@ -505,15 +501,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Publish directory atomically
         id: publish
-        env:
-          PAGES_REPO: ${{ github.workspace }}/pages-repo
-          SOURCE_DIRECTORY: ${{ github.workspace }}/storybook-static
-          PAGES_BRANCH: ${{ needs.build-and-upload.outputs.pages_branch }}
-          TARGET_DIRECTORY: ${{ needs.build-and-upload.outputs.target_directory }}
-          SITE_URL: ${{ needs.build-and-upload.outputs.site_url }}
-          BASE_PATH: ${{ needs.build-and-upload.outputs.base_path }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
         uses: Archetipo95/storybook-github-swiss-knife/actions/publisher@65990e88db9ea7317f50fb9709d69225dd83d577
         with:
           pages_repo: ${{ github.workspace }}/pages-repo
