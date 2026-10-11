@@ -101,24 +101,57 @@ export function renderBadgeSvg({
   ].join('\n');
 }
 
+// The packages that carry Storybook's own version, in order of preference. Addons and tools with
+// their own versions (@storybook/addon-coverage, @storybook/test-runner, ...) are not used.
+const STORYBOOK_VERSION_PACKAGES = [
+  /^storybook$/,
+  /^@storybook\/core$/,
+  /^@storybook\/(?:react|vue3|vue|angular|svelte|web-components|html|preact|ember|server|nextjs|sveltekit|react-native-web)(?:-(?:vite|webpack5|rsbuild))?$/,
+  /^@storybook\/(?:builder-vite|builder-webpack5|blocks|addon-essentials|addon-docs|manager-api|preview-api|components|theming)$/
+];
+
+const SEMVER = /^v?(\d+\.\d+(?:\.\d+)?(?:-[0-9A-Za-z.-]+)?)/;
+
 /**
- * Reads Storybook version from package.json if available.
+ * The version of `name` as installed next to `packageDir`, else as declared, when either looks
+ * like a version. Declared values such as `workspace:*`, `catalog:` or `latest` name no version.
+ */
+function packageVersion(packageDir, name, declared) {
+  try {
+    const installed = JSON.parse(fs.readFileSync(path.join(packageDir, 'node_modules', name, 'package.json'), 'utf8'));
+    const match = SEMVER.exec(String(installed.version ?? ''));
+    if (match) return match[1];
+  } catch {
+    // Not installed here.
+  }
+  // An npm alias (`npm:storybook@9.1.0`) declares the version after its last @.
+  const spec = String(declared).startsWith('npm:')
+    ? String(declared).slice(String(declared).lastIndexOf('@') + 1)
+    : String(declared);
+  const match = SEMVER.exec(spec.trim().replace(/^[\^~>=<\s]+/, ''));
+  return match ? match[1] : null;
+}
+
+/**
+ * Reads Storybook version from package.json if available: the installed version of the first
+ * package that carries it, else its declared version, else "deployed".
  */
 export function extractStorybookVersion(workspaceRoot = process.cwd()) {
-  const candidatePkgPaths = [path.join(workspaceRoot, 'package.json'), path.join(workspaceRoot, '..', 'package.json')];
-
-  for (const pkgPath of candidatePkgPaths) {
-    if (fs.existsSync(pkgPath)) {
-      try {
-        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-        const deps = { ...pkg.devDependencies, ...pkg.dependencies };
-        const sbKey = Object.keys(deps).find(k => k === 'storybook' || k.startsWith('@storybook/'));
-        if (sbKey && deps[sbKey]) {
-          const rawVersion = deps[sbKey].replace(/^[\^~>=<]+/, '');
-          return rawVersion.startsWith('v') ? rawVersion : `v${rawVersion}`;
-        }
-      } catch {
-        // Ignore JSON read errors
+  for (const packageDir of [workspaceRoot, path.join(workspaceRoot, '..')]) {
+    const pkgPath = path.join(packageDir, 'package.json');
+    if (!fs.existsSync(pkgPath)) continue;
+    let deps;
+    try {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+      deps = { ...pkg.devDependencies, ...pkg.dependencies };
+    } catch {
+      continue;
+    }
+    const names = Object.keys(deps).filter(name => deps[name]);
+    for (const pattern of STORYBOOK_VERSION_PACKAGES) {
+      for (const name of names.filter(candidate => pattern.test(candidate))) {
+        const version = packageVersion(packageDir, name, deps[name]);
+        if (version) return `v${version}`;
       }
     }
   }
@@ -286,10 +319,11 @@ export function extractStorybookMetrics(
       for (const entry of Object.values(entries)) {
         if (!entry) continue;
         if (entry.type === 'docs') {
+          // Docs pages are not components: a standalone MDX page would count as a covered one.
           docsCount++;
-        } else {
-          storiesCount++;
+          continue;
         }
+        storiesCount++;
         if (entry.title) {
           components.add(entry.title);
         } else if (entry.id) {
@@ -311,6 +345,11 @@ export function extractStorybookMetrics(
 
       for (const story of Object.values(stories)) {
         if (!story) continue;
+        // Storybook 6's MDX docs-only pages are entries too; they are docs, not components.
+        if (story.parameters?.docsOnly) {
+          docsCount++;
+          continue;
+        }
         storiesCount++;
         if (story.title) {
           components.add(story.title);
