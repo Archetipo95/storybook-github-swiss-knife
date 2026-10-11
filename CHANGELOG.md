@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The warning for a `.storybook-pages.yml` that cannot be read, next to a `.storybook/swiss-knife.json` without `pages`, ended the problem's own sentence with a second period (`… artifact, directory.. Move its settings …`).
+
 ## [0.6.0] - 2026-10-11
 
 ### Changed
