@@ -85,7 +85,7 @@ jobs:
           fi
 
       - name: Load swiss-knife toolkit
-        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@a1942342153038e006c335bfcc10e7d093e94215
+        uses: Archetipo95/storybook-github-swiss-knife/actions/toolkit@bd5013b629e3a9a782b64ab612541c64b6c37f39
 
       - name: Plan the run
         id: plan
@@ -349,7 +349,7 @@ jobs:
 
       - name: Capture missing baselines
         if: needs.plan.outputs.mode == 'compare' && steps.baseline.outputs.cache-matched-key == '' && steps.base.outcome == 'success'
-        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@a1942342153038e006c335bfcc10e7d093e94215
+        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@bd5013b629e3a9a782b64ab612541c64b6c37f39
         with:
           project_dir: ${{ inputs.working_directory }}
           storybook_dir: .swiss-knife/storybook-base
@@ -370,7 +370,7 @@ jobs:
         if: >-
           needs.plan.outputs.mode == 'compare' &&
           (steps.baseline.outputs.cache-matched-key != '' || steps.base.outcome == 'success')
-        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@a1942342153038e006c335bfcc10e7d093e94215
+        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@bd5013b629e3a9a782b64ab612541c64b6c37f39
         with:
           project_dir: ${{ inputs.working_directory }}
           storybook_dir: .swiss-knife/storybook-head
@@ -381,7 +381,7 @@ jobs:
 
       - name: Capture branch baselines
         if: needs.plan.outputs.mode == 'baseline'
-        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@a1942342153038e006c335bfcc10e7d093e94215
+        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@bd5013b629e3a9a782b64ab612541c64b6c37f39
         with:
           project_dir: ${{ inputs.working_directory }}
           storybook_dir: .swiss-knife/storybook-head
@@ -442,7 +442,7 @@ jobs:
           merge-multiple: true
 
       - name: Assemble report and results bundle
-        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-report@a1942342153038e006c335bfcc10e7d093e94215
+        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-report@bd5013b629e3a9a782b64ab612541c64b6c37f39
         with:
           blob_dir: .swiss-knife/shards
           gallery_dir: .swiss-knife/shards/gallery
