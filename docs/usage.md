@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   deploy-storybook:
-    uses: Archetipo95/storybook-github-swiss-knife/.github/workflows/deploy-storybook.yml@v0.6.1
+    uses: Archetipo95/storybook-github-swiss-knife/.github/workflows/deploy-storybook.yml@v0.7.0
     with:
       path: 'storybook-static'
       package_manager: 'npm'
@@ -60,7 +60,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Build and Deploy Storybook
-        uses: Archetipo95/storybook-github-swiss-knife@v0.6.1
+        uses: Archetipo95/storybook-github-swiss-knife@v0.7.0
         with:
           path: 'storybook-static'
           build_command: 'npm run build-storybook'
@@ -138,7 +138,7 @@ jobs:
           fetch-depth: 0
 
       - name: Publish directory
-        uses: Archetipo95/storybook-github-swiss-knife/actions/publisher@v0.6.1
+        uses: Archetipo95/storybook-github-swiss-knife/actions/publisher@v0.7.0
         with:
           pages_repo: ${{ github.workspace }}/pages-repo
           source_directory: ${{ github.workspace }}/storybook-static
@@ -160,7 +160,7 @@ Without the source in the publish job, the publisher warns and can't compute the
 | **Runner OS**        | GitHub-hosted Linux (`ubuntu-latest`)                                                    | Tested on `ubuntu-latest` with Node.js 24+                                                                        |
 | **Node.js Runtime**  | Node.js 24+                                                                              | Zero external npm dependencies (uses native Node.js ES modules)                                                   |
 | **Package Managers** | Reusable workflow: `npm`, `yarn`, `pnpm`, `bun`; composite action: `npm`, `yarn`, `pnpm` | Bun is provisioned only in the reusable workflow's read-only build job                                            |
-| **Tagging Strategy** | Immutable release tags (for example, `@v0.6.1`)                                          | **Recommended for stable, reproducible use.** Floating major tags (e.g. `@v1`) are optional and non-reproducible. |
+| **Tagging Strategy** | Immutable release tags (for example, `@v0.7.0`)                                          | **Recommended for stable, reproducible use.** Floating major tags (e.g. `@v1`) are optional and non-reproducible. |
 
 ---
 

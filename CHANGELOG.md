@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-12
+
 ### Added
 
 - The Visual panel of the Storybook addon opens with a summary of the pull request's report (changed, new, removed and failed stories) and what it still needs: fix the failures, add the approval label, or nothing. The gate writes its outcome (`reason`), the removed stories (`removed`, which have no screenshots) and the label name (`approvalLabel`) to the published `gallery/manifest.json` for it.
