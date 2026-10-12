@@ -6,8 +6,12 @@ import path from 'node:path';
 import { test } from 'node:test';
 
 import {
+  isOutdatedReport,
+  isReportSettled,
   isTagged,
   matchesSidebarFilter,
+  reportSummary,
+  reportVersion,
   SIDEBAR_FILTERS,
   statusEntries,
   withVisualTags
@@ -149,4 +153,76 @@ test('the preset registers the manager entry for the installed Storybook', t => 
     assert.ok(path.isAbsolute(entries[1]));
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('isOutdatedReport flags a report captured for another commit than the preview', () => {
+  assert.equal(isOutdatedReport({ headSha: 'a'.repeat(40) }, 'b'.repeat(40)), true);
+  assert.equal(isOutdatedReport({ headSha: 'a'.repeat(40) }, 'a'.repeat(40)), false);
+  assert.equal(isOutdatedReport({ headSha: 'a'.repeat(40) }, null), false, 'a preview without its commit');
+  assert.equal(isOutdatedReport({}, 'b'.repeat(40)), false, 'a report without its commit');
+});
+
+test('reportSummary says what the report found and what the pull request still needs', () => {
+  assert.deepEqual(reportSummary({ ...manifest, reason: 'interaction', approvalLabel: 'visual-approved' }), {
+    tone: 'negative',
+    found: '1 changed · 1 new · 2 failed',
+    next: 'The visual check fails until the failed stories are fixed.'
+  });
+  const changes = { stories: { 'a--changed': { status: 'changed' }, 'a--new': { status: 'new' } } };
+  assert.deepEqual(reportSummary({ ...changes, reason: 'changed', approvalLabel: 'visual-approved' }), {
+    tone: 'warning',
+    found: '1 changed · 1 new',
+    next: 'Waiting for approval: review the changes, then add the "visual-approved" label to the pull request.'
+  });
+  assert.equal(
+    reportSummary({ ...changes, reason: 'approved', approvalLabel: 'visual-approved' }).next,
+    'Approved with the "visual-approved" label.'
+  );
+  assert.deepEqual(reportSummary({ stories: { 'a--same': { status: 'unchanged' } }, reason: 'clean' }), {
+    tone: 'positive',
+    found: 'No changed, new, removed or failed stories',
+    next: 'Nothing to approve.'
+  });
+});
+
+test('reportSummary falls back to the story statuses for reports without the gate outcome', () => {
+  const changes = { stories: { 'a--changed': { status: 'changed' } } };
+  assert.equal(reportSummary({ ...changes, approved: false }).tone, 'warning');
+  assert.match(reportSummary({ ...changes, approved: false }).next, /add the approval label/);
+  assert.equal(reportSummary({ ...changes, approved: true }).tone, 'positive');
+  assert.equal(reportSummary(manifest).tone, 'negative');
+});
+
+test('reportSummary counts removed stories, which the gate lists outside the screenshots', () => {
+  const removedOnly = { stories: { 'a--same': { status: 'unchanged' } }, removed: ['old--one', 'old--two'] };
+  assert.deepEqual(reportSummary({ ...removedOnly, reason: 'changed', approvalLabel: 'visual-approved' }), {
+    tone: 'warning',
+    found: '2 removed',
+    next: 'Waiting for approval: review the changes, then add the "visual-approved" label to the pull request.'
+  });
+  assert.equal(
+    reportSummary({ ...manifest, removed: ['old--one'], reason: 'interaction' }).found,
+    '1 changed · 1 new · 1 removed · 2 failed'
+  );
+  assert.equal(reportSummary({ ...removedOnly, approved: false }).tone, 'warning', 'without the gate outcome');
+});
+
+test('reportVersion tells a new run, commit or approval of the report apart', () => {
+  const report = { runId: '1', headSha: 'a'.repeat(40), approved: false, reason: 'changed', stories: {} };
+  assert.equal(reportVersion(null), null);
+  assert.equal(reportVersion(report), reportVersion({ ...report, stories: { 'a--x': { status: 'changed' } } }));
+  for (const change of [{ runId: '2' }, { headSha: 'b'.repeat(40) }, { approved: true, reason: 'approved' }]) {
+    assert.notEqual(reportVersion({ ...report, ...change }), reportVersion(report), JSON.stringify(change));
+  }
+});
+
+test('isReportSettled stops the watcher only for a current report that needs nothing more', () => {
+  const head = 'a'.repeat(40);
+  const changes = { headSha: head, stories: { 'a--changed': { status: 'changed' } } };
+  assert.equal(isReportSettled(null, head), false, 'no report yet');
+  assert.equal(isReportSettled({ ...changes, reason: 'approved' }, 'b'.repeat(40)), false, 'outdated');
+  assert.equal(isReportSettled({ ...changes, reason: 'changed' }, head), false, 'waiting for the label');
+  assert.equal(isReportSettled({ ...changes, reason: 'approved' }, head), true);
+  assert.equal(isReportSettled({ ...changes, reason: 'interaction' }, head), true, 'failures need a new push');
+  assert.equal(isReportSettled({ headSha: head, stories: {}, reason: 'clean' }, null), true, 'preview commit unknown');
 });
