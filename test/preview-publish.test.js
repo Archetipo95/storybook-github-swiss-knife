@@ -200,6 +200,11 @@ test('publishPreview publishes a same-repo, current-head preview and posts an id
     assert.equal(result.commentError, null);
     assert.equal(result.commentResult.action, 'created');
     assert.ok(fs.existsSync(path.join(pagesRepo, 'pr-preview', 'pr-42', 'index.html')));
+    assert.deepEqual(
+      JSON.parse(fs.readFileSync(path.join(pagesRepo, 'pr-preview', 'pr-42', 'swiss-knife-preview.json'), 'utf8')),
+      { version: 1, headSha: SHA_A },
+      'the preview records its verified head commit for the Visual panel'
+    );
 
     const commentPost = requests.find(r => r.options && r.options.method === 'POST' && r.url.includes('/comments'));
     assert.ok(commentPost.options.body.includes(buildMarker(42)), 'comment body must include the stable bot marker');

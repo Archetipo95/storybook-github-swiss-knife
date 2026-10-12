@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The Visual panel of the Storybook addon opens with a summary of the pull request's report (changed, new and failed stories) and what it still needs: fix the failures, add the approval label, or nothing. The gate writes its outcome (`reason`) and the label name (`approvalLabel`) to the published `gallery/manifest.json` for it.
+- The preview publisher writes the preview's verified head commit to `swiss-knife-preview.json` next to the preview. When the visual report is for another commit (the previous push's report stays in place until the new one is published), the Visual panel shows an **Outdated report** notice.
+
+### Changed
+
+- The addon kept the first report it found: after a push, a preview opened before the new report was published showed the previous commit's results until a reload. It now keeps checking while the report is outdated or its changes wait for approval, and updates the sidebar and the panel when a new report appears.
+
 ### Fixed
 
 - A root publish through the `publisher` action with `preview_root: '.'` (previews at the Pages root, as the other actions and the configuration read it) treated `.` as a directory name: it kept nothing for the previews and deleted every `pr-<N>` directory. `.` now means the root there too, like `''` and `./`. The reusable `deploy-storybook.yml` was not affected: it resolves `.` to `''` first.

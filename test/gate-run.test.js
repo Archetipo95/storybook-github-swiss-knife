@@ -202,6 +202,8 @@ test('stale approval: checks fail, the label is withdrawn, the report is publish
   assert.equal(published.length, 1);
   assert.equal(published[0].targetDirectory, 'pr-preview/pr-7/visual');
   assert.equal(published[0].manifest.approved, false);
+  assert.equal(published[0].manifest.reason, 'changed');
+  assert.equal(published[0].manifest.approvalLabel, 'visual-approved');
   assert.equal(output.reportUrl, 'https://acme.github.io/widgets/pr-preview/pr-7/visual/');
   assert.match(checks[0].output.summary, /pr-preview\/pr-7\/visual\//);
 });
@@ -211,6 +213,7 @@ test('approval given after the commit was built passes and keeps the label', asy
   assert.equal(checkRuns(calls)[0].conclusion, 'success');
   assert.ok(!calls.some(call => call.method === 'DELETE'));
   assert.equal(published[0].manifest.approved, true);
+  assert.equal(published[0].manifest.reason, 'approved');
 });
 
 test('a baseline count lowered by the PR still comes from the PR head, and new nodes still block', async () => {

@@ -98,7 +98,13 @@ export function evaluateGate({ bundle, config, baseline, approved, headSha, prNu
       )
     };
   }
-  return { visual, a11y, approvedForManifest: approved, changed: gate.counts.changed + gate.counts.removed };
+  return {
+    visual,
+    a11y,
+    approvedForManifest: approved,
+    visualReason: gate.reason,
+    changed: gate.counts.changed + gate.counts.removed
+  };
 }
 
 const ICONS = { success: ':white_check_mark:', failure: ':x:', neutral: ':heavy_minus_sign:' };
