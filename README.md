@@ -21,7 +21,7 @@ The successor of [storybook-github-pages](https://github.com/Archetipo95/storybo
 From the repository root:
 
 ```bash
-npx --yes https://github.com/Archetipo95/storybook-github-swiss-knife/releases/download/v0.6.1/storybook-swiss-knife-0.6.1.tgz init
+npx --yes https://github.com/Archetipo95/storybook-github-swiss-knife/releases/download/v0.7.0/storybook-swiss-knife-0.7.0.tgz init
 ```
 
 The addon isn't on npm yet, so `init` runs from the release tarball, not from the bare package name: an unrelated npm package could hold that name. It writes the caller workflows, `.storybook/swiss-knife.json` and the addon registration, creates the `visual-approved` label, and lists what is left: install the addon, make the two checks required, push once to the base branch for baselines. The manual setup is in [Visual regression and accessibility](docs/visual-regression.md).
@@ -43,7 +43,7 @@ permissions:
 
 jobs:
   deploy-storybook:
-    uses: Archetipo95/storybook-github-swiss-knife/.github/workflows/deploy-storybook.yml@v0.6.1
+    uses: Archetipo95/storybook-github-swiss-knife/.github/workflows/deploy-storybook.yml@v0.7.0
     with:
       path: 'storybook-static'
       package_manager: 'npm'
