@@ -207,7 +207,7 @@ steps:
       echo "head_sha=$sha" >> "$GITHUB_OUTPUT"
 
   - name: Download build artifact
-    uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+    uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
     with:
       name: storybook-preview-pr-${{ github.event.workflow_run.pull_requests[0].number }}-run-${{ github.event.workflow_run.id }}
       run-id: ${{ github.event.workflow_run.id }}
