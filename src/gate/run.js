@@ -453,7 +453,9 @@ export async function runVisualGate({
           approved: result.approvedForManifest,
           reason: result.visualReason,
           approvalLabel: config.visual.approvalLabel
-        })
+        }),
+        // Owner-only, like a private temporary file: git publishes the content, not the mode.
+        { mode: 0o600 }
       );
     }
     if (env.PASSCODE_HASH && pages.enable_passcode_gate !== false) {
