@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A root publish through the `publisher` action with `preview_root: '.'` (previews at the Pages root, as the other actions and the configuration read it) treated `.` as a directory name: it kept nothing for the previews and deleted every `pr-<N>` directory. `.` now means the root there too, like `''` and `./`. The reusable `deploy-storybook.yml` was not affected: it resolves `.` to `''` first.
+
 ## [0.6.1] - 2026-10-12
 
 ### Changed

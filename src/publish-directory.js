@@ -24,16 +24,16 @@ async function pathExists(file) {
 /**
  * Top-level entries a root publish must keep: the first segment of every managed directory and of
  * the preview root (PR previews live there), or, when previews are published at the branch root
- * (empty preview root), every `pr-<N>` directory.
+ * (empty preview root, or `.`), every `pr-<N>` directory.
  */
 function keptRootEntry(managedDirectories, previewRoot) {
+  const previewDirectory = normalizeRelativeDirectory(previewRoot);
   const kept = new Set(
-    [...normalizeManagedDirectories(managedDirectories), ...normalizeManagedDirectories(previewRoot)].map(
+    [...normalizeManagedDirectories(managedDirectories), ...(previewDirectory ? [previewDirectory] : [])].map(
       directory => directory.split('/')[0]
     )
   );
-  const previewsAtRoot = normalizeManagedDirectories(previewRoot).length === 0;
-  return entry => kept.has(entry) || (previewsAtRoot && /^pr-\d+$/.test(entry));
+  return entry => kept.has(entry) || (!previewDirectory && /^pr-\d+$/.test(entry));
 }
 
 export async function replaceDirectory(

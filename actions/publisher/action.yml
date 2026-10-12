@@ -14,7 +14,7 @@ inputs:
     required: false
     default: ''
   preview_root:
-    description: 'Where PR previews live on the Pages branch; a root publish keeps it (empty: previews are pr-<N> directories at the root)'
+    description: 'Where PR previews live on the Pages branch; a root publish keeps it (empty or ".": previews are pr-<N> directories at the root)'
     required: false
     default: 'pr-preview'
   site_url:
