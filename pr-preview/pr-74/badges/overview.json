@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "status": "published • fd3ac98",
+  "build": "passed • fd3ac98",
+  "commit": "fd3ac98",
+  "storybookVersion": "deployed",
+  "storiesCount": 1,
+  "componentsCount": 1,
+  "totalComponents": 12,
+  "coveragePercent": 8,
+  "docsCount": 0,
+  "hasStoriesData": true,
+  "tests": null,
+  "generatedAt": "2026-10-12T13:56:26.063Z"
+}
