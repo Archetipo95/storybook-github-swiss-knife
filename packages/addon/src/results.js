@@ -101,8 +101,8 @@ const count = (manifest, statuses) =>
 /**
  * One line on the whole report: what it found and what the pull request still needs. `reason`,
  * `removed` and `approvalLabel` come from the gate (removed stories have no screenshots, so they
- * are not in `stories`); reports published before it wrote them fall back to the story statuses
- * and `approved`.
+ * are not in `stories`); reports published before it wrote them, or with an outcome this addon
+ * does not know (a newer gate), fall back to the story statuses and `approved`.
  * @param {{ stories: Record<string, { status: string }>, approved?: boolean, reason?: string,
  *   removed?: string[], approvalLabel?: string }} manifest
  * @returns {{ tone: 'positive' | 'warning' | 'negative', found: string, next: string }}
@@ -121,19 +121,27 @@ export function reportSummary(manifest) {
     ]
       .filter(Boolean)
       .join(' · ') || 'No changed, new, removed or failed stories';
-  const reason =
-    manifest.reason ??
-    (failed ? 'interaction' : changed || removed ? (manifest.approved ? 'approved' : 'changed') : 'clean');
   const label = manifest.approvalLabel ? `the "${manifest.approvalLabel}" label` : 'the approval label';
-  const next = {
+  const outcomes = {
     incomplete: ['negative', 'The run is incomplete: re-run the visual check.'],
     interaction: ['negative', 'The visual check fails until the failed stories are fixed.'],
     error: ['negative', 'The visual check fails until the failed stories are fixed.'],
     changed: ['warning', `Waiting for approval: review the changes, then add ${label} to the pull request.`],
     approved: ['positive', `Approved with ${label}.`],
     clean: ['positive', 'Nothing to approve.']
-  }[reason] ?? ['warning', ''];
-  return { tone: next[0], found, next: next[1] };
+  };
+  // hasOwnProperty, not Object.hasOwn: the addon is built for ES2020 browsers.
+  const reason = Object.prototype.hasOwnProperty.call(outcomes, manifest.reason)
+    ? manifest.reason
+    : failed
+      ? 'interaction'
+      : changed || removed
+        ? manifest.approved
+          ? 'approved'
+          : 'changed'
+        : 'clean';
+  const [tone, next] = outcomes[reason];
+  return { tone, found, next };
 }
 
 /**
