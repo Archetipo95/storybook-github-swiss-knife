@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The addon kept the first report it found: after a push, a preview opened before the new report was published showed the previous commit's results until a reload. It now keeps checking while the report is outdated or its changes wait for approval, and updates the sidebar and the panel when a new report appears.
+- `docs/troubleshooting.md` explains the `403 Resource not accessible by integration` that a job with only `issues: read` gets when it reads a pull request's labels or events through the issues endpoints: it also needs `pull-requests: read` (`write` to remove labels).
 
 ### Fixed
 
