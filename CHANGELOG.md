@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Dependency updates (#64 to #69, bundled): `actions/setup-node` 7.1.0, `actions/upload-artifact` 7.0.2 and `actions/download-artifact` 8.0.2 in the reusable workflows, the composite action, the internal actions (`preview-build`, `visual-capture`, `visual-report`) and the workflows `storybook-swiss-knife init` writes; `github/codeql-action` 4.38.3 and `eslint` 10.12.0 for this repository's own CI. Each pin is the full commit SHA of the new tag.
+- The example workflows in `docs/usage.md` and `docs/pr-previews.md` pinned v4 releases of `actions/checkout`, `setup-node`, `upload-artifact` and `download-artifact`; they now use the same pins as this repository's workflows, and a test keeps them, and this repository's own files, on one pin per action.
 
 ### Fixed
 
