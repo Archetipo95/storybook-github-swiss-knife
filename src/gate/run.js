@@ -455,7 +455,9 @@ export async function runVisualGate({
           removed: result.visualRemoved,
           approvalLabel: config.visual.approvalLabel
         }),
-        // Owner-only, like a private temporary file: git publishes the content, not the mode.
+        // For CodeQL (js/insecure-temporary-file): `mode` only applies when the write creates the
+        // file, and the manifest already exists here, so it keeps its mode. Harmless either way:
+        // git publishes the content, not the mode.
         { mode: 0o600 }
       );
     }

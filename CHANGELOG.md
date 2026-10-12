@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The Visual panel's summary showed no next step for a report whose outcome (`reason`) the addon does not know, as one from a newer gate would have, and the addon kept checking for a newer report every 5 minutes for as long as the page was open. It now reads such a report like one from an older gate, from the story statuses and `approved`.
+
 ## [0.7.0] - 2026-10-12
 
 ### Added

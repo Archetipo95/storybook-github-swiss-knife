@@ -226,3 +226,18 @@ test('isReportSettled stops the watcher only for a current report that needs not
   assert.equal(isReportSettled({ ...changes, reason: 'interaction' }, head), true, 'failures need a new push');
   assert.equal(isReportSettled({ headSha: head, stories: {}, reason: 'clean' }, null), true, 'preview commit unknown');
 });
+
+test('a report with an outcome this addon does not know falls back to the story statuses', () => {
+  const head = 'a'.repeat(40);
+  const changes = { headSha: head, stories: { 'a--changed': { status: 'changed' } } };
+  assert.deepEqual(reportSummary({ ...changes, reason: 'from-a-newer-gate', approvalLabel: 'visual-approved' }), {
+    tone: 'warning',
+    found: '1 changed',
+    next: 'Waiting for approval: review the changes, then add the "visual-approved" label to the pull request.'
+  });
+  const quiet = { headSha: head, stories: { 'a--same': { status: 'unchanged' } } };
+  for (const reason of ['from-a-newer-gate', 'toString', 'constructor']) {
+    assert.equal(reportSummary({ ...quiet, reason }).next, 'Nothing to approve.', reason);
+    assert.equal(isReportSettled({ ...quiet, reason }, head), true, `${reason}: the watcher stops`);
+  }
+});
