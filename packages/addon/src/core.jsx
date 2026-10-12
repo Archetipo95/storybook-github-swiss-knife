@@ -6,8 +6,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 
 import {
+  isOutdatedReport,
+  isReportSettled,
   isTagged,
   matchesSidebarFilter,
+  reportSummary,
+  reportVersion,
   SIDEBAR_FILTERS,
   STATUS_LABELS,
   statusEntries,
@@ -46,9 +50,27 @@ export function loadManifest(refresh = false) {
   return manifestRequest;
 }
 
-// The preview is published minutes before the gate publishes its report. While the report is
-// missing, ask again every 30 s for 20 minutes, then every 5 minutes; when it appears, every
-// listener (the sidebar statuses, an open Visual panel) gets it without a reload.
+let previewRequest;
+/**
+ * The commit this preview was built from, which the publisher writes next to it
+ * (swiss-knife-preview.json, src/preview-publish.js); null for builds it did not publish. Read
+ * once per page with a timestamp, like the manifest: a cached copy from an earlier publish would
+ * name another commit for the whole session.
+ */
+export function loadPreviewHeadSha() {
+  previewRequest ??= fetch(new URL(`swiss-knife-preview.json?t=${Date.now()}`, document.baseURI).href, {
+    cache: 'no-store'
+  })
+    .then(response => (response.ok ? response.json() : null))
+    .then(info => (typeof info?.headSha === 'string' ? info.headSha : null))
+    .catch(() => null);
+  return previewRequest;
+}
+
+// The preview is published minutes before the gate publishes its report, and until then the
+// report of the previous commit is still there. While the report is missing or outdated, or its
+// changes wait for approval, ask again every 30 s for 20 minutes, then every 5 minutes; every
+// listener (the sidebar statuses, an open Visual panel) gets each new report without a reload.
 const RETRY_MS = 30_000;
 const FAST_RETRIES = 40;
 const SLOW_RETRY_MS = 300_000;
@@ -63,9 +85,11 @@ export function publishManifest(manifest) {
 }
 
 function watchManifest(attempt = 0) {
-  loadManifest(attempt > 0).then(manifest => {
-    if (manifest) publishManifest(manifest);
-    else setTimeout(() => watchManifest(attempt + 1), attempt < FAST_RETRIES ? RETRY_MS : SLOW_RETRY_MS);
+  Promise.all([loadManifest(attempt > 0), loadPreviewHeadSha()]).then(([manifest, previewHeadSha]) => {
+    if (manifest && reportVersion(manifest) !== reportVersion(currentManifest)) publishManifest(manifest);
+    if (!isReportSettled(manifest, previewHeadSha)) {
+      setTimeout(() => watchManifest(attempt + 1), attempt < FAST_RETRIES ? RETRY_MS : SLOW_RETRY_MS);
+    }
   });
 }
 
@@ -303,9 +327,11 @@ export function createVisualPanel({ useStorybookState, useStorybookApi, useTheme
     const api = useStorybookApi();
     const theme = useTheme();
     const [manifest, setManifest] = useState();
+    const [previewHeadSha, setPreviewHeadSha] = useState(null);
 
     useEffect(() => {
       let mounted = true;
+      loadPreviewHeadSha().then(sha => mounted && setPreviewHeadSha(sha));
       // null ("not published yet") only until the watcher finds the report.
       loadManifest().then(found => mounted && setManifest(previous => previous ?? found));
       const unsubscribe = onManifest(setManifest);
@@ -338,11 +364,34 @@ export function createVisualPanel({ useStorybookState, useStorybookApi, useTheme
     // The browser's default link blue is unreadable on the dark theme.
     const linkStyle = { color: theme?.color?.secondary };
     const story = manifest.stories[storyId];
+    const summary = reportSummary(manifest);
+    const shortSha = sha => String(sha).slice(0, 7);
     const showComparison =
       story && story.images.includes('base') && story.images.includes('pr') && story.status !== 'unchanged';
     return (
       <div style={{ padding: 16 }}>
-        <p style={{ marginTop: 0 }}>
+        <p
+          role="status"
+          style={{
+            marginTop: 0,
+            padding: '8px 12px',
+            borderLeft: `4px solid ${theme?.color?.[summary.tone] ?? 'currentColor'}`
+          }}
+        >
+          <strong>This pull request: {summary.found}.</strong> {summary.next}
+        </p>
+        {isOutdatedReport(manifest, previewHeadSha) && (
+          <p
+            role="status"
+            style={{ padding: '8px 12px', borderLeft: `4px solid ${theme?.color?.warning ?? 'currentColor'}` }}
+          >
+            <strong>Outdated report:</strong> it was captured for commit {shortSha(manifest.headSha)}, and this preview
+            is commit {shortSha(previewHeadSha)}. The report for {shortSha(previewHeadSha)} is not published yet: its
+            visual check is still running, or it stopped before publishing (see the checks on the pull request). This
+            panel and the sidebar update by themselves when it is published.
+          </p>
+        )}
+        <p>
           <strong>{story ? (STATUS_LABELS[story.status] ?? story.status) : 'Not in the visual report'}</strong>
           {story?.status === 'changed' && manifest.approved && ' (approved)'}
           {' · '}

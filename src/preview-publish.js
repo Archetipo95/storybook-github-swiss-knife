@@ -20,6 +20,10 @@ export { readArtifactCurrentSnapshot };
 import { auditBundleSize, readBundleReport } from './audit-static.js';
 import { appendCommandFile } from './command-file.js';
 
+// Read by the Storybook addon (packages/addon/src/core.jsx), which compares it with the visual
+// report's commit. Written here from the verified metadata, never taken from the PR's build.
+export const PREVIEW_INFO_FILENAME = 'swiss-knife-preview.json';
+
 /**
  * Builds the bundle size inputs for the PR comment. The untrusted build only
  * signals that auditing was enabled by shipping `audit/bundle-size.json`; the
@@ -221,6 +225,10 @@ export async function publishPreview({
         sessionHours: Number(passcodeSessionHours)
       });
     }
+    fs.writeFileSync(
+      path.join(contentDir, PREVIEW_INFO_FILENAME),
+      JSON.stringify({ version: 1, headSha: metadata.headSha })
+    );
     if (generateStatsGraphEnabled) {
       // Use the exact current-PR snapshot the untrusted build already
       // computed against the real PR source tree; never recompute it here

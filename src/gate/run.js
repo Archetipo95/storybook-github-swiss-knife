@@ -445,7 +445,20 @@ export async function runVisualGate({
   if (canPublish && !runProblem && reportDir && fs.existsSync(path.join(reportDir, 'index.html'))) {
     const manifestPath = path.join(reportDir, 'gallery', 'manifest.json');
     const manifest = readJson(manifestPath);
-    if (manifest) fs.writeFileSync(manifestPath, JSON.stringify({ ...manifest, approved: result.approvedForManifest }));
+    if (manifest) {
+      fs.writeFileSync(
+        manifestPath,
+        JSON.stringify({
+          ...manifest,
+          approved: result.approvedForManifest,
+          reason: result.visualReason,
+          removed: result.visualRemoved,
+          approvalLabel: config.visual.approvalLabel
+        }),
+        // Owner-only, like a private temporary file: git publishes the content, not the mode.
+        { mode: 0o600 }
+      );
+    }
     if (env.PASSCODE_HASH && pages.enable_passcode_gate !== false) {
       await injectAuthGate(reportDir, {
         passcodeHash: env.PASSCODE_HASH,
