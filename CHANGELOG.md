@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `docs/troubleshooting.md` explains the `403 Resource not accessible by integration` that a job with only `issues: read` gets when it reads a pull request's labels or events through the issues endpoints: it also needs `pull-requests: read` (`write` to remove labels).
+
 ### Fixed
 
 - A root publish through the `publisher` action with `preview_root: '.'` (previews at the Pages root, as the other actions and the configuration read it) treated `.` as a directory name: it kept nothing for the previews and deleted every `pr-<N>` directory. `.` now means the root there too, like `''` and `./`. The reusable `deploy-storybook.yml` was not affected: it resolves `.` to `''` first.

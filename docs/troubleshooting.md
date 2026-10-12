@@ -14,6 +14,7 @@
 - **Causes & Solutions**:
   - **Artifact Mode**: The calling workflow job requires `pages: write` and `id-token: write` permissions.
   - **Directory Mode**: The calling workflow job requires `contents: write` and `pages: write` permissions.
+  - **Pull Request Labels and Events**: GitHub treats a pull request's labels and timeline as pull request data, even when they are read through the issues endpoints (`/repos/{owner}/{repo}/issues/{number}/labels`, `/repos/{owner}/{repo}/issues/{number}/events`). A job with only `issues: read` gets `403 Resource not accessible by integration` on these calls. Grant `pull-requests: read` as well, or `pull-requests: write` if the job also removes labels, as the visual gate does when it withdraws a stale approval.
   - **Repository Settings**: Verify `Settings > Actions > General > Workflow permissions` is configured to allow workflows to read/write as appropriate.
 
 ### 3. PR Preview Publish Gate Skipped for Fork PRs
