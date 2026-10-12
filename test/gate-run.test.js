@@ -203,6 +203,7 @@ test('stale approval: checks fail, the label is withdrawn, the report is publish
   assert.equal(published[0].targetDirectory, 'pr-preview/pr-7/visual');
   assert.equal(published[0].manifest.approved, false);
   assert.equal(published[0].manifest.reason, 'changed');
+  assert.deepEqual(published[0].manifest.removed, []);
   assert.equal(published[0].manifest.approvalLabel, 'visual-approved');
   assert.equal(output.reportUrl, 'https://acme.github.io/widgets/pr-preview/pr-7/visual/');
   assert.match(checks[0].output.summary, /pr-preview\/pr-7\/visual\//);

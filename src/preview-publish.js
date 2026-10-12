@@ -17,12 +17,12 @@ import { generateStatsGraph, readArtifactCurrentSnapshot } from './generate-stat
 
 // Re-exported for callers of the publisher module.
 export { readArtifactCurrentSnapshot };
+import { auditBundleSize, readBundleReport } from './audit-static.js';
+import { appendCommandFile } from './command-file.js';
 
 // Read by the Storybook addon (packages/addon/src/core.jsx), which compares it with the visual
 // report's commit. Written here from the verified metadata, never taken from the PR's build.
 export const PREVIEW_INFO_FILENAME = 'swiss-knife-preview.json';
-import { auditBundleSize, readBundleReport } from './audit-static.js';
-import { appendCommandFile } from './command-file.js';
 
 /**
  * Builds the bundle size inputs for the PR comment. The untrusted build only

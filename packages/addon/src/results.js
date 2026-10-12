@@ -99,23 +99,31 @@ const count = (manifest, statuses) =>
   Object.values(manifest.stories).filter(story => statuses.includes(story.status)).length;
 
 /**
- * One line on the whole report: what it found and what the pull request still needs. `reason` and
- * `approvalLabel` come from the gate; reports published before it wrote them fall back to the
- * story statuses and `approved`.
+ * One line on the whole report: what it found and what the pull request still needs. `reason`,
+ * `removed` and `approvalLabel` come from the gate (removed stories have no screenshots, so they
+ * are not in `stories`); reports published before it wrote them fall back to the story statuses
+ * and `approved`.
  * @param {{ stories: Record<string, { status: string }>, approved?: boolean, reason?: string,
- *   approvalLabel?: string }} manifest
+ *   removed?: string[], approvalLabel?: string }} manifest
  * @returns {{ tone: 'positive' | 'warning' | 'negative', found: string, next: string }}
  */
 export function reportSummary(manifest) {
   const changed = count(manifest, ['changed']);
   const added = count(manifest, ['new']);
+  const removed = Array.isArray(manifest.removed) ? manifest.removed.length : 0;
   const failed = count(manifest, ['interaction', 'error']);
   const found =
-    [changed && `${changed} changed`, added && `${added} new`, failed && `${failed} failed`]
+    [
+      changed && `${changed} changed`,
+      added && `${added} new`,
+      removed && `${removed} removed`,
+      failed && `${failed} failed`
+    ]
       .filter(Boolean)
-      .join(' · ') || 'No changed, new or failed stories';
+      .join(' · ') || 'No changed, new, removed or failed stories';
   const reason =
-    manifest.reason ?? (failed ? 'interaction' : changed ? (manifest.approved ? 'approved' : 'changed') : 'clean');
+    manifest.reason ??
+    (failed ? 'interaction' : changed || removed ? (manifest.approved ? 'approved' : 'changed') : 'clean');
   const label = manifest.approvalLabel ? `the "${manifest.approvalLabel}" label` : 'the approval label';
   const next = {
     incomplete: ['negative', 'The run is incomplete: re-run the visual check.'],
@@ -127,3 +135,21 @@ export function reportSummary(manifest) {
   }[reason] ?? ['warning', ''];
   return { tone: next[0], found, next: next[1] };
 }
+
+/**
+ * Identifies a published report: another run, commit or approval is a new report, which the
+ * sidebar and the Visual panel must show.
+ * @param {{ runId?: string, headSha?: string, approved?: boolean, reason?: string } | null | undefined} manifest
+ */
+export const reportVersion = manifest =>
+  manifest ? `${manifest.runId}:${manifest.headSha}:${manifest.approved}:${manifest.reason}` : null;
+
+/**
+ * Whether the addon can stop looking for a newer report: there is one, it is for this preview's
+ * commit, and none of its changes wait for the approval label (adding the label publishes the
+ * report again).
+ * @param {Parameters<typeof reportSummary>[0] | null | undefined} manifest
+ * @param {string | null | undefined} previewHeadSha
+ */
+export const isReportSettled = (manifest, previewHeadSha) =>
+  Boolean(manifest) && !isOutdatedReport(manifest, previewHeadSha) && reportSummary(manifest).tone !== 'warning';

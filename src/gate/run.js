@@ -452,6 +452,7 @@ export async function runVisualGate({
           ...manifest,
           approved: result.approvedForManifest,
           reason: result.visualReason,
+          removed: result.visualRemoved,
           approvalLabel: config.visual.approvalLabel
         }),
         // Owner-only, like a private temporary file: git publishes the content, not the mode.

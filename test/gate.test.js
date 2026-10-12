@@ -71,6 +71,32 @@ test('an incomplete run fails both checks even without differences', () => {
   assert.equal(a11y.conclusion, 'failure');
 });
 
+test('removed stories need approval, and the gate hands their ids to the published report', () => {
+  const removedOnly = {
+    suites: [
+      {
+        specs: [
+          ...passing.suites[0].specs,
+          {
+            title: 'Removed stories',
+            tests: [
+              {
+                status: 'unexpected',
+                annotations: [{ type: 'removed', description: 'old--one,old--two' }],
+                results: [{ error: { message: 'Removed stories: old--one, old--two' } }]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  };
+  const result = gate({ bundle: { meta, results: removedOnly, a11yReports: [] } });
+  assert.equal(result.visual.conclusion, 'failure');
+  assert.equal(result.visualReason, 'changed');
+  assert.deepEqual(result.visualRemoved, ['old--one', 'old--two']);
+});
+
 test('visual changes fail until approved, and the approval label comes from the trusted config', () => {
   const blocked = gate({
     bundle: { meta, results: changedOnly, a11yReports: [] },

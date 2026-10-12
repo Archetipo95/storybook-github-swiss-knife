@@ -123,10 +123,10 @@ export default {
 In the PR preview, the addon reads the report published next to it (`visual/gallery/` under
 the preview; `STORYBOOK_SWISS_KNIFE_VISUAL_URL` at build time overrides it):
 
-- a **Visual** panel. Its first line sums up the pull request: how many stories changed, are new
-  or failed, and what is still needed (fix the failures, add the approval label, or nothing). Below
-  it come the base and PR screenshots of the selected story, a toggle, and the changed pixels
-  highlighted (the highlight stays on while moving between stories);
+- a **Visual** panel. Its first line sums up the pull request: how many stories changed, are new,
+  were removed or failed, and what is still needed (fix the failures, add the approval label, or
+  nothing). Below it come the base and PR screenshots of the selected story, a toggle, and the
+  changed pixels highlighted (the highlight stays on while moving between stories);
 - sidebar statuses. Interaction and render failures are errors on every version; Storybook keeps
   stories with an error status in the sidebar under every filter.
 
@@ -145,9 +145,11 @@ How the sidebar is filtered depends on the Storybook version:
 It stays off in automated browsers. The preview is usually published a few minutes before its
 report, and until then the report of the previous commit is still in place. The publisher writes the
 preview's commit to `swiss-knife-preview.json` next to it; when the report is for another commit, the
-panel says so (**Outdated report**). While the report is missing or outdated, or its changes wait
-for the approval label, the addon checks again every 30 seconds for 20 minutes, then every 5
-minutes, and updates the sidebar and the panel without a reload.
+panel says so (**Outdated report**) until a report for the preview's commit is published (if its
+visual check stops before publishing, the notice stays: see the checks on the pull request). While
+the report is missing or outdated, or its changes wait for the approval label, the addon checks
+again every 30 seconds for 20 minutes, then every 5 minutes, and updates the sidebar and the panel
+without a reload.
 
 ## How a pull request is checked
 

@@ -7,9 +7,11 @@ import React, { useEffect, useRef, useState } from 'react';
 
 import {
   isOutdatedReport,
+  isReportSettled,
   isTagged,
   matchesSidebarFilter,
   reportSummary,
+  reportVersion,
   SIDEBAR_FILTERS,
   STATUS_LABELS,
   statusEntries,
@@ -51,10 +53,14 @@ export function loadManifest(refresh = false) {
 let previewRequest;
 /**
  * The commit this preview was built from, which the publisher writes next to it
- * (swiss-knife-preview.json, src/preview-publish.js); null for builds it did not publish.
+ * (swiss-knife-preview.json, src/preview-publish.js); null for builds it did not publish. Read
+ * once per page with a timestamp, like the manifest: a cached copy from an earlier publish would
+ * name another commit for the whole session.
  */
 export function loadPreviewHeadSha() {
-  previewRequest ??= fetch(new URL('swiss-knife-preview.json', document.baseURI).href, { cache: 'no-store' })
+  previewRequest ??= fetch(new URL(`swiss-knife-preview.json?t=${Date.now()}`, document.baseURI).href, {
+    cache: 'no-store'
+  })
     .then(response => (response.ok ? response.json() : null))
     .then(info => (typeof info?.headSha === 'string' ? info.headSha : null))
     .catch(() => null);
@@ -78,14 +84,12 @@ export function publishManifest(manifest) {
   manifestListeners.forEach(listener => listener(manifest));
 }
 
-const reportVersion = manifest => manifest && `${manifest.runId}:${manifest.headSha}:${manifest.approved}`;
-
 function watchManifest(attempt = 0) {
   Promise.all([loadManifest(attempt > 0), loadPreviewHeadSha()]).then(([manifest, previewHeadSha]) => {
     if (manifest && reportVersion(manifest) !== reportVersion(currentManifest)) publishManifest(manifest);
-    const settled =
-      manifest && !isOutdatedReport(manifest, previewHeadSha) && reportSummary(manifest).tone !== 'warning';
-    if (!settled) setTimeout(() => watchManifest(attempt + 1), attempt < FAST_RETRIES ? RETRY_MS : SLOW_RETRY_MS);
+    if (!isReportSettled(manifest, previewHeadSha)) {
+      setTimeout(() => watchManifest(attempt + 1), attempt < FAST_RETRIES ? RETRY_MS : SLOW_RETRY_MS);
+    }
   });
 }
 
@@ -382,8 +386,9 @@ export function createVisualPanel({ useStorybookState, useStorybookApi, useTheme
             style={{ padding: '8px 12px', borderLeft: `4px solid ${theme?.color?.warning ?? 'currentColor'}` }}
           >
             <strong>Outdated report:</strong> it was captured for commit {shortSha(manifest.headSha)}, and this preview
-            is commit {shortSha(previewHeadSha)}. The report for {shortSha(previewHeadSha)} is still running or being
-            published; this panel and the sidebar update by themselves when it is ready.
+            is commit {shortSha(previewHeadSha)}. The report for {shortSha(previewHeadSha)} is not published yet: its
+            visual check is still running, or it stopped before publishing (see the checks on the pull request). This
+            panel and the sidebar update by themselves when it is published.
           </p>
         )}
         <p>
