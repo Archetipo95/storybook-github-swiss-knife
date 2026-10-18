@@ -129,7 +129,7 @@ jobs:
 
       - name: Prune stale preview directories
         if: steps.branch_check.outputs.exists == 'true'
-        uses: Archetipo95/storybook-github-swiss-knife/actions/preview-janitor@b6adf7c3f7d2f148f2439533e0da82dbac53e79c
+        uses: Archetipo95/storybook-github-swiss-knife/actions/preview-janitor@f67c315935f1a1f35e2d74b5c68ac7cf213ab18f
         with:
           pages_repo: ${{ github.workspace }}/pages-repo
           pages_branch: ${{ steps.config.outputs.pages_branch }}
