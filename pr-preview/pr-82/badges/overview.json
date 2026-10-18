@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "status": "published • babfc56",
+  "build": "passed • babfc56",
+  "commit": "babfc56",
+  "storybookVersion": "deployed",
+  "storiesCount": 1,
+  "componentsCount": 1,
+  "totalComponents": 12,
+  "coveragePercent": 8,
+  "docsCount": 0,
+  "hasStoriesData": true,
+  "tests": null,
+  "generatedAt": "2026-10-18T23:54:44.888Z"
+}
