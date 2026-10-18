@@ -349,7 +349,7 @@ jobs:
 
       - name: Capture missing baselines
         if: needs.plan.outputs.mode == 'compare' && steps.baseline.outputs.cache-matched-key == '' && steps.base.outcome == 'success'
-        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@b6adf7c3f7d2f148f2439533e0da82dbac53e79c
+        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@f67c315935f1a1f35e2d74b5c68ac7cf213ab18f
         with:
           project_dir: ${{ inputs.working_directory }}
           storybook_dir: .swiss-knife/storybook-base
@@ -370,7 +370,7 @@ jobs:
         if: >-
           needs.plan.outputs.mode == 'compare' &&
           (steps.baseline.outputs.cache-matched-key != '' || steps.base.outcome == 'success')
-        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@b6adf7c3f7d2f148f2439533e0da82dbac53e79c
+        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@f67c315935f1a1f35e2d74b5c68ac7cf213ab18f
         with:
           project_dir: ${{ inputs.working_directory }}
           storybook_dir: .swiss-knife/storybook-head
@@ -381,7 +381,7 @@ jobs:
 
       - name: Capture branch baselines
         if: needs.plan.outputs.mode == 'baseline'
-        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@b6adf7c3f7d2f148f2439533e0da82dbac53e79c
+        uses: Archetipo95/storybook-github-swiss-knife/actions/visual-capture@f67c315935f1a1f35e2d74b5c68ac7cf213ab18f
         with:
           project_dir: ${{ inputs.working_directory }}
           storybook_dir: .swiss-knife/storybook-head
