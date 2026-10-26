@@ -203,6 +203,9 @@ test('removePreviewDirectory rejects additional paths that leave the Pages branc
     'pr-{pr}/..',
     'pr-{pr}/../',
     'pr-{pr}\\..\\',
+    'pr-preview/pr-{pr}/..',
+    'x/{pr}/..',
+    'x/{pr}\\..',
     // Without {pr}, every closed PR would remove the same shared directory.
     'pr-preview',
     'pr-5-visual'

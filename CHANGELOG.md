@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- A directory setting that normalizes to the root with a trailing slash (`x/../`, `.\\`, or `./` where the root is not allowed) passed the check that keeps directories inside the Pages branch, which rejected only `.`. It is now rejected like `.`; the root itself is still `''`, `.` or `./` where a setting allows it.
+- A directory setting that normalizes to the root with a trailing slash (`x/../`, `.\`, or `./` where the root is not allowed) passed the check that keeps directories inside the Pages branch, which rejected only `.`. It is now rejected like `.`; the root itself is still `''`, `.` or `./` where a setting allows it.
 - The janitor's composite-action example in the PR previews guide checked out the Pages branch at the default depth of 1. There `git log` dates every preview at the tip commit, so the retention window never expired a preview and no inactivity warning was posted. The example now sets `fetch-depth: 0`.
 - The Visual panel's summary showed no next step for a report whose outcome (`reason`) the addon does not know, as one from a newer gate would have, and the addon kept checking for a newer report every 5 minutes for as long as the page was open. It now reads such a report like one from an older gate, from the story statuses and `approved`.
 

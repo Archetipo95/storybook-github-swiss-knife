@@ -26,6 +26,8 @@ export function resolveAdditionalPaths(additionalPaths, prNumber) {
     .filter(Boolean)
     .map(line => {
       if (!line.includes('{pr}')) throw new Error(`additional_paths "${line}" must contain {pr}`);
+      // `..` could drop the {pr} segment: `pr-preview/pr-{pr}/..` is the whole preview root.
+      if (line.split(/[\\/]/).includes('..')) throw new Error(`additional_paths "${line}" must not contain ..`);
       const target = line.replaceAll('{pr}', String(Number(prNumber)));
       validateRelativeDirectory(target, 'additional_paths');
       return normalizeRelativeDirectory(path.posix.normalize(target.replaceAll('\\', '/')));
