@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `actions/preview-cleanup` takes `trigger_pages_rebuild`. It defaults to `true`, as before: after removing a preview, cleanup requests a Pages build of its commit and waits up to 2 minutes for it. A site built from a branch already starts a build on the push, so the request duplicated it; set `false` there to skip both. The publish workflow's input of the same name defaults to `false` for that reason; cleanup keeps `true` so a site that relies on the request keeps its rebuild.
-- `actions/preview-cleanup` takes `additional_paths`: more directories to remove in the same commit as the preview, one per line, with `{pr}` replaced by the pull request number (for example `pr-{pr}-visual`). A site that publishes a second per-PR folder next to the preview now gets one Pages commit, and one build, per closed pull request instead of two. Each path must stay inside the Pages branch (no absolute path, no `..`, not `.git`); a missing one is skipped. The janitor does not prune these folders.
+- `actions/preview-cleanup` takes `additional_paths`: more directories to remove in the same commit as the preview, one per line, with `{pr}` replaced by the pull request number (for example `pr-{pr}-visual`). A site that publishes a second per-PR folder next to the preview now gets one Pages commit, and one build, per closed pull request instead of two. Each path must contain `{pr}`, so a closed pull request never removes a shared directory, and stay inside the Pages branch (no absolute path, no `..`, not `.git`); a missing one is skipped. The janitor does not prune these folders.
 
 ### Changed
 
@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A directory setting that normalizes to the root with a trailing slash (`x/../`, `.\\`, or `./` where the root is not allowed) passed the check that keeps directories inside the Pages branch, which rejected only `.`. It is now rejected like `.`; the root itself is still `''`, `.` or `./` where a setting allows it.
+- The janitor's composite-action example in the PR previews guide checked out the Pages branch at the default depth of 1. There `git log` dates every preview at the tip commit, so the retention window never expired a preview and no inactivity warning was posted. The example now sets `fetch-depth: 0`.
 - The Visual panel's summary showed no next step for a report whose outcome (`reason`) the addon does not know, as one from a newer gate would have, and the addon kept checking for a newer report every 5 minutes for as long as the page was open. It now reads such a report like one from an older gate, from the story statuses and `approved`.
 
 ## [0.7.0] - 2026-10-12

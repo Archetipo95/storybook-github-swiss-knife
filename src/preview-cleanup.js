@@ -16,8 +16,8 @@ async function pathExists(target) {
 }
 
 /**
- * `additional_paths`: one directory per line, `{pr}` replaced by the PR number. Each must stay
- * inside the Pages branch, like the preview root.
+ * `additional_paths`: one directory per line, `{pr}` replaced by the PR number. Each must name
+ * `{pr}`, so a closed PR never removes a shared directory, and stay inside the Pages branch.
  */
 export function resolveAdditionalPaths(additionalPaths, prNumber) {
   return String(additionalPaths ?? '')
@@ -25,6 +25,7 @@ export function resolveAdditionalPaths(additionalPaths, prNumber) {
     .map(line => line.trim())
     .filter(Boolean)
     .map(line => {
+      if (!line.includes('{pr}')) throw new Error(`additional_paths "${line}" must contain {pr}`);
       const target = line.replaceAll('{pr}', String(Number(prNumber)));
       validateRelativeDirectory(target, 'additional_paths');
       return normalizeRelativeDirectory(path.posix.normalize(target.replaceAll('\\', '/')));

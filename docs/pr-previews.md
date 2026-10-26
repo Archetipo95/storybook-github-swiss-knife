@@ -303,7 +303,7 @@ steps:
 | `preview_root`          | No       | `pr-preview` | Must match the trusted publisher's configured `preview_root`                                                                                                                                                                                                 |
 | `pr_number`             | Yes      | —            | Pull request whose preview is removed                                                                                                                                                                                                                        |
 | `trigger_pages_rebuild` | No       | `true`       | Request a Pages build of the removal commit and wait for it (up to 2 minutes; a failure is a warning). Set `false` when a push to the Pages branch already starts a build, as it does on a site built from a branch: it saves a duplicate build and the wait |
-| `additional_paths`      | No       | `''`         | More directories to remove in the same commit, one per line, relative to the Pages branch root. `{pr}` is replaced by the pull request number. Each must stay inside the branch (no absolute path, no `..`, not `.git`); a missing one is skipped            |
+| `additional_paths`      | No       | `''`         | More directories to remove in the same commit, one per line, relative to the Pages branch root. Each must contain `{pr}`, replaced by the pull request number, and stay inside the branch (no absolute path, no `..`, not `.git`); a missing one is skipped  |
 
 The job running this composite action also needs `deployments: write`, because
 cleanup deactivates the deployment associated with a removed preview, and
@@ -349,6 +349,7 @@ steps:
     with:
       ref: gh-pages
       path: pages-repo
+      fetch-depth: 0 # the janitor dates each preview by its last commit
       token: ${{ secrets.GITHUB_TOKEN }}
   - name: Prune stale previews
     uses: Archetipo95/storybook-github-swiss-knife/actions/preview-janitor@v0.7.0

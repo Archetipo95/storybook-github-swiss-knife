@@ -194,7 +194,19 @@ test('removePreviewDirectory removes an additional path when the preview directo
 
 test('removePreviewDirectory rejects additional paths that leave the Pages branch before touching it', async () => {
   const { cloneDir } = initBarePagesRepo({ withPreview: true });
-  for (const additionalPaths of ['../escape', '/etc', 'pr-{pr}/../..', '.git', 'C:/pages', '.']) {
+  for (const additionalPaths of [
+    '../escape-{pr}',
+    '/etc/{pr}',
+    'pr-{pr}/../..',
+    '.git/{pr}',
+    'C:/pages-{pr}',
+    'pr-{pr}/..',
+    'pr-{pr}/../',
+    'pr-{pr}\\..\\',
+    // Without {pr}, every closed PR would remove the same shared directory.
+    'pr-preview',
+    'pr-5-visual'
+  ]) {
     await assert.rejects(
       removePreviewDirectory({
         repo: cloneDir,
