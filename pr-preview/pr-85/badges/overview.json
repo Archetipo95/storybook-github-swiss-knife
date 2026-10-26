@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "status": "published • dab33cb",
+  "build": "passed • dab33cb",
+  "commit": "dab33cb",
+  "storybookVersion": "deployed",
+  "storiesCount": 1,
+  "componentsCount": 1,
+  "totalComponents": 12,
+  "coveragePercent": 8,
+  "docsCount": 0,
+  "hasStoriesData": true,
+  "tests": null,
+  "generatedAt": "2026-10-26T14:35:42.452Z"
+}
