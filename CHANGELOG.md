@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-26
+
 ### Added
 
 - `actions/preview-cleanup` takes `trigger_pages_rebuild`. It defaults to `true`, as before: after removing a preview, cleanup requests a Pages build of its commit and waits up to 2 minutes for it. A site built from a branch already starts a build on the push, so the request duplicated it; set `false` there to skip both. The publish workflow's input of the same name defaults to `false` for that reason; cleanup keeps `true` so a site that relies on the request keeps its rebuild.
