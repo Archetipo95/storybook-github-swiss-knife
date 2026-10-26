@@ -135,7 +135,7 @@ jobs:
         with:
           ref: gh-pages
           path: pages-repo
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Publish directory
         uses: Archetipo95/storybook-github-swiss-knife/actions/publisher@v0.7.0

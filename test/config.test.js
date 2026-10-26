@@ -480,6 +480,16 @@ test('validateRelativeDirectory rejects paths that normalize to the parent direc
   assert.equal(validateRelativeDirectory('feature/../release'), true, 'paths that stay inside remain valid');
 });
 
+test('validateRelativeDirectory rejects paths that normalize to the root with a trailing slash', () => {
+  for (const value of ['a/../', 'a\\..\\', 'feature/../', './/']) {
+    assert.throws(() => validateRelativeDirectory(value, 'field', { allowEmpty: true }), /unsafe/, value);
+  }
+  for (const value of ['./', '.\\']) {
+    assert.throws(() => validateRelativeDirectory(value, 'field'), /unsafe/, value);
+  }
+  assert.equal(validateRelativeDirectory('./', 'field', { allowEmpty: true }), true, 'the literal root stays allowed');
+});
+
 test('resolveBaseDirectoryForRef never maps a base ref outside the Pages branch', () => {
   for (const ref of ['feature/../..', 'refs/heads/a/../..', 'a/b/../../../x', '.github', 'refs/heads/.git']) {
     assert.throws(() => resolveBaseDirectoryForRef(ref, { default_branch: 'main' }), /unsafe/, ref);

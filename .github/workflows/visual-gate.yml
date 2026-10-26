@@ -119,7 +119,8 @@ jobs:
           ref: ${{ steps.pages.outputs.branch }}
           # actions/checkout only writes inside the workspace (the trusted default-branch checkout).
           path: .swiss-knife-pages
-          fetch-depth: 0
+          # The tip only: the write fetches, commits and pushes it, and nothing reads the history.
+          fetch-depth: 1
 
       - name: Gate and post checks
         env:

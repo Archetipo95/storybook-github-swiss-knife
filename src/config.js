@@ -99,6 +99,8 @@ export function validateRelativeDirectory(value, field = 'target_directory', { a
   const normalized = path.posix.normalize(value.replaceAll('\\', '/'));
   if (
     normalized === '.' ||
+    // posix.normalize keeps a trailing slash: 'x/../' and '.\\' normalize to './', the root.
+    normalized === './' ||
     normalized === '..' ||
     normalized.startsWith('../') ||
     normalized.includes('/../') ||

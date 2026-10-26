@@ -165,7 +165,13 @@ test('withSerializedBranchWrite re-runs mutate on the new branch tip when a conc
     git(rival, 'commit', '-q', '-m', 'init');
     git(rival, 'remote', 'add', 'origin', origin);
     git(rival, 'push', '-q', 'origin', 'gh-pages');
-    git(tmp, 'clone', '-q', '-b', 'gh-pages', origin, writer);
+    writePreview(rival, 'pr-0');
+    git(rival, 'add', '-A');
+    git(rival, 'commit', '-q', '-m', 'Publish pr-0');
+    git(rival, 'push', '-q', 'origin', 'gh-pages');
+    // Depth 1, as the workflows check out the Pages branch: the write needs only the tip.
+    git(tmp, 'clone', '-q', '--depth', '1', '-b', 'gh-pages', `file://${origin}`, writer);
+    assert.equal(git(writer, 'rev-parse', '--is-shallow-repository'), 'true');
 
     const sawRivalPreview = [];
     const delays = [];
@@ -196,6 +202,7 @@ test('withSerializedBranchWrite re-runs mutate on the new branch tip when a conc
     assert.equal(git(origin, 'rev-parse', 'gh-pages'), result.commitSha);
     assert.deepEqual(git(origin, 'ls-tree', '-r', '--name-only', 'gh-pages').split('\n'), [
       '.nojekyll',
+      'pr-0/index.html',
       'pr-1/index.html',
       'pr-2/index.html'
     ]);
