@@ -124,6 +124,7 @@ jobs:
         with:
           ref: ${{ steps.config.outputs.pages_branch }}
           path: pages-repo
+          # Full history: the janitor dates each preview by its last commit (`git log`).
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 

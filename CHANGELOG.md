@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `actions/preview-cleanup` takes `trigger_pages_rebuild`. It defaults to `true`, as before: after removing a preview, cleanup requests a Pages build of its commit and waits up to 2 minutes for it. A site built from a branch already starts a build on the push, so the request duplicated it; set `false` there to skip both. The publish workflow's input of the same name defaults to `false` for that reason; cleanup keeps `true` so a site that relies on the request keeps its rebuild.
+- `actions/preview-cleanup` takes `additional_paths`: more directories to remove in the same commit as the preview, one per line, with `{pr}` replaced by the pull request number (for example `pr-{pr}-visual`). A site that publishes a second per-PR folder next to the preview now gets one Pages commit, and one build, per closed pull request instead of two. Each path must stay inside the Pages branch (no absolute path, no `..`, not `.git`); a missing one is skipped. The janitor does not prune these folders.
+
+### Changed
+
+- The Pages-branch checkouts in `pr-preview-publish.yml`, `pr-preview-cleanup.yml`, `deploy-storybook.yml` (directory mode) and `visual-gate.yml` fetch only the branch tip (`fetch-depth: 1`) instead of its whole history. The write fetches, commits and pushes the tip and reads no history, so on a Pages branch with a long history the checkout no longer dominates the job. `pr-preview-janitor.yml` keeps the full history: it dates each preview by its last commit. The publisher examples in the docs check out the tip too.
+
 ### Fixed
 
 - The Visual panel's summary showed no next step for a report whose outcome (`reason`) the addon does not know, as one from a newer gate would have, and the addon kept checking for a newer report every 5 minutes for as long as the page was open. It now reads such a report like one from an older gate, from the story statuses and `approved`.

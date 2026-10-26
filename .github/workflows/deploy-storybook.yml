@@ -505,7 +505,8 @@ jobs:
         with:
           ref: ${{ needs.build-and-upload.outputs.pages_branch }}
           path: pages-repo
-          fetch-depth: 0
+          # The tip only: the write fetches, commits and pushes it, and nothing reads the history.
+          fetch-depth: 1
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Publish directory atomically
         id: publish

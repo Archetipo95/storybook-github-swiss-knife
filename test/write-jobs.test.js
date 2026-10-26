@@ -83,3 +83,20 @@ test('release-tags.yml: the validation suite runs in the read-only verify job; t
     );
   }
 });
+
+test('Pages-branch checkouts fetch only the tip, except the janitor, which reads the history', () => {
+  const depths = {};
+  for (const file of fs.readdirSync(workflowDir).filter(name => /\.ya?ml$/.test(name))) {
+    const steps = fs.readFileSync(path.join(workflowDir, file), 'utf8').split(/\n\s+- name: /);
+    for (const step of steps.filter(text => text.startsWith('Checkout Pages branch'))) {
+      depths[file] = /fetch-depth: (\d+)/.exec(step)?.[1] ?? '1';
+    }
+  }
+  assert.deepEqual(depths, {
+    'deploy-storybook.yml': '1',
+    'pr-preview-cleanup.yml': '1',
+    'pr-preview-janitor.yml': '0',
+    'pr-preview-publish.yml': '1',
+    'visual-gate.yml': '1'
+  });
+});

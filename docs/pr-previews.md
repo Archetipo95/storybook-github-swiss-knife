@@ -60,7 +60,7 @@ warning_days_before_cleanup: 3 # default; 0 disables inactivity warnings
 
 When `preview_root` is set to `''` (empty string), previews are placed directly at the Pages branch root as `pr-<number>` (e.g. `pr-42`). The trusted publisher, cleanup, and janitor strictly target `pr-<number>` directories:
 
-- **Cleanup**: Removes only the exact `pr-<closed-pr-number>` directory on PR close.
+- **Cleanup**: Removes only the exact `pr-<closed-pr-number>` directory on PR close (plus the composite action's `additional_paths`, when set).
 - **Janitor**: Scans the root and removes only entries matching `^pr-(\d+)$` whose PR is closed or exceeds retention; production root files (`index.html`, assets) and named environment directories (such as `staging/`) are never touched.
 
 ### Reusable Preview Lifecycle APIs
@@ -219,7 +219,7 @@ steps:
     with:
       ref: gh-pages
       path: pages-repo
-      fetch-depth: 0
+      fetch-depth: 1
       token: ${{ secrets.GITHUB_TOKEN }}
 
   - name: Validate provenance and publish preview
@@ -291,11 +291,27 @@ steps:
       pages_branch: gh-pages
       preview_root: ''
       pr_number: ${{ github.event.pull_request.number }}
+      trigger_pages_rebuild: false # optional: the push already starts a build on a branch-built site
+      additional_paths: | # optional: more per-PR directories, removed in the same commit
+        pr-{pr}-visual
 ```
+
+| Input                   | Required | Default      | Description                                                                                                                                                                                                                                                  |
+| ----------------------- | -------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pages_repo`            | No       | working dir  | Path to the checked-out Pages branch                                                                                                                                                                                                                         |
+| `pages_branch`          | No       | `gh-pages`   | Pages branch name                                                                                                                                                                                                                                            |
+| `preview_root`          | No       | `pr-preview` | Must match the trusted publisher's configured `preview_root`                                                                                                                                                                                                 |
+| `pr_number`             | Yes      | —            | Pull request whose preview is removed                                                                                                                                                                                                                        |
+| `trigger_pages_rebuild` | No       | `true`       | Request a Pages build of the removal commit and wait for it (up to 2 minutes; a failure is a warning). Set `false` when a push to the Pages branch already starts a build, as it does on a site built from a branch: it saves a duplicate build and the wait |
+| `additional_paths`      | No       | `''`         | More directories to remove in the same commit, one per line, relative to the Pages branch root. `{pr}` is replaced by the pull request number. Each must stay inside the branch (no absolute path, no `..`, not `.git`); a missing one is skipped            |
 
 The job running this composite action also needs `deployments: write`, because
 cleanup deactivates the deployment associated with a removed preview, and
 `pull-requests: write` to mark the PR's preview comment as removed.
+
+`additional_paths` suits a second per-PR folder published next to the preview, such as a report at
+`pr-<number>-visual`: one commit per closed pull request instead of two. The janitor still prunes
+only `pr-<number>` directories under the preview root, so it does not remove those folders.
 
 #### 3. Reusable Stale-Preview Janitor
 
