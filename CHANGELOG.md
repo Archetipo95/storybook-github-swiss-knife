@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A story could switch off an enforced accessibility rule with its own parameters (`a11y.config.rules` or `a11y.options.rules`). axe then never ran the rule on that story, so the violation the gate would block never reached it, and `a11y.enforcedRules` did not hold. The runner now records the rules a story turns off in its axe report, and the gate fails the accessibility check when one of them is enforced, listing the story and rule. Rules that are not enforced can still be turned off per story.
+
 ## [0.8.0] - 2026-10-26
 
 ### Added
