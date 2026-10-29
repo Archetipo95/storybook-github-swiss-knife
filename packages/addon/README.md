@@ -5,7 +5,7 @@ Pages deploys, PR previews, and visual regression plus accessibility checks on e
 Storybook 8.6, 9 and 10.
 
 ```sh
-npx --yes https://github.com/Archetipo95/storybook-github-swiss-knife/releases/download/v0.8.0/storybook-swiss-knife-0.8.0.tgz init
+npx --yes https://github.com/Archetipo95/storybook-github-swiss-knife/releases/download/v0.9.0/storybook-swiss-knife-0.9.0.tgz init
 ```
 
 The addon isn't on npm yet: run `init`, and install the addon, from the tarball attached to each

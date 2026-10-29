@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-29
+
 ### Added
 
 - The Visual panel lists the pull request's removed stories (a baseline without a story) under its summary, each with its last base screenshot. Its summary only counted them, and a removed story is not in the preview's sidebar to select. The runner now copies their baselines to the report's gallery; a report published before this has the list without the screenshots.
