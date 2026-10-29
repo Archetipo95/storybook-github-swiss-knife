@@ -4,6 +4,15 @@ updates:
     directory: '/'
     schedule:
       interval: 'weekly'
+    ignore:
+      # This repository's own actions move together, with `npm run bump-pins` or
+      # `npm run prepare-release` (docs/development.md); one pin moved alone mixes code versions.
+      - dependency-name: 'Archetipo95/storybook-github-swiss-knife*'
+    groups:
+      # CodeQL fails when its steps (init, analyze) run different versions.
+      codeql-action:
+        patterns:
+          - 'github/codeql-action*'
     commit-message:
       prefix: 'build(deps):'
       include: 'scope'
