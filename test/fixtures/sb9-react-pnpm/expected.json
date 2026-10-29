@@ -22,7 +22,8 @@
     "fixture-card--mobile"
   ],
   "a11yBlocking": [
-    "fixture-badge--low-contrast:color-contrast:2"
+    "fixture-badge--low-contrast:color-contrast:2",
+    "fixture-button--primary:image-alt:0"
   ],
   "gate": "interaction",
   "changedImages": [
