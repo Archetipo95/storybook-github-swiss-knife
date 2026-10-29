@@ -52,6 +52,26 @@ test('enforced rules block whatever the baseline says, from config or from the b
   assert.deepEqual(enforcedRules, ['button-name', 'label']);
 });
 
+test("an enforced rule turned off in a story's parameters blocks; any other rule may be turned off", () => {
+  const reports = [{ id: 'nav--menu', violations: [], disabledRules: ['button-name', 'color-contrast'] }];
+  const { blocking } = evaluateA11yReports(reports, { baseline, enforcedRules: ['button-name'] });
+  assert.deepEqual(
+    blocking.map(({ story, id, disabled }) => [story, id, disabled]),
+    [['nav--menu', 'button-name', true]]
+  );
+  assert.equal(evaluateA11yReports(reports, { baseline }).blocking.length, 0);
+  assert.equal(
+    evaluateA11yReports([{ id: 'nav--menu', violations: [], disabledRules: 'button-name' }], {
+      enforcedRules: ['button-name']
+    }).blocking.length,
+    0
+  );
+  assert.match(
+    renderA11ySummary(evaluateA11yReports(reports, { enforcedRules: ['button-name'] })),
+    /`nav--menu`: button-name \(enforced, but turned off in the story's parameters\)/
+  );
+});
+
 test('the runner cannot mark its own violations as not new', () => {
   const spoofed = { id: 'card--x', violations: [{ ...contrast(3), isNew: false }] };
   assert.equal(evaluateA11yReports([spoofed], { baseline }).blocking.length, 1);

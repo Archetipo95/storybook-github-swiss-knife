@@ -162,7 +162,9 @@ without a reload.
 - **Accessibility**: a violation fails when its rule is enforced (`a11y.enforcedRules`), or
   when it has a blocking impact (`a11y.blockingImpacts`) and fails on more nodes than the
   baseline records for that story and rule. Baseline entries a pull request adds or raises are
-  listed in the check, so they are reviewed like code.
+  listed in the check, so they are reviewed like code. A story whose parameters turn off an
+  enforced rule (`a11y.config.rules` or `a11y.options.rules`) fails too, since that rule could
+  never report a violation there.
 - Adding or removing any label re-evaluates the commit's results in about a minute, with the
   approval label read from the pull request at that moment; nothing is screenshotted again.
   A label run cancelled by a newer label event leaves the checks to the newer run. When the
