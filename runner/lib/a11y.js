@@ -16,7 +16,7 @@ export function isA11yDisabled(parameters = {}) {
 
 /**
  * Runs axe on the rendered story and writes `<reportDir>/<storyId>.json` when it finds
- * violations. Blocking is decided later, by the trusted gate (src/a11y/report.js).
+ * violations or the story's parameters turned rules off. Blocking is decided later, by the trusted gate (src/a11y/report.js).
  * @param {import('@playwright/test').Page} page
  * @param {{ storyId: string, parameters: any, reportDir: string, scope: string, disabledRules: string[] }} options
  */
@@ -33,9 +33,11 @@ export async function scanStory(page, { storyId, parameters, reportDir, scope, d
   let builder = new AxeBuilder({ page }).include(storyScope || scope);
   if (Object.keys(rules).length > 0) builder = builder.options({ rules });
   const { violations } = await builder.analyze();
-  if (violations.length === 0) return [];
+  if (violations.length === 0 && disabled.size === 0) return [];
   const report = {
     id: storyId,
+    // The gate blocks an enforced rule a story turned off: it can never report a violation.
+    disabledRules: [...disabled].sort(),
     violations: violations.map(({ id, impact, help, helpUrl, nodes }) => ({
       id,
       impact,

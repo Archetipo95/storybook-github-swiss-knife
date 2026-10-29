@@ -3,7 +3,7 @@
 
 /**
  * @typedef {{ id: string, impact?: string, help?: string, helpUrl?: string, nodes: number, targets?: string[] }} Violation
- * @typedef {{ id: string, violations: Violation[] }} StoryReport
+ * @typedef {{ id: string, violations: Violation[], disabledRules?: string[] }} StoryReport
  * @typedef {{ enforcedRules?: string[], stories?: Record<string, Record<string, number>> }} Baseline
  */
 
@@ -25,7 +25,8 @@ const safeUrl = value => (/^https:\/\/[^\s()<>]+$/.test(String(value ?? '')) ? S
 /**
  * Marks each violation `isNew` (blocking) and returns the blocking ones.
  * A violation blocks when its rule is enforced (any impact), or when its impact is blocking and
- * it fails on more nodes than the baseline records for that story and rule.
+ * it fails on more nodes than the baseline records for that story and rule. An enforced rule the
+ * story's parameters turned off blocks too, since it can never report a violation.
  * @param {StoryReport[]} reports
  * @param {{ baseline?: Baseline, enforcedRules?: string[], blockingImpacts?: string[] }} options
  */
@@ -37,8 +38,11 @@ export function evaluateA11yReports(
   const enforced = new Set([...enforcedRules, ...(baseline.enforcedRules ?? [])]);
   const impacts = new Set(blockingImpacts);
   const evaluated = reports
-    .map(({ id, violations }) => ({
+    .map(({ id, violations = [], disabledRules = [] }) => ({
       id,
+      disabledEnforced: (Array.isArray(disabledRules) ? disabledRules : [])
+        .filter(rule => typeof rule === 'string' && enforced.has(rule))
+        .sort(),
       violations: violations.map(violation => {
         const known = baseline.stories?.[id]?.[violation.id] ?? 0;
         const isNew = enforced.has(violation.id) || (impacts.has(violation.impact) && Number(violation.nodes) > known);
@@ -46,9 +50,10 @@ export function evaluateA11yReports(
       })
     }))
     .sort((left, right) => left.id.localeCompare(right.id));
-  const blocking = evaluated.flatMap(({ id, violations }) =>
-    violations.filter(violation => violation.isNew).map(violation => ({ story: id, ...violation }))
-  );
+  const blocking = evaluated.flatMap(({ id, violations, disabledEnforced }) => [
+    ...violations.filter(violation => violation.isNew).map(violation => ({ story: id, ...violation })),
+    ...disabledEnforced.map(rule => ({ story: id, id: rule, nodes: 0, isNew: true, disabled: true }))
+  ]);
   return { reports: evaluated, blocking, enforcedRules: [...enforced].sort() };
 }
 
@@ -105,7 +110,7 @@ export function renderA11ySummary(
       ? `:x: ${blocking.length} new accessibility violation${blocking.length === 1 ? '' : 's'}.`
       : ':white_check_mark: No new accessibility violations.',
     '',
-    `${storiesWithViolations} stories with violations. New ${blockingImpacts.join('/')} violations (a rule not in \`${baselinePath}\` for that story, or failing on more nodes than recorded there) and any violation of an enforced rule block: ${enforced}.`,
+    `${storiesWithViolations} stories with violations. New ${blockingImpacts.join('/')} violations (a rule not in \`${baselinePath}\` for that story, or failing on more nodes than recorded there) and any violation of an enforced rule block, as does a story turning one off: ${enforced}.`,
     '',
     ...(rows.length > 0
       ? [
@@ -120,7 +125,8 @@ export function renderA11ySummary(
           '### New violations',
           '',
           ...blocking.map(
-            ({ story, id, nodes }) => `- ${code(story)}: ${text(id)} (${nodes} node${Number(nodes) === 1 ? '' : 's'})`
+            ({ story, id, nodes, disabled }) =>
+              `- ${code(story)}: ${text(id)} (${disabled ? "enforced, but turned off in the story's parameters" : `${nodes} node${Number(nodes) === 1 ? '' : 's'}`})`
           ),
           ''
         ]

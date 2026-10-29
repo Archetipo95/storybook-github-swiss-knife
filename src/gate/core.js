@@ -103,7 +103,7 @@ export function evaluateGate({ bundle, config, baseline, approved, headSha, prNu
     a11y,
     approvedForManifest: approved,
     visualReason: gate.reason,
-    // Removed stories have no screenshots, so the gallery manifest does not list them.
+    // Removed stories were not run, so the gallery manifest's stories do not list them.
     visualRemoved: results.removed,
     changed: gate.counts.changed + gate.counts.removed
   };
