@@ -329,7 +329,8 @@ function RemovedStories({ manifest }) {
     <details>
       <summary>Removed stories ({removed.length})</summary>
       {removed.map(id => (
-        <figure key={id} style={{ margin: '8px 0' }}>
+        // Keyed by URL: a newer report remounts the image, undoing an earlier onError hide.
+        <figure key={imageUrl(manifest, id, 'base')} style={{ margin: '8px 0' }}>
           <figcaption>
             <code>{id}</code>
           </figcaption>
@@ -408,7 +409,6 @@ export function createVisualPanel({ useStorybookState, useStorybookApi, useTheme
         >
           <strong>This pull request: {summary.found}.</strong> {summary.next}
         </p>
-        <RemovedStories manifest={manifest} />
         {isOutdatedReport(manifest, previewHeadSha) && (
           <p
             role="status"
@@ -420,6 +420,7 @@ export function createVisualPanel({ useStorybookState, useStorybookApi, useTheme
             panel and the sidebar update by themselves when it is published.
           </p>
         )}
+        <RemovedStories manifest={manifest} />
         <p>
           <strong>{story ? (STATUS_LABELS[story.status] ?? story.status) : 'Not in the visual report'}</strong>
           {story?.status === 'changed' && manifest.approved && ' (approved)'}
