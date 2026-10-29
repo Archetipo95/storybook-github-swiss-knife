@@ -100,8 +100,8 @@ const count = (manifest, statuses) =>
 
 /**
  * One line on the whole report: what it found and what the pull request still needs. `reason`,
- * `removed` and `approvalLabel` come from the gate (removed stories have no screenshots, so they
- * are not in `stories`); reports published before it wrote them, or with an outcome this addon
+ * `removed` and `approvalLabel` come from the gate (removed stories were not run, so they are not
+ * in `stories`); reports published before it wrote them, or with an outcome this addon
  * does not know (a newer gate), fall back to the story statuses and `approved`.
  * @param {{ stories: Record<string, { status: string }>, approved?: boolean, reason?: string,
  *   removed?: string[], approvalLabel?: string }} manifest

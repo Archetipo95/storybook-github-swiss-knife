@@ -125,8 +125,10 @@ the preview; `STORYBOOK_SWISS_KNIFE_VISUAL_URL` at build time overrides it):
 
 - a **Visual** panel. Its first line sums up the pull request: how many stories changed, are new,
   were removed or failed, and what is still needed (fix the failures, add the approval label, or
-  nothing). Below it come the base and PR screenshots of the selected story, a toggle, and the
-  changed pixels highlighted (the highlight stays on while moving between stories);
+  nothing). Removed stories are no longer in the sidebar, so the panel lists them under the
+  summary, each with its last base screenshot. Below it come the base and PR screenshots of the
+  selected story, a toggle, and the changed pixels highlighted (the highlight stays on while moving
+  between stories);
 - sidebar statuses. Interaction and render failures are errors on every version; Storybook keeps
   stories with an error status in the sidebar under every filter.
 

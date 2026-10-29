@@ -96,7 +96,7 @@ function mutatedCopy() {
 }
 
 /** Opens the head build like a reviewer would and checks the addon's panel and sidebar status. */
-async function checkAddon(storybookDir, storyId) {
+async function checkAddon(storybookDir, storyId, removedId) {
   const { chromium } = await import(path.join(runnerDir, 'node_modules/@playwright/test/index.mjs'));
   const server = createStaticServer(storybookDir);
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -109,6 +109,9 @@ async function checkAddon(storybookDir, storyId) {
     await page.getByText('Visual change', { exact: true }).waitFor({ timeout: 30_000 });
     await page.getByRole('img', { name: 'PR screenshot' }).waitFor();
     await page.locator(`[data-item-id="${storyId}"] [aria-label^="Test status"]`).waitFor({ timeout: 10_000 });
+    // The image hides itself when its baseline is missing from the gallery.
+    await page.getByText('Removed stories (1)').click();
+    await page.getByRole('img', { name: `Last base screenshot of ${removedId}` }).waitFor();
   } finally {
     await browser.close();
     server.close();
@@ -212,6 +215,7 @@ for (const [id, size] of Object.entries(expectedViewports)) {
 
 const published = path.join(headBuild, 'visual', 'gallery');
 fs.cpSync(gallery, published, { recursive: true });
-fs.writeFileSync(path.join(published, 'manifest.json'), JSON.stringify(manifest));
-await checkAddon(headBuild, expected.changed[0]);
+// The gate adds the removed story ids when it publishes the report.
+fs.writeFileSync(path.join(published, 'manifest.json'), JSON.stringify({ ...manifest, removed: results.removed }));
+await checkAddon(headBuild, expected.changed[0], expected.removed[0]);
 console.log(`\n${name}: OK`);
