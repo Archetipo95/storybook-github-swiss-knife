@@ -320,6 +320,35 @@ function Comparison({ manifest, storyId, theme }) {
   );
 }
 
+// Removed stories are not in this Storybook, so the sidebar cannot select them: list them with
+// their last baseline. Reports published before the runner saved it have no image.
+function RemovedStories({ manifest }) {
+  const removed = Array.isArray(manifest.removed) ? manifest.removed : [];
+  if (removed.length === 0) return null;
+  return (
+    <details>
+      <summary>Removed stories ({removed.length})</summary>
+      {removed.map(id => (
+        // Keyed by URL: a newer report remounts the image, undoing an earlier onError hide.
+        <figure key={imageUrl(manifest, id, 'base')} style={{ margin: '8px 0' }}>
+          <figcaption>
+            <code>{id}</code>
+          </figcaption>
+          <img
+            src={imageUrl(manifest, id, 'base')}
+            alt={`Last base screenshot of ${id}`}
+            loading="lazy"
+            onError={event => {
+              event.currentTarget.style.display = 'none';
+            }}
+            style={{ display: 'block', maxWidth: '100%' }}
+          />
+        </figure>
+      ))}
+    </details>
+  );
+}
+
 /** The panel body; the hooks come from the version's manager API. */
 export function createVisualPanel({ useStorybookState, useStorybookApi, useTheme }) {
   return function VisualPanel() {
@@ -391,6 +420,7 @@ export function createVisualPanel({ useStorybookState, useStorybookApi, useTheme
             panel and the sidebar update by themselves when it is published.
           </p>
         )}
+        <RemovedStories manifest={manifest} />
         <p>
           <strong>{story ? (STATUS_LABELS[story.status] ?? story.status) : 'Not in the visual report'}</strong>
           {story?.status === 'changed' && manifest.approved && ' (approved)'}

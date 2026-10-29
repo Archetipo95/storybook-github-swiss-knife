@@ -125,8 +125,10 @@ the preview; `STORYBOOK_SWISS_KNIFE_VISUAL_URL` at build time overrides it):
 
 - a **Visual** panel. Its first line sums up the pull request: how many stories changed, are new,
   were removed or failed, and what is still needed (fix the failures, add the approval label, or
-  nothing). Below it come the base and PR screenshots of the selected story, a toggle, and the
-  changed pixels highlighted (the highlight stays on while moving between stories);
+  nothing). Removed stories are no longer in the sidebar, so the panel lists them under the
+  summary, each with its last base screenshot. Below it come the base and PR screenshots of the
+  selected story, a toggle, and the changed pixels highlighted (the highlight stays on while moving
+  between stories);
 - sidebar statuses. Interaction and render failures are errors on every version; Storybook keeps
   stories with an error status in the sidebar under every filter.
 
@@ -162,7 +164,9 @@ without a reload.
 - **Accessibility**: a violation fails when its rule is enforced (`a11y.enforcedRules`), or
   when it has a blocking impact (`a11y.blockingImpacts`) and fails on more nodes than the
   baseline records for that story and rule. Baseline entries a pull request adds or raises are
-  listed in the check, so they are reviewed like code.
+  listed in the check, so they are reviewed like code. A story whose parameters turn off an
+  enforced rule (`a11y.config.rules` or `a11y.options.rules`) fails too, since that rule could
+  never report a violation there.
 - Adding or removing any label re-evaluates the commit's results in about a minute, with the
   approval label read from the pull request at that moment; nothing is screenshotted again.
   A label run cancelled by a newer label event leaves the checks to the newer run. When the

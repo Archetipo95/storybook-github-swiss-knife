@@ -195,6 +195,8 @@ test('Removed stories', async ({}, testInfo) => {
     test.skip(true, 'capturing baselines');
   }
   test.skip(removed.length === 0, 'no removed stories');
+  // The Visual panel shows what each removed story last looked like.
+  for (const id of removed) saveToGallery(id, 'base', path.join(settings.snapshotDir, `${id}.png`));
   testInfo.annotations.push({ type: 'removed', description: removed.join(',') });
   throw new Error(`Removed stories (baseline without a story): ${removed.join(', ')}`);
 });
