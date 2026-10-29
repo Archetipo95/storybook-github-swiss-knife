@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The Visual panel lists the pull request's removed stories (a baseline without a story) under its summary, each with its last base screenshot. Its summary only counted them, and a removed story is not in the preview's sidebar to select. The runner now copies their baselines to the report's gallery; a report published before this has the list without the screenshots.
 
+### Fixed
+
+- A story could switch off an enforced accessibility rule with its own parameters (`a11y.config.rules` or `a11y.options.rules`). axe then never ran the rule on that story, so the violation the gate would block never reached it, and `a11y.enforcedRules` did not hold. The runner now records the rules a story turns off in its axe report, and the gate fails the accessibility check when one of them is enforced, listing the story and rule. Rules that are not enforced can still be turned off per story.
+
 ## [0.8.0] - 2026-10-26
 
 ### Added
